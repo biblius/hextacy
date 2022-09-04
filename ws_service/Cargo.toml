@@ -1,0 +1,18 @@
+[package]
+name = "ws_service"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "lib"
+
+[dependencies]
+actix = "0.13"
+actix-web-actors = "4.1.0"
+chrono = {version = "0.4", features = ["serde"]}
+colored = "2.0.0"
+serde = {version = "1.0.137", features = ["derive"]}
+serde_json = "1.0.81"
+tracing = "0.1.35"
+tracing-test = "0.1"
+uuid = {version = "1.1.2", features = ["v4"]}
