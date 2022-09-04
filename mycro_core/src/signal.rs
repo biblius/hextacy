@@ -1,11 +1,9 @@
+use actix::Message;
 use chrono::Local;
 use core::fmt::Debug;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tracing::error;
 use uuid::Uuid;
-
-use crate::session::ws_signal::{RawJson, WsSignal};
-
 /// The system signal used for service communication.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Signal<T> {
@@ -38,31 +36,6 @@ where
         }
     }
 
-    /// Transforms this signal to a `RawJson` ready to be sent to the client through `WsSession`.
-    pub fn to_json(&self) -> Result<RawJson, SignalError> {
-        let s = serde_json::to_string(&self).map_err(|e| {
-            error!("An error occurred while serializing to JSON: {}", e);
-            SignalError::Serde(e)
-        })?;
-        Ok(RawJson(s))
-    }
-
-    /// If at any point we already have a fully typed signal in json, this method can be used to
-    /// transform it to a system ready signal.
-    pub fn from_json(json: &str) -> Result<Self, SignalError> {
-        let s = serde_json::from_str::<Signal<T>>(json).map_err(|e| {
-            error!("An error occurred while serializing to JSON: {}", e);
-            SignalError::Serde(e)
-        })?;
-        Ok(s)
-    }
-
-    /// Shortcut for directly transforming a `WsSignal` json to a system signal
-    pub fn from_ws_json(json: &str) -> Result<Self, SignalError> {
-        let s = WsSignal::from_json(json)?.into();
-        Ok(s)
-    }
-
     /// Return the signal id
     pub fn id(&self) -> &str {
         &self.id
@@ -87,11 +60,44 @@ where
     pub fn src_id(&self) -> &str {
         &self.src
     }
+
+    /// Transforms this signal to a `RawJson` ready to be sent to the client through `WsSession`.
+    pub fn to_json(&self) -> Result<RawJson, SignalError> {
+        let s = serde_json::to_string(&self).map_err(|e| {
+            error!("An error occurred while serializing to JSON: {}", e);
+            SignalError::Serde(e)
+        })?;
+        Ok(RawJson(s))
+    }
+
+    /// If at any point we already have a fully typed signal in json, this method can be used to
+    /// transform it to a system ready signal.
+    pub fn from_json(json: &str) -> Result<Self, SignalError> {
+        let s = serde_json::from_str::<Signal<T>>(json).map_err(|e| {
+            error!("An error occurred while serializing to JSON: {}", e);
+            SignalError::Serde(e)
+        })?;
+        Ok(s)
+    }
 }
 
 #[derive(Debug)]
 pub enum SignalError {
     Serde(serde_json::Error),
+}
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct RawJson(pub String);
+
+impl RawJson {
+    pub fn to_inner(&self) -> String {
+        self.0.clone()
+    }
+
+    pub fn get_inner(&self) -> &str {
+        &self.0
+    }
 }
 
 #[cfg(test)]
@@ -102,22 +108,6 @@ mod tests {
     struct SampleData {
         lol: String,
         lel: String,
-    }
-
-    #[test]
-    fn test_from_ws() {
-        let data = SampleData {
-            lol: "lol".to_string(),
-            lel: "lel".to_string(),
-        };
-        let ws_signal = WsSignal::new("SampleData", None, data.clone());
-
-        let signal: Signal<SampleData> = ws_signal.into();
-
-        assert_eq!(signal.data().lol, "lol");
-        assert_eq!(signal.data().lel, "lel");
-
-        assert!(signal.to().is_none());
     }
 
     #[test]

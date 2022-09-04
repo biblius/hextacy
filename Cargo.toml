@@ -1,5 +1,6 @@
 [workspace]
 
 members = [
+  "mycro_core",
   "ws_service"
 ]

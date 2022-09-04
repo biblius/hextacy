@@ -1,6 +1,7 @@
-use super::{actor::WsSession, ws_signal::RawJson};
+use super::actor::WsSession;
 use actix::prelude::*;
 use actix_web_actors::ws;
+use mycro_core::signal::RawJson;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, time::Instant};
 use tracing::{error, trace, warn};

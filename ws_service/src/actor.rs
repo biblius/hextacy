@@ -1,9 +1,11 @@
 //! Actor that manages client JSON messages
+use crate::ws_signal::WsSignal;
+
 use super::ws_error::WsError;
-use crate::signal::Signal;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
+use mycro_core::signal::Signal;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::{
@@ -84,7 +86,7 @@ where
         json: String,
         ctx: &mut ws::WebsocketContext<Self>,
     ) -> Result<(), WsError> {
-        let sig: Signal<T> = Signal::from_ws_json(&json)?.into();
+        let sig: Signal<T> = WsSignal::from_json(&json)?.into();
         debug!("{} {:?}", "WsSession -- parsed signal:".blue(), sig);
         if let Some(to) = sig.to() {
             self.address_book

@@ -1,22 +1,7 @@
-use crate::signal::{Signal, SignalError};
-use actix::Message;
+use mycro_core::signal::{RawJson, Signal, SignalError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;
-
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct RawJson(pub String);
-
-impl RawJson {
-    pub fn to_inner(&self) -> String {
-        self.0.clone()
-    }
-
-    pub fn get_inner(&self) -> &str {
-        &self.0
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WsSignal<'a, T> {
@@ -24,6 +9,7 @@ pub struct WsSignal<'a, T> {
     to: Option<&'a str>,
     data: T,
 }
+
 impl<'a, T: Serialize + Deserialize<'a>> WsSignal<'a, T> {
     pub fn new(s_type: &'a str, to: Option<&'a str>, data: T) -> Self {
         Self { s_type, to, data }
@@ -58,5 +44,32 @@ impl<'a, T: Serialize + Deserialize<'a>> WsSignal<'a, T> {
 impl<T: Debug + Serialize + DeserializeOwned> From<WsSignal<'_, T>> for Signal<T> {
     fn from(ws_sig: WsSignal<T>) -> Self {
         Signal::new("ws_service", ws_sig.data, ws_sig.to)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Serialize, Deserialize, Clone)]
+    struct SampleData {
+        lol: String,
+        lel: String,
+    }
+
+    #[test]
+    fn test_from_ws() {
+        let data = SampleData {
+            lol: "lol".to_string(),
+            lel: "lel".to_string(),
+        };
+        let ws_signal = WsSignal::new("SampleData", None, data.clone());
+
+        let signal: Signal<SampleData> = ws_signal.into();
+
+        assert_eq!(signal.data().lol, "lol");
+        assert_eq!(signal.data().lel, "lel");
+
+        assert!(signal.to().is_none());
     }
 }

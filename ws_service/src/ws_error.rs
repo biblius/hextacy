@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::signal::SignalError;
+use mycro_core::signal::SignalError;
 
 #[derive(Debug)]
 pub enum WsError {

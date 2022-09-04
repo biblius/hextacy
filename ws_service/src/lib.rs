@@ -1,14 +1,16 @@
-pub mod mycroservice;
-pub mod session;
-pub mod signal;
+pub mod actor;
+pub mod handlers;
+pub mod ws_error;
+pub mod ws_signal;
+
+pub use mycro_core;
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        session::ws_signal::WsSignal,
-        signal::{Signal, SignalError},
-    };
+    use crate::ws_signal::WsSignal;
     use actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
+    use mycro_core::signal::SignalError;
+    use mycro_core::Signal;
     use serde::{de::DeserializeOwned, Deserialize, Serialize};
     use std::fmt::Debug;
     use std::{collections::HashMap, marker::PhantomData, sync::mpsc};
