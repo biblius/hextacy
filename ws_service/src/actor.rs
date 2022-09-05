@@ -1,6 +1,5 @@
 //! Actor that manages client JSON messages
-use crate::ws_signal::WsSignal;
-
+use super::signals::ws_signal::WsSignal;
 use super::ws_error::WsError;
 use actix::prelude::*;
 use actix_web_actors::ws;
@@ -39,7 +38,6 @@ where
     /// if a pong isn't received for `CLIENT_TIMEOUT` seconds, drop the connection i.e. stop the context
     fn hb(&self, context: &mut ws::WebsocketContext<Self>) {
         context.run_interval(HEARTBEAT_INTERVAL, |actor, context| {
-            // Check if the duration is greater than the timeout
             if Instant::now().duration_since(actor.heartbeat) > CLIENT_TIMEOUT {
                 warn!(
                     "{}",

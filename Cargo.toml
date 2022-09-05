@@ -2,5 +2,6 @@
 
 members = [
   "mycro_core",
-  "ws_service"
+  "ws_service",
+  "tests"
 ]
