@@ -1,20 +1,20 @@
-pub mod mycro_core;
+pub mod mycro_actors;
 pub mod ws_service;
 
 #[cfg(test)]
 mod tests {
     use actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
-    use mycro_core::signal::SignalError;
-    use mycro_core::Signal;
+    use mycro_actors::Signal;
     use serde::{de::DeserializeOwned, Deserialize, Serialize};
     use std::fmt::Debug;
+    use std::io::Error;
     use std::{collections::HashMap, marker::PhantomData, sync::mpsc};
     use tracing::{debug, error, trace};
     use tracing_test::traced_test;
     use ws_service::signals::ws_signal::WsSignal;
 
     #[test]
-    fn simple_message_handling() -> Result<(), SignalError> {
+    fn simple_message_handling() -> Result<(), Error> {
         // Initialize system
         let sys = System::new();
 
@@ -59,7 +59,7 @@ mod tests {
     /// This test should be run with `-- --nocapture` to really see what's going on.
     #[traced_test]
     #[test]
-    fn simple_broadcast() -> Result<(), SignalError> {
+    fn simple_broadcast() -> Result<(), Error> {
         // Initialize system
         let sys = System::new();
 

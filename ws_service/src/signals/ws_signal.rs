@@ -1,6 +1,6 @@
 use super::raw_json::RawJson;
 use crate::ws_error::WsError;
-use mycro_core::Signal;
+use mycro_actors::Signal;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use tracing::error;

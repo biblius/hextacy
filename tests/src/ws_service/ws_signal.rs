@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use mycro_core::Signal;
+    use mycro_actors::Signal;
     use serde::{Deserialize, Serialize};
     use ws_service::signals::ws_signal::WsSignal;
 

@@ -67,8 +67,3 @@ impl<T> Signal<T> {
         }
     }
 }
-
-#[derive(Debug)]
-pub enum SignalError {
-    Serde(serde_json::Error),
-}

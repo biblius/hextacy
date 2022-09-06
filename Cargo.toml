@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-  "mycro_core",
+  "mycro_actors",
   "ws_service",
   "tests"
 ]

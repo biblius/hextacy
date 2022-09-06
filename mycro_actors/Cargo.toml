@@ -1,5 +1,5 @@
 [package]
-name = "mycro_core"
+name = "mycro_actors"
 version = "0.1.0"
 edition = "2021"
 

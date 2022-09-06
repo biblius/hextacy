@@ -1,3 +1,6 @@
+use crate::signals::broker::Subscribe;
+
+use super::super::signals::broker::{Broadcast, IssueAsync, IssueSync};
 use actix::{prelude::*, Recipient};
 use actix::{Actor, Context, Handler};
 use colored::Colorize;
@@ -6,8 +9,6 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::{any::TypeId, collections::HashMap};
 use tracing::{debug, trace};
-
-use super::signals::{BroadcastSignal, IssueAsync, IssueSync};
 
 #[derive(Debug)]
 pub struct Broker<T> {
@@ -35,22 +36,21 @@ impl<T> Broker<T> {
         }
     }
 
-    pub fn add_sub<S: BroadcastSignal>(&mut self, sub: Recipient<S>) {
+    pub fn add_sub<S: Broadcast>(&mut self, sub: Recipient<S>) {
         let s_type = TypeId::of::<S>();
+        trace!("Broker adding sub for {:?}", s_type);
         let boxed_sub = Box::new(sub);
         if let Some(subs) = self.subs.get_mut(&s_type) {
-            trace!("Broker adding sub for {:?}", s_type);
             subs.push(boxed_sub);
             return;
         }
-        trace!("Broker creating sub: {:?}", boxed_sub);
         self.subs.insert(s_type, vec![boxed_sub]);
-        trace!("Broker -- subs: {:?}", self.subs);
     }
 
-    fn take_subs<S: BroadcastSignal>(&mut self) -> Option<(TypeId, Vec<Recipient<S>>)> {
+    fn take_subs<S: Broadcast>(&mut self) -> Option<(TypeId, Vec<Recipient<S>>)> {
         let id = TypeId::of::<S>();
         let subs = self.subs.get_mut(&id)?;
+
         let subs = subs
             .drain(..)
             .filter_map(|rec| {
@@ -62,7 +62,9 @@ impl<T> Broker<T> {
             })
             .map(|rec| *rec)
             .collect();
+
         trace!("Broker -- take_subs() -- id: {:?} -- subs: {:?}", id, subs);
+
         Some((id, subs))
     }
 }
@@ -70,15 +72,18 @@ impl<T> Broker<T> {
 impl<T, S> Handler<IssueAsync<S>> for Broker<T>
 where
     T: 'static + Unpin + Debug,
-    S: Debug + BroadcastSignal,
+    S: Debug + Broadcast,
 {
     type Result = ();
 
     fn handle(&mut self, msg: IssueAsync<S>, ctx: &mut Self::Context) -> Self::Result {
         let signal = msg.get_inner();
+
         trace!("{} -- received IssueAsync for: {:?}", self.id, signal);
+
         if let Some((id, mut subs)) = self.take_subs() {
             trace!("{}{}{:?}", self.id, " - Issuing async : ".purple(), id);
+
             subs.drain(..).for_each(|rec| {
                 rec.send(signal.clone())
                     .into_actor(self)
@@ -92,15 +97,18 @@ where
 impl<T, S> Handler<IssueSync<S>> for Broker<T>
 where
     T: 'static + Unpin + Debug,
-    S: BroadcastSignal,
+    S: Broadcast + Debug,
 {
     type Result = ();
 
     fn handle(&mut self, msg: IssueSync<S>, _ctx: &mut Self::Context) -> Self::Result {
         let signal = msg.get_inner();
+
         trace!("{} -- received IssueSync for: {:?}", self.id, signal);
+
         if let Some((id, mut subs)) = self.take_subs() {
             trace!("{}{}{:?}", self.id, " - Issuing sync : ".purple(), id);
+
             subs.drain(..)
                 .for_each(|rec| match rec.try_send(signal.clone()) {
                     Ok(_) => self.add_sub(rec),
@@ -111,5 +119,17 @@ where
                     Err(_) => (),
                 })
         }
+    }
+}
+
+impl<T, S> Handler<Subscribe<S>> for Broker<T>
+where
+    T: 'static + Unpin + Debug,
+    S: Broadcast + Debug,
+{
+    type Result = ();
+
+    fn handle(&mut self, msg: Subscribe<S>, _: &mut Self::Context) -> Self::Result {
+        self.add_sub::<S>(msg.clone_inner());
     }
 }

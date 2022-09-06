@@ -4,7 +4,7 @@ use super::ws_error::WsError;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
-use mycro_core::signal::Signal;
+use mycro_actors::signals::system::Signal;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 use std::{
