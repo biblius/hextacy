@@ -20,7 +20,8 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// The session instance. Gets created each time a client connects. `WsSession` is different from
 /// actors in the system in that its context is actix's `WebsocketContext`. It is responsible for
-/// receiving signls from the client and distributing them to other actors in the system.
+/// receiving signals from the client and distributing them to other actors in the system as well as
+/// sending messages back to the client.
 #[derive(Debug)]
 pub struct WsSession<T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug> {
     /// Unique session identifier for this actor

@@ -1,4 +1,4 @@
-use super::{actor::WsSession, signals::raw_json::RawJson};
+use super::{session::WsSession, signals::raw_json::RawJson};
 use actix::prelude::*;
 use actix_web_actors::ws;
 use serde::{de::DeserializeOwned, Serialize};
