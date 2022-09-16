@@ -1,6 +1,4 @@
-use crate::signals::broker::Subscribe;
-
-use super::super::signals::broker::{Broadcast, IssueAsync, IssueSync};
+use super::signals::{Broadcast, IssueAsync, IssueSync, Subscribe};
 use actix::{prelude::*, Recipient};
 use actix::{Actor, Context, Handler};
 use colored::Colorize;
@@ -10,6 +8,8 @@ use std::marker::PhantomData;
 use std::{any::TypeId, collections::HashMap};
 use tracing::{debug, trace};
 
+/// An actor used to broadcast signals to any actors subscribed to them.
+/// The phantom data is required for satisfying trait bounds on the handler impls.
 #[derive(Debug)]
 pub struct Broker<T> {
     id: &'static str,
@@ -36,6 +36,7 @@ impl<T> Broker<T> {
         }
     }
 
+    /// Adds an actor to this brokers subscribtion list for the given signal.
     pub fn add_sub<S: Broadcast>(&mut self, sub: Recipient<S>) {
         let s_type = TypeId::of::<S>();
         trace!("Broker adding sub for {:?}", s_type);
@@ -47,6 +48,8 @@ impl<T> Broker<T> {
         self.subs.insert(s_type, vec![boxed_sub]);
     }
 
+    /// Used when broadcasting a message. Drains this broker's subscriptions for the signal
+    /// and returns them, if any
     fn take_subs<S: Broadcast>(&mut self) -> Option<(TypeId, Vec<Recipient<S>>)> {
         let id = TypeId::of::<S>();
         let subs = self.subs.get_mut(&id)?;

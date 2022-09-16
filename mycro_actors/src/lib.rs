@@ -1,3 +1,3 @@
 pub mod broker;
-pub mod signals;
-pub use signals::system::Signal;
+pub mod signal;
+pub use signal::Signal;

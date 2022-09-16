@@ -26,8 +26,8 @@ impl<T> Signal<T> {
             id: Uuid::new_v4().to_string(),
             to: to.map(|to| to.to_string()),
             timestamp: chrono::Local::now(),
-            data,
             src: src.to_string(),
+            data,
         }
     }
 

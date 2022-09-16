@@ -2,7 +2,7 @@ use actix::{Actor, Context, Handler, System};
 use colored::Colorize;
 use mycro_actors::{
     broker::broker::{Broker, DefaultBroker},
-    signals::broker::{IssueAsync, IssueSync, Subscribe},
+    broker::signals::{IssueAsync, IssueSync, Subscribe},
     Signal,
 };
 use std::sync::mpsc;
