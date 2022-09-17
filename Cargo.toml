@@ -1,7 +1,4 @@
 [workspace]
 
-members = [
-  "mycro_actors",
-  "ws_service",
-  "tests"
-]
+
+members = ["actors", "storage", "websocket", "tests", "config"]

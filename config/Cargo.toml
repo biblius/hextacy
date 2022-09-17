@@ -1,0 +1,12 @@
+[package]
+name = "config"
+version = "0.1.0"
+edition = "2021"
+doctest = false
+
+[lib]
+path = "src/lib.rs"
+name = "config"
+doctest = false
+
+[dependencies]

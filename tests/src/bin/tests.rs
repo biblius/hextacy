@@ -3,9 +3,10 @@ use env_logger::fmt::Color;
 use env_logger::Env;
 use std::env;
 use std::io::Write;
-use tests::mycro_actors;
+use tests::{actors, config};
 
 pub fn main() {
+    // Set up the logger for debugging
     env::set_var("TRACING_LEVEL", "debug");
     env_logger::Builder::from_env(Env::default().filter("TRACING_LEVEL"))
         .format(|buf, record| {
@@ -14,6 +15,12 @@ pub fn main() {
             writeln!(buf, "{}", style.value(record.args()))
         })
         .init();
-    mycro_actors::broker_test::add_sub();
-    mycro_actors::broker_test::handle_subscribe();
+
+    // Run tests
+    actors::direct_message_handling::simple_message_handling().unwrap();
+    actors::direct_message_handling::simple_broadcast().unwrap();
+    actors::broker_test::add_sub();
+    actors::broker_test::handle_subscribe();
+    config::load_env();
+    config::set_env_vars();
 }

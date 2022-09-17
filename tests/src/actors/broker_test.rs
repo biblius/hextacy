@@ -1,6 +1,6 @@
 use actix::{Actor, Context, Handler, System};
 use colored::Colorize;
-use mycro_actors::{
+use actors::{
     broker::broker::{Broker, DefaultBroker},
     broker::signals::{IssueAsync, IssueSync, Subscribe},
     Signal,

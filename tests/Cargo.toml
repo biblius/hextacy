@@ -2,6 +2,7 @@
 name = "tests"
 version = "0.1.0"
 edition = "2021"
+doctest = false
 
 [[bin]]
 name = "tests"
@@ -9,18 +10,20 @@ path = "src/bin/tests.rs"
 
 [lib]
 name = "tests"
-path = "src/lib.rs"  
+path = "src/lib.rs"
+doctest = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-mycro_actors = { path = "../mycro_actors" }
-ws_service = { path = "../ws_service" }
+actors = { path = "../actors" }
+websocket = { path = "../websocket" }
+config = { path = "../config" }
 actix = "0.13"
-chrono = {version = "0.4", features = ["serde"]}
+chrono = { version = "0.4", features = ["serde"] }
 colored = "2.0.0"
 env_logger = "0.9.0"
-serde = {version = "1.0.137", features = ["derive"]}
+serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 tracing = "0.1.35"
 tracing-test = "0.1"
-uuid = {version = "1.1.2", features = ["v4"]}
+uuid = { version = "1.1.2", features = ["v4"] }

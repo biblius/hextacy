@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use mycro_actors::Signal;
+    use actors::Signal;
     use serde::{Deserialize, Serialize};
-    use ws_service::signals::ws_signal::WsSignal;
+    use websocket::signals::ws_signal::WsSignal;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct SampleData {
