@@ -10,7 +10,7 @@ const ENV_PATH: &'static str = "./tests/.env.test";
 
 pub fn main() {
     // Set up the logger for debugging
-    env::set_var("TRACING_LEVEL", "trace");
+    env::set_var("TRACING_LEVEL", "info");
     env_logger::Builder::from_env(Env::default().filter("TRACING_LEVEL"))
         .format(|buf, record| {
             let mut style = buf.style();
