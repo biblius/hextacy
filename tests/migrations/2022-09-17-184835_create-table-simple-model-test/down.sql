@@ -1,0 +1,1 @@
+DROP TABLE simple_model_test;

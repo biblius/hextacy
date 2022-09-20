@@ -125,7 +125,7 @@ impl Handler<Signal<SampleData>> for MyActor<SampleData> {
     fn handle(&mut self, mut sig: Signal<SampleData>, _: &mut Self::Context) -> Self::Result {
         sig.data_mut().lol = "Modified lmao".to_string();
         sig.data_mut().lel = "Modified lmeo".to_string();
-        debug!("{} -- received message : {:?}", self.id, sig);
+        debug!("{} -- received signal : {:?}", self.id, sig);
     }
 }
 
@@ -157,10 +157,10 @@ where
                 .then(|res, act, _| {
                     match res {
                         Ok(_) => {
-                            debug!("{} - succesfully sent message", act.id)
+                            debug!("{} - succesfully sent signal", act.id)
                         }
                         Err(_) => {
-                            error!("{} - an error occurred while sending a message", act.id)
+                            error!("{} - an error occurred while sending a signal", act.id)
                         }
                     }
                     fut::ready(())
@@ -185,7 +185,7 @@ impl Handler<Signal<SampleData>> for TestActor<SampleData> {
     type Result = ();
 
     fn handle(&mut self, sig: Signal<SampleData>, ctx: &mut Self::Context) -> Self::Result {
-        debug!("{} -- received message : {:?}", self.id, sig);
+        debug!("{} -- received signal : {:?}", self.id, sig);
         self.broadcast(sig, ctx);
     }
 }

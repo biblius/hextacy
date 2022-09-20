@@ -1,0 +1,138 @@
+use crate::DatabaseError;
+use r2d2::Pool;
+use r2d2_redis::{
+    redis::{Client, ConnectionInfo, IntoConnectionInfo},
+    RedisConnectionManager,
+};
+use tracing::trace;
+
+pub type RedisPool = r2d2::Pool<r2d2_redis::RedisConnectionManager>;
+pub type RedisConnection = r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>;
+
+pub fn build_pool() -> RedisPool {
+    let pool_size = config::get_or_default("RD_POOL_SIZE", "8")
+        .parse::<u32>()
+        .expect("Unable to parse RD_POOL_SIZE, maker sure it is a valid integer");
+
+    let conn_info = connection_info();
+
+    trace!("Building Redis pool for {:?}", conn_info.addr);
+
+    let manager = RedisConnectionManager::new(conn_info)
+        .expect("Error while attempting to construct Redis connection manager");
+
+    Pool::builder()
+        .max_size(pool_size)
+        .build(manager)
+        .unwrap_or_else(|e| panic!("Failed to create redis pool: {}", e))
+}
+
+pub fn build_pool_default() -> RedisPool {
+    let pool_size = config::get_or_default("RD_POOL_SIZE", "8")
+        .parse::<u32>()
+        .expect("Unable to parse RD_POOL_SIZE, maker sure it is a valid integer");
+
+    let conn_info = connection_info_default();
+
+    trace!("Building Redis pool for {:?}", conn_info.addr);
+
+    let manager = RedisConnectionManager::new(conn_info)
+        .expect("Error while attempting to construct Redis connection manager");
+
+    Pool::builder()
+        .max_size(pool_size)
+        .build(manager)
+        .unwrap_or_else(|e| panic!("Failed to create redis pool: {}", e))
+}
+
+/// Generates a `ConnectionInfo` struct using the following environment variables:
+///
+/// `REDIS_URL`,
+/// `RD_USER`,
+/// `RD_PASSWORD`,
+/// `RD_DATABASE`
+///
+/// Panics if it can't find any of the listed env variables apart from `RD_USE_DB` which defaults to 0.
+pub fn connection_info() -> ConnectionInfo {
+    let mut params =
+        config::get_multiple(vec!["REDIS_URL", "RD_USER", "RD_PASSWORD", "RD_DATABASE"]);
+
+    let db = params.pop().map_or_else(
+        || {
+            trace!("RD_DATABASE parameter not set, defaulting to 0");
+            0
+        },
+        |s| {
+            s.parse::<i64>()
+                .expect("Invalid RD_DATABASE, make sure it's a valid integer")
+        },
+    );
+
+    let password = params.pop().expect("RD_PASSWORD must be set");
+
+    let username = params.pop().expect("RD_USER must be set");
+
+    let db_url = params.pop().expect("REDIS_URL must be set");
+
+    trace!("Buildig Redis connection info with {}", db_url);
+
+    let mut conn_info = db_url.into_connection_info().unwrap();
+    conn_info.username = Some(username);
+    conn_info.passwd = Some(password);
+    conn_info.db = db;
+
+    conn_info
+}
+
+/// Generates a default `ConnectionInfo` struct using the database url found in the shell environment.
+/// Searches for `REDIS_URL` in the shell environment and panics if it is not set.
+/// The redis connection info defaults to: `RedisConnectionInfo {db: 0, username: None, password: None}`.
+/// Will fail if the Redis server is password protected.
+pub fn connection_info_default() -> ConnectionInfo {
+    let db_url = config::get("REDIS_URL").expect("REDIS_URL must be set");
+
+    trace!("Buildig Redis default connection info for {}", db_url);
+
+    let conn_info = db_url.into_connection_info().unwrap();
+
+    conn_info
+}
+
+#[derive(Clone)]
+pub struct Rd {
+    pool: RedisPool,
+}
+
+impl Default for Rd {
+    fn default() -> Self {
+        Self::new_default()
+    }
+}
+
+impl Rd {
+    pub fn new_default() -> Self {
+        Self {
+            pool: build_pool_default(),
+        }
+    }
+
+    pub fn new() -> Self {
+        Self { pool: build_pool() }
+    }
+
+    pub fn connect(&self) -> Result<RedisConnection, DatabaseError> {
+        match self.pool.get() {
+            Ok(conn) => Ok(conn),
+            Err(e) => Err(DatabaseError::RdPoolConnection(e.to_string())),
+        }
+    }
+
+    pub fn connect_direct() -> Result<Client, DatabaseError> {
+        let db_url = config::get("REDIS_URL").expect("REDIS_URL must be set");
+
+        match Client::open(db_url) {
+            Ok(conn) => Ok(conn),
+            Err(e) => Err(DatabaseError::RdDirectConnection(e)),
+        }
+    }
+}

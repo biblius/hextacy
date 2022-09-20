@@ -10,3 +10,4 @@ name = "config"
 doctest = false
 
 [dependencies]
+dotenv = "0.15.0"
