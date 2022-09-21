@@ -7,7 +7,7 @@ use r2d2_redis::{
 use tracing::trace;
 
 pub type RedisPool = r2d2::Pool<r2d2_redis::RedisConnectionManager>;
-pub type RedisConnection = r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>;
+pub type RedisPoolConnection = r2d2::PooledConnection<r2d2_redis::RedisConnectionManager>;
 
 pub fn build_pool() -> RedisPool {
     let pool_size = config::get_or_default("RD_POOL_SIZE", "8")
@@ -120,7 +120,7 @@ impl Rd {
         Self { pool: build_pool() }
     }
 
-    pub fn connect(&self) -> Result<RedisConnection, DatabaseError> {
+    pub fn connect(&self) -> Result<RedisPoolConnection, DatabaseError> {
         match self.pool.get() {
             Ok(conn) => Ok(conn),
             Err(e) => Err(DatabaseError::RdPoolConnection(e.to_string())),

@@ -10,7 +10,7 @@ const ENV_PATH: &'static str = "./tests/.env.test";
 
 pub fn main() {
     // Set up the logger for debugging
-    env::set_var("TRACING_LEVEL", "info");
+    env::set_var("TRACING_LEVEL", "trace");
     env_logger::Builder::from_env(Env::default().filter("TRACING_LEVEL"))
         .format(|buf, record| {
             let mut style = buf.style();
@@ -31,6 +31,8 @@ pub fn main() {
 
     // Postgres
     storage::establish_pg_connection();
+    storage::pg_transaction();
+    storage::pg_transaction_fail();
 
     // Redis
     storage::rd_default_conn_info();

@@ -1,1 +1,1 @@
-DROP TABLE simple_model_test;
+DROP TABLE simple_models;
