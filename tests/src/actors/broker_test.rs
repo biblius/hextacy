@@ -1,17 +1,17 @@
 use actix::{Actor, Context, Handler, System};
-use colored::Colorize;
 use actors::{
     broker::broker::{Broker, DefaultBroker},
     broker::signals::{IssueAsync, IssueSync, Subscribe},
     Signal,
 };
+use colored::Colorize;
 use std::sync::mpsc;
 use tracing::{debug, info};
 
 const BROKER_ID: &'static str = "TEST_BROKER";
 
 pub fn add_sub() {
-    info!("========== TEST - BROKER ADD SUB ==========");
+    info!("\n========== TEST - BROKER ADD SUB ==========\n");
     let sys = System::new();
     let mut broker = Broker::<DefaultBroker>::new(BROKER_ID);
 
@@ -54,7 +54,7 @@ pub fn add_sub() {
 }
 
 pub fn handle_subscribe() {
-    info!("========== TEST - BROKER HANDLE SUBSCRIBE ==========");
+    info!("\n========== TEST - BROKER HANDLE SUBSCRIBE ==========\n");
     let sys = System::new();
     let broker = Broker::<DefaultBroker>::new(BROKER_ID);
 

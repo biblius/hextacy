@@ -4,12 +4,7 @@ use diesel::{
     ExpressionMethods, Insertable, Queryable, RunQueryDsl,
 };
 use mongodb::bson::doc;
-use r2d2_redis::redis::ConnectionAddr;
-use storage::{
-    mongo::MongoSync,
-    postgres::{Pg, SqlModel},
-    redis::{connection_info_default, Rd},
-};
+use storage::{mongo::MongoSync, postgres::Pg, redis::Rd};
 
 use tracing::{info, trace};
 
@@ -21,19 +16,6 @@ pub fn establish_pg_connection() {
     assert!(matches!(conn, Ok(_)));
     let dir_conn = Pg::connect_direct();
     assert!(matches!(dir_conn, Ok(_)));
-}
-
-pub fn rd_default_conn_info() {
-    info!("\n========== TEST - RD DEFAULT CONNECTION INFO ==========\n");
-
-    let ci = connection_info_default();
-    assert_eq!(
-        *ci.addr,
-        ConnectionAddr::Tcp(String::from("localhost"), 6379)
-    );
-    assert_eq!(ci.db, 0);
-    assert_eq!(ci.username, None);
-    assert_eq!(ci.passwd, None);
 }
 
 pub fn establish_rd_connection() {
@@ -75,28 +57,34 @@ pub fn mongo_insert_with_transaction() {
 
 pub fn pg_transaction() {
     info!("\n========== TEST - PG INSERT WITH TRANSACTION SUCCESS ==========\n");
+
     let mut conn = Pg::connect_direct().unwrap();
+
     let user = NewTestUser {
         username: "i am user".to_string(),
         password: "super secret".to_string(),
     };
+
     let data = NewSimpleModel {
         some_param: "param".to_string(),
         other_param: 12,
     };
-    let input: Vec<Box<dyn SqlModel>> = vec![Box::new(user), Box::new(data)];
-    let result = Pg::transaction(input, &mut conn, |input, conn| {
+
+    let result = conn.build_transaction().deferrable().run(|conn| {
         let mut user: Vec<TestUser> = diesel::insert_into(test_users::table)
-            .values(input[0].as_any().downcast_ref::<NewTestUser>().unwrap())
+            .values(user)
             .get_results(conn)
             .expect("Couldn't insert user");
 
         trace!("{:?}", user);
 
-        let mut simple: Vec<SimpleModel> = diesel::insert_into(simple_models::table)
-            .values(input[1].as_any().downcast_ref::<NewSimpleModel>().unwrap())
-            .get_results(conn)
-            .expect("Couldn't insert simple model");
+        let mut simple = match diesel::insert_into(simple_models::table)
+            .values(data)
+            .get_results::<SimpleModel>(conn)
+        {
+            Ok(simple) => simple,
+            Err(_) => return Err(diesel::result::Error::RollbackTransaction),
+        };
 
         trace!("{:?}", simple);
         Ok((user.pop().unwrap(), simple.pop().unwrap()))
@@ -131,15 +119,9 @@ pub fn pg_transaction_fail() {
 
     trace!("Current highest id: {}", highest_id);
 
-    let input: Vec<Box<dyn SqlModel>> = vec![Box::new(user), Box::new(data)];
-    let result = Pg::transaction(input, &mut conn, |input, conn| {
-        let new_user = input[0].as_any().downcast_ref::<NewTestUser>().unwrap();
-
-        // This will downcast to the wrong type resulting in an error
-        let new_simple = input[1].as_any().downcast_ref::<SimpleModel>();
-
+    let result = conn.build_transaction().deferrable().run(|conn| {
         let user: Vec<TestUser> = diesel::insert_into(test_users::table)
-            .values(new_user)
+            .values(user)
             .get_results(conn)
             .expect("Couldn't insert user");
 
@@ -147,12 +129,14 @@ pub fn pg_transaction_fail() {
 
         // Error here after inserting the user to see if the transaction rolls back
         match diesel::insert_into(simple_models::table)
-            .values(new_simple)
+            .values(data)
             .get_results::<SimpleModel>(conn)
         {
-            Ok(simple) => Ok((user, simple)),
-            Err(_) => Err(diesel::result::Error::RollbackTransaction.into()),
-        }
+            Ok(_) => return Err(diesel::result::Error::RollbackTransaction),
+            Err(_) => return Err(diesel::result::Error::RollbackTransaction),
+        };
+        #[allow(unreachable_code)]
+        Ok(user)
     });
 
     assert!(matches!(result, Err(_)));
@@ -196,25 +180,4 @@ struct SimpleModel {
 struct NewSimpleModel {
     some_param: String,
     other_param: i32,
-}
-
-impl SqlModel for TestUser {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-impl SqlModel for NewTestUser {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-impl SqlModel for SimpleModel {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-}
-impl SqlModel for NewSimpleModel {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
 }

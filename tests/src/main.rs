@@ -1,10 +1,13 @@
-//! Runs all tests with tracing
+pub mod actors;
+pub mod config;
+pub mod schema;
+pub mod storage;
+pub mod websocket;
 
 use env_logger::fmt::Color;
 use env_logger::Env;
 use std::env;
 use std::io::Write;
-use tests::{actors, config, storage};
 
 const ENV_PATH: &'static str = "./tests/.env.test";
 
@@ -35,7 +38,6 @@ pub fn main() {
     storage::pg_transaction_fail();
 
     // Redis
-    storage::rd_default_conn_info();
     storage::establish_rd_connection();
 
     // Mongo

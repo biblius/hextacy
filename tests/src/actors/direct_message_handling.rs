@@ -9,7 +9,7 @@ use websocket::signals::ws_signal::WsSignal;
 
 /// Also tests WsSignal conversion to a system signal
 pub fn simple_message_handling() -> Result<(), Error> {
-    info!("========== TEST - SIMPLE MESSAGE HANDLING ==========");
+    info!("\n========== TEST - SIMPLE MESSAGE HANDLING ==========\n");
     // Initialize system
     let sys = System::new();
 
@@ -54,7 +54,7 @@ pub fn simple_message_handling() -> Result<(), Error> {
 /// Initiates an actor and adds another to its address book and tries to send the message
 /// to everyone in the actor's address book without the use of the broker
 pub fn simple_broadcast() -> Result<(), Error> {
-    info!("========== TEST - SIMPLE DIRECT BROADCAST ==========");
+    info!("\n========== TEST - SIMPLE DIRECT BROADCAST ==========\n");
     // Initialize system
     let sys = System::new();
 

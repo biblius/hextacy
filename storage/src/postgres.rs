@@ -1,9 +1,7 @@
-use std::any::Any;
-
 use super::DatabaseError;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
-    Connection, Insertable, PgConnection, Queryable,
+    Connection, PgConnection,
 };
 use tracing::trace;
 
@@ -66,31 +64,4 @@ impl Pg {
             Err(e) => Err(e.into()),
         }
     }
-
-    /// Attempts a direct connection and tries to complete the transaction with the provided closure.
-    ///
-    pub fn transaction<F, R>(
-        models: Vec<Box<dyn SqlModel>>,
-        conn: &mut PgConnection,
-        f: F,
-    ) -> Result<R, DatabaseError>
-    where
-        F: FnOnce(Vec<Box<dyn SqlModel>>, &mut PgConnection) -> Result<R, diesel::result::Error>,
-    {
-        match conn.transaction(|conn| f(models, conn)) {
-            Ok(r) => Ok(r),
-            Err(e) => Err(e.into()),
-        }
-    }
-}
-
-pub trait SqlModel {
-    fn as_any(&self) -> &dyn Any;
-}
-
-#[macro_export]
-macro_rules! pg_transaction {
-    ($($a: expr),+, $i: item) => {
-        3
-    };
 }

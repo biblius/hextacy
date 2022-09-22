@@ -2,17 +2,10 @@
 name = "tests"
 version = "0.1.0"
 edition = "2021"
-doctest = false
 
 [[bin]]
-name = "tests"
-path = "src/bin/tests.rs"
-
-[lib]
-name = "tests"
-path = "src/lib.rs"
-doctest = false
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+name = "main"
+path = "src/main.rs"
 
 [dependencies]
 actors = { path = "../actors" }

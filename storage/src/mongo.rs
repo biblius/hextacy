@@ -5,6 +5,8 @@ use mongodb::{
 };
 use tracing::trace;
 
+/// Searches for `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`,
+/// and `MONDO_DATABASE` environment variables and panics if any are not set.
 pub fn client_options() -> ClientOptions {
     let mut params = config::get_multiple(vec![
         "MONGO_HOST",
@@ -47,31 +49,38 @@ pub fn client_options() -> ClientOptions {
         .build()
 }
 
-/// Creates a `ClientOptions` struct with the `MONGO_HOST` and `MONGO_PORT` environment variables
-/// as the address. Panics if they are not set
-pub fn default_client_options() -> ClientOptions {
-    let mut params = config::get_multiple(vec!["MONGO_HOST", "MONGO_PORT"]);
-
-    let port = params.pop().map_or_else(
-        || 27017,
-        |p| {
-            p.parse::<u16>()
-                .expect("MONGO_PORT must be a valid integer")
-        },
-    );
-
-    let host = params.pop().expect("MONGO_HOST must be set");
-
-    let address = ServerAddress::Tcp {
-        host,
-        port: Some(port),
-    };
-
-    ClientOptions::builder().hosts(vec![address]).build()
-}
-
 pub struct Mongo {
     pub client: Client,
+}
+
+impl Mongo {
+    pub fn new() -> Self {
+        match Client::with_options(client_options()) {
+            Ok(client) => {
+                trace!("Built Mongo client");
+                Self { client }
+            }
+            Err(e) => panic!("Error occurred while building Mongo client: {e}"),
+        }
+    }
+
+    pub fn direct() -> Self {
+        let mut opts = client_options();
+        opts.direct_connection = Some(true);
+        match Client::with_options(opts) {
+            Ok(client) => {
+                trace!("Built Mongo client with direct connection");
+                Self { client }
+            }
+            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
+        }
+    }
+}
+
+impl Default for Mongo {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 pub struct MongoSync {
@@ -88,30 +97,20 @@ impl MongoSync {
             Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
         }
     }
-    pub fn list_dbs(&self) {
-        for db in self.client.list_database_names(None, None).unwrap() {
-            println!("{}", db)
-        }
-    }
-}
-
-impl Mongo {
-    pub fn new() -> Self {
-        match Client::with_options(client_options()) {
+    pub fn direct() -> Self {
+        let mut opts = client_options();
+        opts.direct_connection = Some(true);
+        match SyncClient::with_options(opts) {
             Ok(client) => {
-                trace!("Built Mongo client");
+                trace!("Built sync Mongo client with direct connection");
                 Self { client }
             }
-            Err(e) => panic!("Error occurred while building Mongo client: {e}"),
+            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
         }
-    }
-
-    pub async fn list_dbs(&self) {
-        self.client.list_database_names(None, None).await.unwrap();
     }
 }
 
-impl Default for Mongo {
+impl Default for MongoSync {
     fn default() -> Self {
         Self::new()
     }
