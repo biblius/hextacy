@@ -1,0 +1,12 @@
+[package]
+name = "utility"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+doctest = false
+
+[dependencies]
+actix-web = { version = "4.2.1", features = ["secure-cookies", "openssl"] }
+actix-cors = "0.6.3"

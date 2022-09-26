@@ -1,4 +1,5 @@
 pub mod actors;
+pub mod auth;
 pub mod config;
 pub mod schema;
 pub mod storage;
@@ -42,4 +43,7 @@ pub fn main() {
 
     // Mongo
     storage::mongo_insert_with_transaction();
+
+    // Auth
+    auth::otp::test();
 }

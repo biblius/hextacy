@@ -1,6 +1,8 @@
 pub mod mongo;
 pub mod postgres;
 pub mod redis;
+pub use diesel;
+pub use r2d2_redis;
 pub use tracing::{info, warn};
 
 #[derive(Debug)]

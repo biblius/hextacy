@@ -12,6 +12,7 @@ actors = { path = "../actors" }
 websocket = { path = "../websocket" }
 config = { path = "../config" }
 storage = { path = "../storage" }
+auth = { path = "../auth" }
 actix = "0.13"
 chrono = { version = "0.4", features = ["serde"] }
 colored = "2.0.0"

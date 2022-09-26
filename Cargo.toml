@@ -1,4 +1,12 @@
 [workspace]
 
 
-members = ["actors", "storage", "websocket", "tests", "config"]
+members = [
+  "actors",
+  "storage",
+  "websocket",
+  "tests",
+  "config",
+  "auth",
+  "utility",
+]
