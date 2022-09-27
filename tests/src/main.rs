@@ -42,7 +42,7 @@ pub fn main() {
     storage::establish_rd_connection();
 
     // Mongo
-    storage::mongo_insert_with_transaction();
+    // storage::mongo_insert_with_transaction();
 
     // Auth
     auth::otp::test();
