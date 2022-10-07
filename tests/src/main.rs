@@ -1,5 +1,4 @@
 pub mod actors;
-pub mod auth;
 pub mod config;
 pub mod schema;
 pub mod storage;
@@ -10,7 +9,7 @@ use env_logger::Env;
 use std::env;
 use std::io::Write;
 
-const ENV_PATH: &'static str = "./tests/.env.test";
+const ENV_PATH: &str = ".env";
 
 pub fn main() {
     // Set up the logger for debugging
@@ -43,7 +42,4 @@ pub fn main() {
 
     // Mongo
     // storage::mongo_insert_with_transaction();
-
-    // Auth
-    auth::otp::test();
 }

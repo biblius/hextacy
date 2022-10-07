@@ -12,8 +12,6 @@ pub fn setup_cors(allowed_origins: Vec<&str>, expose_headers: Vec<&str>) -> Cors
             ORIGIN,
             ACCESS_CONTROL_REQUEST_METHOD,
             HeaderName::from_static("x-csrf-token"),
-            HeaderName::from_static("x-location-latitude"),
-            HeaderName::from_static("x-location-longitude"),
         ])
         .expose_headers(expose_headers);
     for origin in allowed_origins {

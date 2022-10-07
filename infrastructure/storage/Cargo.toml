@@ -9,7 +9,7 @@ name = "storage"
 doctest = false
 
 [dependencies]
-config = { path = "../config" }
+config = { path = "../../config" }
 diesel = { version = "2.0.0", features = [
   "serde_json",
   "chrono",

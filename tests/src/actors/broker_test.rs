@@ -8,7 +8,7 @@ use colored::Colorize;
 use std::sync::mpsc;
 use tracing::{debug, info};
 
-const BROKER_ID: &'static str = "TEST_BROKER";
+const BROKER_ID: &str = "TEST_BROKER";
 
 pub fn add_sub() {
     info!("\n========== TEST - BROKER ADD SUB ==========\n");
@@ -46,7 +46,7 @@ pub fn add_sub() {
         tx.send(42).unwrap();
     };
 
-    let _ = sys.block_on(exec);
+    sys.block_on(exec);
 
     let num = rx.recv().unwrap();
 
@@ -82,7 +82,7 @@ pub fn handle_subscribe() {
         b_addr.send(IssueSync::new(sig_s)).await.unwrap();
     };
 
-    let _ = sys.block_on(exec);
+    sys.block_on(exec);
 }
 
 #[derive(Debug, Clone)]

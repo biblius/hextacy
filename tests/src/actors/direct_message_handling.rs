@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use std::io::Error;
 use std::{collections::HashMap, marker::PhantomData, sync::mpsc};
 use tracing::{debug, error, info};
-use websocket::signals::ws_signal::WsSignal;
+use websocket::signals::WsSignal;
 
 /// Also tests WsSignal conversion to a system signal
 pub fn simple_message_handling() -> Result<(), Error> {
@@ -41,7 +41,7 @@ pub fn simple_message_handling() -> Result<(), Error> {
     };
 
     // Block until the future is done
-    let _ = sys.block_on(execution);
+    sys.block_on(execution);
 
     // Catch the message sent from it
     let num = rx.recv().unwrap();
@@ -94,7 +94,7 @@ pub fn simple_broadcast() -> Result<(), Error> {
         }
     };
 
-    let _ = sys.block_on(exec);
+    sys.block_on(exec);
 
     let num = rx.recv().unwrap();
 

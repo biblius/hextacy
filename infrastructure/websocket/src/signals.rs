@@ -1,5 +1,20 @@
-use super::raw_json::RawJson;
-use crate::ws_error::WsError;
+use actix::Message;
+
+#[derive(Message)]
+#[rtype(result = "()")]
+pub struct RawJson(pub String);
+
+impl RawJson {
+    pub fn to_inner(&self) -> String {
+        self.0.clone()
+    }
+
+    pub fn get_inner(&self) -> &str {
+        &self.0
+    }
+}
+
+use super::WsError;
 use actors::Signal;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;

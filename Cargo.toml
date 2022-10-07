@@ -1,12 +1,12 @@
 [workspace]
 
-
 members = [
-  "actors",
-  "storage",
-  "websocket",
-  "tests",
   "config",
+  "infrastructure/actors",
+  "infrastructure/websocket",
+  "infrastructure/storage",
+  "infrastructure/http",
+  "infrastructure/error",
+  "tests",
   "auth",
-  "utility",
 ]

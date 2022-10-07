@@ -1,6 +1,6 @@
 //! Actor that manages client JSON messages
-use super::signals::ws_signal::WsSignal;
-use super::ws_error::WsError;
+use super::signals::WsSignal;
+use super::WsError;
 use ::actors::signal::Signal;
 use actix::prelude::*;
 use actix_web_actors::ws;

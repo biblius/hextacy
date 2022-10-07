@@ -1,4 +1,25 @@
-pub mod otp;
-pub mod session;
+pub mod csrf;
 pub mod user;
-pub use crypto::{hmac::Hmac, mac::Mac, sha1::Sha1};
+
+use reqwest::StatusCode;
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum AuthenticationError {
+    #[error("Invalid credentials")]
+    InvalidCredentials,
+    #[error("Invalid token")]
+    InvalidToken,
+    #[error("Invalid OTP")]
+    InvalidOTP,
+}
+
+impl AuthenticationError {
+    fn status_code(&self) -> StatusCode {
+        match self {
+            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
+            Self::InvalidToken => StatusCode::UNAUTHORIZED,
+            Self::InvalidOTP => StatusCode::UNAUTHORIZED,
+        }
+    }
+}

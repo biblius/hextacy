@@ -2,7 +2,7 @@
 mod tests {
     use actors::Signal;
     use serde::{Deserialize, Serialize};
-    use websocket::signals::ws_signal::WsSignal;
+    use websocket::signals::WsSignal;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct SampleData {
