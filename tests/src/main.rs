@@ -1,7 +1,7 @@
 pub mod actors;
 pub mod config;
 pub mod schema;
-pub mod storage;
+pub mod storage_t;
 pub mod websocket;
 
 use env_logger::fmt::Color;
@@ -22,7 +22,7 @@ pub fn main() {
         })
         .init();
 
-    // Config test also set the env
+    // Config tests also set the env
     config::set_env_vars();
     config::load_from_dot_env(ENV_PATH);
 
@@ -33,12 +33,12 @@ pub fn main() {
     actors::broker_test::handle_subscribe();
 
     // Postgres
-    storage::establish_pg_connection();
-    storage::pg_transaction();
-    storage::pg_transaction_fail();
+    storage_t::establish_pg_connection();
+    storage_t::pg_transaction();
+    storage_t::pg_transaction_fail();
 
     // Redis
-    storage::establish_rd_connection();
+    storage_t::establish_rd_connection();
 
     // Mongo
     // storage::mongo_insert_with_transaction();

@@ -1,12 +1,3 @@
 [workspace]
 
-members = [
-  "config",
-  "infrastructure/actors",
-  "infrastructure/websocket",
-  "infrastructure/storage",
-  "infrastructure/http",
-  "infrastructure/error",
-  "tests",
-  "auth",
-]
+members = ["app", "infrastructure", "tests"]

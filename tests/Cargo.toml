@@ -4,29 +4,20 @@ version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "main"
+name = "test"
 path = "src/main.rs"
 
 [dependencies]
-config = { path = "../config" }
+infrastructure = { path = "../infrastructure" }
 actors = { path = "../infrastructure/actors" }
-websocket = { path = "../infrastructure/websocket" }
-storage = { path = "../infrastructure/storage" }
-auth = { path = "../auth" }
-actix = "0.13"
-chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0.137", features = ["derive"] }
 colored = "2.0.0"
 env_logger = "0.9.0"
-mongodb = "2.3.0"
-serde = { version = "1.0.137", features = ["derive"] }
-serde_json = "1.0.81"
 tracing = "0.1.35"
-tracing-test = "0.1"
-r2d2_redis = "0.14.0"
-uuid = { version = "1.1.2", features = ["v4"] }
-diesel = { version = "2.0.0", features = [
-  "serde_json",
-  "chrono",
+diesel = { version = "2.0.1", features = [
   "postgres",
+  "chrono",
   "r2d2",
+  "serde_json",
 ] }
+mongodb = { version = "2.3.1", features = ["tokio-runtime", "tokio-sync"] }

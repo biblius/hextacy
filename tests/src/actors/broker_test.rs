@@ -1,7 +1,7 @@
-use actix::{Actor, Context, Handler, System};
+use actors::actix::{Actor, Context, Handler, System};
 use actors::{
-    broker::broker::{Broker, DefaultBroker},
     broker::signals::{IssueAsync, IssueSync, Subscribe},
+    broker::{Broker, DefaultBroker},
     Signal,
 };
 use colored::Colorize;

@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod tests {
     use actors::Signal;
+    use infrastructure::websocket::signals::WsSignal;
     use serde::{Deserialize, Serialize};
-    use websocket::signals::WsSignal;
 
     #[derive(Debug, Serialize, Deserialize, Clone)]
     struct SampleData {

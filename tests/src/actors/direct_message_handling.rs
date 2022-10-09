@@ -1,11 +1,11 @@
+use ::actors::actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
 use ::actors::Signal;
-use actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
+use infrastructure::websocket::signals::WsSignal;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::io::Error;
 use std::{collections::HashMap, marker::PhantomData, sync::mpsc};
 use tracing::{debug, error, info};
-use websocket::signals::WsSignal;
 
 /// Also tests WsSignal conversion to a system signal
 pub fn simple_message_handling() -> Result<(), Error> {

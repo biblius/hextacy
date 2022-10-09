@@ -1,4 +1,4 @@
-use config::{get_multiple, load_from_file, set};
+use infrastructure::config::{self, get_multiple, load_from_file, set};
 use std::env;
 use tracing::info;
 
@@ -6,7 +6,7 @@ pub fn set_env_vars() {
     info!("\n========== TEST - SET ENV VARS ==========\n");
     set("DB_URL", "localhost:postgres:lmao");
     set("SOME_VAR", "SOME_VALUE");
-    let mut from_env = get_multiple(vec!["DB_URL", "SOME_VAR"]);
+    let mut from_env = get_multiple(&["DB_URL", "SOME_VAR"]);
 
     assert_eq!(from_env.pop(), Some("SOME_VALUE".to_string()));
     assert_eq!(from_env.pop(), Some("localhost:postgres:lmao".to_string()));
