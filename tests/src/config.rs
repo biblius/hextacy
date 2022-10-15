@@ -1,4 +1,4 @@
-use infrastructure::config::{self, get_multiple, load_from_file, set};
+use infrastructure::config::env::{get_multiple, load_from_file, set};
 use std::env;
 use tracing::info;
 
@@ -14,7 +14,7 @@ pub fn set_env_vars() {
 
 pub fn load_from_dot_env(path: &str) {
     info!("\n========== TEST - LOAD DOT ENV ==========\n");
-    load_from_file(path, config::ConfigFormat::DotEnv).unwrap();
+    load_from_file(path).unwrap();
     let db_url = env::var("POSTGRES_URL").unwrap();
     let max_conns = env::var("PG_POOL_SIZE").unwrap();
     assert_eq!(

@@ -1,5 +1,5 @@
-use super::super::config;
 use super::DatabaseError;
+use crate::config::env;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection},
     Connection, PgConnection,
@@ -12,8 +12,7 @@ pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 /// Builds a postgres connection pool. Searches the shell env for `POSTGRES_URL` and `PG_POOL_SIZE`.
 /// Panics if the db url isn't present or if the pool size is not parseable. The pool size defaults to 8 if not set.
 pub fn build_pool() -> PgPool {
-    let mut params =
-        config::get_or_default_multiple(&[("POSTGRES_URL", ""), ("PG_POOL_SIZE", "8")]);
+    let mut params = env::get_or_default_multiple(&[("POSTGRES_URL", ""), ("PG_POOL_SIZE", "8")]);
 
     let pool_size = params.pop().unwrap().parse::<u32>().unwrap();
 
@@ -58,7 +57,7 @@ impl Pg {
     /// Attempts to establish a direct connection to the postgres server. Panics if `POSTGRES_URL` is not set
     /// in the environment.
     pub fn connect_direct() -> Result<PgConnection, DatabaseError> {
-        let db_url = config::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
+        let db_url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
 
         match PgConnection::establish(&db_url) {
             Ok(conn) => Ok(conn),

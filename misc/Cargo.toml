@@ -1,0 +1,10 @@
+[package]
+name = "misc"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "gen_env_example"
+path = "src/bin/gen_env_example.rs"
+
+[dependencies]

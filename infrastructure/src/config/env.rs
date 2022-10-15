@@ -51,17 +51,8 @@ pub fn get_or_default_multiple(keys: &[(&str, &str)]) -> Vec<String> {
 }
 
 /// Reads a file and sets all of its declared variables in the shell environment
-pub fn load_from_file(path: &str, format: ConfigFormat) -> Result<(), ConfigError> {
-    match format {
-        ConfigFormat::DotEnv => dotenv::from_path(Path::new(path)).map_err(ConfigError::DotEnv),
-        ConfigFormat::Toml => todo!(),
-    }
-}
-
-/// Represents the type of file to parse variables from.
-pub enum ConfigFormat {
-    DotEnv,
-    Toml,
+pub fn load_from_file(path: &str) -> Result<(), ConfigError> {
+    dotenv::from_path(Path::new(path)).map_err(ConfigError::DotEnv)
 }
 
 #[derive(Debug, Error)]

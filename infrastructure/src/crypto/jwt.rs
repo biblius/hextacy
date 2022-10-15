@@ -10,6 +10,7 @@ use tracing::info;
 use super::CryptoError;
 
 /// Used for jwts. sub is the actual payload, iat and exp are unix timestamps representing the issued at and expiration times respectively.
+/// As per https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
@@ -77,11 +78,11 @@ mod tests {
     #[test]
     fn encode_decode_jwt() {
         //Fetch the private key
-        let priv_key =
-            fs::read(Path::new("./key_pair/priv_key.pem")).expect("Couldn't open private key");
+        let priv_key = fs::read(Path::new("../crypto/key_pair/priv_key.pem"))
+            .expect("Couldn't open private key");
         //Fetch the public key
-        let pub_key =
-            fs::read(Path::new("./key_pair/pub_key.pem")).expect("Couldn't open private key");
+        let pub_key = fs::read(Path::new("../crypto/key_pair/pub_key.pem"))
+            .expect("Couldn't open public key");
 
         //Transmogrify the key key par to the encoding and decoding keys as arrays of u8
         let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(&priv_key)
@@ -103,7 +104,6 @@ mod tests {
             "biblius".to_string(),
             expires,
         );
-        eprintln!("{claims:?}");
         //Encode jwt
         let token = encode(
             &jsonwebtoken::Header::new(Algorithm::RS256),
@@ -111,7 +111,6 @@ mod tests {
             &encoding_key,
         )
         .expect("Couldn't encode token");
-        eprintln!("token: {}", token);
         //Set headers for decoding
         let validation = Validation::new(Algorithm::RS256);
 

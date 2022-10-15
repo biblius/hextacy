@@ -7,6 +7,7 @@ diesel::table! {
         username -> Varchar,
         user_role -> Varchar,
         frozen -> Bool,
+        verified -> Nullable<Bool>,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
         expires_at -> Timestamptz,

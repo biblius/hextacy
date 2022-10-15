@@ -9,7 +9,7 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq)]
 #[diesel(sql_type = Text)]
 pub enum Role {
     #[serde(rename = "admin")]

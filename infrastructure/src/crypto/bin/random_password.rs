@@ -1,22 +1,29 @@
+use rand::{thread_rng, Rng};
 use std::env;
 
-use rand::{thread_rng, Rng};
+const ALPHABET: [char; 60] = [
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S',
+    'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l',
+    'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '!', '@', '#', '$', '%',
+    '^', '&', '*',
+];
 
+/// Generates a random password using the alphabet above and the provided length.
+/// Run the following from the ROOT DIRECTORY of the project.
+/// cargo run -p infrastructure --bin random_password <length>
 #[allow(dead_code)]
 fn main() {
     let args = env::args().collect::<Vec<String>>();
 
     let length = &args[1].parse::<u8>().unwrap();
 
-    println!("{length}");
-
     let mut pw = String::new();
 
     let mut rng = thread_rng();
 
     for _ in 0..*length {
-        pw.push(char::from_u32(rng.gen_range(33..127) as u32).unwrap());
+        pw.push(ALPHABET[rng.gen_range(0..60) as usize]);
     }
 
-    std::fs::write(std::path::Path::new("./password"), pw).unwrap();
+    std::fs::write(std::path::Path::new("./crypto/password"), pw).unwrap();
 }

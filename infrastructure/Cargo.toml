@@ -3,9 +3,21 @@ name = "infrastructure"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "infrastructure"
+path = "src/lib.rs"
+
 [[bin]]
 name = "random_password"
 path = "src/crypto/bin/random_password.rs"
+
+[[bin]]
+name = "rsa_key_pair"
+path = "src/crypto/bin/rsa_key_pair.rs"
+
+[[bin]]
+name = "generate_secret"
+path = "src/crypto/bin/generate_secret.rs"
 
 [dependencies]
 actors = { path = "./actors", optional = true }
@@ -16,6 +28,8 @@ chrono = { version = "0.4", features = ["serde"] }
 # Config and logging
 
 dotenv = "0.15.0"
+env_logger = "0.9.1"
+log4rs = "1.2.0"
 tracing = "0.1.35"
 
 # HTTP
@@ -28,6 +42,10 @@ cookie = "0.16.1"
 
 actix = "0.13.0"
 actix-web-actors = "4.1.0"
+
+# Email
+
+lettre = "0.10.1"
 
 # Storage
 
@@ -43,10 +61,14 @@ diesel = { version = "2.0.1", features = [
 
 # Crypto
 
+data-encoding = "2.3.2"
 bcrypt = "0.13.0"
 rsa = { version = "0.6.1", features = ["pem"] }
 rand = "0.8.5"
+hmac = "0.12.1"
+sha2 = "0.10.6"
 jsonwebtoken = "8.1.1"
+thotp = "0.1.11"
 
 # Utility and pretty
 

@@ -7,7 +7,8 @@ edition = "2021"
 
 [dependencies]
 infrastructure = { path = "../infrastructure" }
-
+validator = "0.16.0"
+async-trait = "0.1.42"
 actix-web = "4"
 tracing = "0.1.35"
 chrono = { version = "0.4.22", features = ["serde"] }

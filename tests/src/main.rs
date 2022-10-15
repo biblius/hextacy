@@ -9,7 +9,7 @@ use env_logger::Env;
 use std::env;
 use std::io::Write;
 
-const ENV_PATH: &str = ".env";
+const ENV_PATH: &str = "tests/.env";
 
 pub fn main() {
     // Set up the logger for debugging

@@ -1,4 +1,4 @@
-use super::super::config;
+use crate::config::env;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
     sync::Client as SyncClient,
@@ -9,7 +9,7 @@ use tracing::trace;
 /// Searches for `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`,
 /// and `MONDO_DATABASE` environment variables and panics if any are not set.
 pub fn client_options() -> ClientOptions {
-    let mut params = config::get_multiple(&[
+    let mut params = env::get_multiple(&[
         "MONGO_HOST",
         "MONGO_PORT",
         "MONGO_USER",
