@@ -1,10 +1,8 @@
 use data_encoding::{Encoding, BASE32, BASE64, BASE64URL};
-use hmac::{Hmac, Mac};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
-use sha2::Sha256;
 use std::{env, fmt::Write, fs, path::Path};
 
-/// cargo run -p infrastructure --bin generate_secret <KEY> [<ENCODING> b32 | b64 | b64u]
+/// cargo run -p infrastructure --bin generate_secret <KEY> <LENGTH> [<ENCODING> b32 | b64 | b64u]
 fn main() {
     let args = env::args().collect::<Vec<String>>();
 
@@ -19,35 +17,47 @@ fn main() {
         b.trim().to_string()
     };
 
-    let encoding = if let Some(enc) = args.get(2) {
-        enc.clone()
+    let length = if let Some(len) = args.get(2) {
+        len.parse::<usize>().expect("Invalid length")
     } else {
-        String::from("b64u")
+        256
     };
 
-    println!("Writing {key} with encoding {encoding}");
+    let encoding = args.get(3).cloned();
 
-    let session_secret = secret(match &encoding[..] {
-        "b32" => BASE32,
-        "b64" => BASE64,
-        "b64u" => BASE64URL,
-        _ => BASE64URL,
-    });
+    println!("Writing {key} with encoding {:?}", encoding);
+
+    let session_secret = secret(
+        match encoding {
+            Some(enc) => match &enc[..] {
+                "b32" => Some(BASE32),
+                "b64" => Some(BASE64),
+                "b64u" => Some(BASE64URL),
+                _ => None,
+            },
+            None => None,
+        },
+        length,
+    );
 
     write!(env_file, "\n{key} = \"{session_secret}\"").unwrap();
 
     fs::write(Path::new("./.env"), env_file).unwrap();
 }
 
-fn secret(enc: Encoding) -> String {
-    type HmacSha256 = Hmac<Sha256>;
-
-    let mut buff = [0_u8; 160];
+fn secret(enc: Option<Encoding>, len: usize) -> String {
+    let mut buff = vec![0_u8; len];
 
     let mut rng = StdRng::from_entropy();
     rng.fill_bytes(&mut buff);
 
-    let mac = HmacSha256::new_from_slice(&buff).unwrap().finalize();
-
-    enc.encode(&mac.into_bytes())
+    if let Some(enc) = enc {
+        enc.encode(&buff)
+    } else {
+        let mut b = String::new();
+        for byte in buff {
+            write!(b, "{:02x}", byte).unwrap();
+        }
+        b
+    }
 }

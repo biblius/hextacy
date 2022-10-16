@@ -26,10 +26,10 @@ pub fn init(level: &str) {
 
             writeln!(
                 buf,
-                "[{}] {} | {} | {}",
-                format!("{:^5}", record.level()),
-                &chrono::Utc::now().to_string().replace("T", " ")[0..21],
-                format!("{:<35}", record.target()),
+                "{} {} | {} | {}",
+                format_args!("{:^5}", record.level()),
+                &chrono::Utc::now().to_string().replace('T', " ")[0..21],
+                format_args!("{:^50}", record.target()),
                 style.value(record.args()),
             )
         })

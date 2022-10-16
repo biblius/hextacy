@@ -7,7 +7,7 @@ fn main() {
     let mut example = String::new();
 
     for l in env_file.lines() {
-        if let Some(i) = l.find("=") {
+        if let Some(i) = l.find('=') {
             writeln!(example, "{}", l.split_at(i + 1).0).unwrap();
         } else {
             writeln!(example, "{}", l).unwrap();

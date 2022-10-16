@@ -19,6 +19,10 @@ pub enum Error {
     Bcrypt(#[from] infrastructure::crypto::CryptoError),
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
+    #[error("Email Error: {0}")]
+    Email(#[from] infrastructure::email::EmailError),
+    #[error("Reqwest Header Error: {0}")]
+    Reqwest(#[from] reqwest::header::InvalidHeaderValue),
 }
 
 impl Error {
@@ -30,7 +34,10 @@ impl Error {
                     ("INVALID_CREDENTIALS", "Invalid credentials")
                 }
                 AuthenticationError::InvalidOTP => ("INVALID_2FA", "Invalid 2FA code"),
-                AuthenticationError::InvalidRole => ("INVALID_ROLE", "Role does not exist"),
+                AuthenticationError::InsufficientPrivileges => (
+                    "FORBIDDEN",
+                    "You do not have the rights to access this page",
+                ),
                 AuthenticationError::InvalidToken => {
                     ("INVALID_TOKEN", "Invalid registration token")
                 }
@@ -38,6 +45,7 @@ impl Error {
                 AuthenticationError::AccountFrozen => {
                     ("ACCOUNT_FROZEN", "Account has been suspended")
                 }
+                AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
             },
             _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
         }
@@ -95,12 +103,14 @@ pub enum AuthenticationError {
     InvalidToken,
     #[error("Invalid OTP")]
     InvalidOTP,
-    #[error("Invalid role")]
-    InvalidRole,
+    #[error("Insufficient privileges")]
+    InsufficientPrivileges,
     #[error("Unverified email")]
     UnverifiedEmail,
     #[error("Account frozen")]
     AccountFrozen,
+    #[error("Email taken")]
+    EmailTaken,
 }
 
 impl AuthenticationError {
@@ -109,9 +119,10 @@ impl AuthenticationError {
             Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Self::InvalidToken => StatusCode::UNAUTHORIZED,
             Self::InvalidOTP => StatusCode::UNAUTHORIZED,
-            Self::InvalidRole => StatusCode::UNPROCESSABLE_ENTITY,
+            Self::InsufficientPrivileges => StatusCode::FORBIDDEN,
             Self::UnverifiedEmail => StatusCode::UNAUTHORIZED,
             Self::AccountFrozen => StatusCode::UNAUTHORIZED,
+            Self::EmailTaken => StatusCode::CONFLICT,
         }
     }
 }

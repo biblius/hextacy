@@ -9,8 +9,8 @@ diesel::table! {
         frozen -> Bool,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        expires_at -> Timestamptz,
         soft_expires_at -> Timestamptz,
+        expires_at -> Timestamptz,
     }
 }
 

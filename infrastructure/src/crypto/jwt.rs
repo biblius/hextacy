@@ -11,7 +11,7 @@ use super::CryptoError;
 
 /// Used for jwts. sub is the actual payload, iat and exp are unix timestamps representing the issued at and expiration times respectively.
 /// As per https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
     pub iss: String,
@@ -37,7 +37,7 @@ pub fn generate(
     expires_in: cookie::time::Duration,
     algo: Algorithm,
 ) -> Result<String, CryptoError> {
-    let priv_key = fs::read(Path::new("./key_pair/priv_key.pem"))?;
+    let priv_key = fs::read(Path::new("../crypto/key_pair/priv_key.pem"))?;
     let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
 
     let now = jsonwebtoken::get_current_timestamp();
@@ -53,12 +53,12 @@ pub fn generate(
 pub fn parse<T: Serialize + DeserializeOwned>(token: &str) -> Result<T, CryptoError> {
     info!("{}", "Verifying JWT".cyan());
     // Fetch public key
-    let pub_key = fs::read(Path::new("./key_pair/pub_key.pem"))?;
+    let pub_key = fs::read(Path::new("../crypto/key_pair/pub_key.pem"))?;
 
     let decoding_key = DecodingKey::from_rsa_pem(&pub_key)?;
 
     let token_data =
-        jsonwebtoken::decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::RS256))?;
+        jsonwebtoken::decode::<Claims>(token, &decoding_key, &Validation::new(Algorithm::RS256))?;
 
     let result: T = serde_json::from_str(&token_data.claims.sub)?;
     Ok(result)

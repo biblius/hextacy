@@ -16,4 +16,8 @@ pub enum DatabaseError {
     RdDirectConnection(#[from] r2d2_redis::redis::RedisError),
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),
+    #[error("Serde Error: {0}")]
+    Serde(#[from] serde_json::Error),
+    #[error("Does not exist: {0}")]
+    DoesNotExist(String),
 }

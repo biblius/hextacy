@@ -26,13 +26,12 @@ pub struct User {
 
 impl User {
     /// Creates a user entry with all the default properties
-    pub fn create_initial(
+    pub fn create(
         user_email: &str,
         user_name: &str,
         conn: &mut PgPoolConnection,
     ) -> Result<Self, Error> {
         use super::schema::users::dsl::*;
-
         diesel::insert_into(users)
             .values(NewUserBasic {
                 email: user_email,
@@ -45,7 +44,6 @@ impl User {
     /// Fetches a user by their ID
     pub fn get_by_id(user_id: &str, conn: &mut PgPoolConnection) -> Result<Self, Error> {
         use super::schema::users::dsl::*;
-
         users
             .filter(id.eq(user_id))
             .first::<Self>(conn)
@@ -55,7 +53,6 @@ impl User {
     /// Fetches a user by their email
     pub fn get_by_email(user_email: &str, conn: &mut PgPoolConnection) -> Result<Self, Error> {
         use super::schema::users::dsl::*;
-
         users
             .filter(email.eq(user_email))
             .first::<Self>(conn)
@@ -63,7 +60,7 @@ impl User {
     }
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
-    pub fn set_password(
+    pub fn update_password(
         user_id: &str,
         pw: &str,
         conn: &mut PgPoolConnection,
@@ -74,6 +71,29 @@ impl User {
 
         diesel::update(users.filter(id.eq(user_id)))
             .set(password.eq(hashed))
+            .load::<Self>(conn)
+            .map_err(|e| e.into())
+    }
+
+    /// Sets the user's frozen flag to true.
+    pub fn freeze(user_id: &str, conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
+        use super::schema::users::dsl::*;
+
+        diesel::update(users.filter(id.eq(user_id)))
+            .set(frozen.eq(true))
+            .load::<Self>(conn)
+            .map_err(|e| e.into())
+    }
+
+    /// Sets the user's frozen flag to true.
+    pub fn update_email_verified_at(
+        user_id: &str,
+        conn: &mut PgPoolConnection,
+    ) -> Result<Vec<Self>, Error> {
+        use super::schema::users::dsl::*;
+
+        diesel::update(users.filter(id.eq(user_id)))
+            .set(email_verified_at.eq(chrono::Utc::now()))
             .load::<Self>(conn)
             .map_err(|e| e.into())
     }

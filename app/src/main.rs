@@ -1,18 +1,17 @@
-use actix_web::{
-    web::{self, Data},
-    App, HttpServer,
-};
+use actix_web::{middleware::Logger, web, App, HttpServer};
 use infrastructure::{
     config::{env, logger},
-    http,
+    email, http,
+    storage::{postgres::Pg, redis::Rd},
 };
+use std::sync::Arc;
 use tracing::info;
+
+use api::router;
 mod api;
 mod error;
 mod middleware;
 mod models;
-mod state;
-use api::router;
 
 pub async fn hello_world() -> impl actix_web::Responder {
     "Sanity works!"
@@ -22,35 +21,51 @@ pub async fn hello_world() -> impl actix_web::Responder {
 async fn main() -> std::io::Result<()> {
     env::load_from_file("./.env").unwrap();
 
-    logger::init("info");
-    //logger::init_file("trace", "server.log");
+    logger::init("debug");
+    // logger::init_file("debug", "server.log");
 
-    let state = Data::new(state::State::init());
+    //let state = Data::new(state::State::init());
+
+    let pg = Arc::new(Pg::new());
+    info!("Postgres pool initialized");
+
+    let rd = Arc::new(Rd::new());
+    info!("Redis pool initialized");
+
+    let email_client = Arc::new(email::build_client());
+    info!("Redis pool initialized");
 
     let (host, port) = (
         env::get_or_default("HOST", "0.0.0.0"),
         env::get_or_default("PORT", "8080"),
     );
 
-    infrastructure::email::send_email(
+    let addr = format!("{}:{}", host, port);
+    info!("Starting server on {}:{}", host, port);
+
+    /* infrastructure::email::send_email(
         Some("Yolo mcSwag"),
         "biblius khan",
         "josip.benkodakovic@barrage.net",
         "Desiii",
         "Tusmoooo".to_string(),
     )
-    .unwrap();
-
-    let addr = format!("{}:{}", host, port);
-    info!("Starting server on {}:{}", host, port);
+    .unwrap(); */
 
     HttpServer::new(move || {
         App::new()
-            .app_data(state.clone())
-            .configure(router::set_routes)
+            .configure(|cfg| {
+                router::init(
+                    Arc::clone(&pg),
+                    Arc::clone(&rd),
+                    Arc::clone(&email_client),
+                    cfg,
+                )
+            })
             .route("/hello", web::get().to(hello_world))
             .wrap(http::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
             .wrap(http::security_headers::default())
+            .wrap(Logger::default())
     })
     .bind(addr)?
     .run()
