@@ -1,5 +1,8 @@
 use crate::config;
-use lettre::{transport::smtp::authentication::Credentials, Message, SmtpTransport, Transport};
+use lettre::{
+    message::header::ContentType, transport::smtp::authentication::Credentials, Message,
+    SmtpTransport, Transport,
+};
 use std::{fmt::Write, fs, path::Path};
 use thiserror::Error;
 
@@ -62,6 +65,7 @@ pub fn send_email(
     let email = Message::builder()
         .from(from.parse().unwrap())
         .to(to.parse().unwrap())
+        .header(ContentType::TEXT_HTML)
         .subject(subject)
         .body(body)?;
 

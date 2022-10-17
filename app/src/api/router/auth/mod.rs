@@ -3,15 +3,14 @@ pub mod handler;
 pub mod response;
 pub mod service;
 
-use actix_web::web;
+use self::service::email::Email;
+use actix_web::web::{self, Data};
 use infrastructure::{
     email::lettre::SmtpTransport,
     storage::{postgres::Pg, redis::Rd},
 };
 use service::{authentication::Authentication, cache::Cache, postgres::Postgres};
 use std::sync::Arc;
-
-use self::service::email::Email;
 
 pub fn init(
     pg_pool: Arc<Pg>,
@@ -25,7 +24,7 @@ pub fn init(
         email: Email::new(email_client),
     };
 
-    cfg.app_data(service);
+    cfg.app_data(Data::new(service));
 
     // Credentials login
     cfg.service(

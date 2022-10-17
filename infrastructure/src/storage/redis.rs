@@ -5,7 +5,7 @@ use r2d2_redis::{
     redis::{Client, ConnectionInfo, IntoConnectionInfo},
     RedisConnectionManager,
 };
-use tracing::trace;
+use tracing::{info, trace};
 
 pub use r2d2_redis::redis::Commands;
 pub use r2d2_redis::redis::FromRedisValue;
@@ -82,6 +82,7 @@ impl Default for Rd {
 
 impl Rd {
     pub fn new() -> Self {
+        info!("Initializing redis pool");
         Self { pool: build_pool() }
     }
 
