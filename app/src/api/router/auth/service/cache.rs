@@ -7,12 +7,12 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tracing::debug;
 
-pub(crate) struct Cache {
+pub(super) struct Cache {
     pool: Arc<Rd>,
 }
 
 impl Cache {
-    pub(crate) fn new(pool: Arc<Rd>) -> Self {
+    pub(super) fn new(pool: Arc<Rd>) -> Self {
         Self { pool }
     }
 
@@ -22,18 +22,19 @@ impl Cache {
         csrf_token: &str,
         session: &Session,
     ) -> Result<(), Error> {
-        debug!("Caching session with token: {}", &csrf_token);
+        debug!(
+            "Caching session under {}",
+            format!("{}:{}", CacheId::Session, csrf_token)
+        );
         let mut connection = self.pool.connect()?;
-
         Cacher::set(
             CacheId::Session,
             csrf_token,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
             &mut connection,
-        )?;
-
-        Ok(())
+        )
+        .map_err(|e| e.into())
     }
 
     /// Caches a user whenever they have 2fa enabled and attempt to login. Used to quickly fetch the user
@@ -71,11 +72,9 @@ impl Cache {
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
     /// will be created, otherwise they will be incremented.
     pub(super) async fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
-        let mut connection = self.pool.connect()?;
         debug!("Caching login attempt for: {}", &user_id);
-
-        let key = Cacher::prefix_key(CacheId::LoginAttempts, &user_id);
-
+        let mut connection = self.pool.connect()?;
+        let key = Cacher::prefix_id(CacheId::LoginAttempts, &user_id);
         match connection.incr::<&str, u8, u8>(&key, 1) {
             Ok(c) => Ok(c),
             Err(_) => connection
@@ -88,7 +87,6 @@ impl Cache {
     pub(super) async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
         debug!("Deleting login attempts for: {}", &user_id);
         let mut connection = self.pool.connect()?;
-
         Cacher::delete(CacheId::LoginAttempts, user_id, &mut connection).map_err(|e| e.into())
     }
 }

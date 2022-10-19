@@ -6,54 +6,80 @@ use infrastructure::storage::{postgres::Pg, DatabaseError};
 use std::sync::Arc;
 use tracing::debug;
 
-pub(crate) struct Postgres {
+pub(super) struct Postgres {
     pool: Arc<Pg>,
 }
 
 impl Postgres {
-    pub(crate) fn new(pool: Arc<Pg>) -> Self {
+    pub(super) fn new(pool: Arc<Pg>) -> Self {
         Self { pool }
     }
 
-    pub(super) async fn find_user_by_email(&self, email: &str) -> Result<User, Error> {
+    /// Gets a user by their id
+    pub(super) async fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
+        debug!("Getting user with ID {}", id);
+        User::get_by_id(id, &mut self.pool.connect()?)
+    }
+
+    /// Gets a user by their email
+    pub(super) async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
+        debug!("Getting user with email {}", email);
         User::get_by_email(email, &mut self.pool.connect()?)
     }
 
-    pub(super) async fn create_session(&self, user: &User) -> Result<Session, Error> {
+    /// Creates session for given user
+    pub(super) async fn create_session(
+        &self,
+        user: &User,
+        csrf_token: &str,
+    ) -> Result<Session, Error> {
         debug!("Creating session for user: {}", &user.id);
-        Session::create(user, &mut self.pool.connect()?)
+        Session::create(user, csrf_token, &mut self.pool.connect()?)
     }
 
+    /// Marks the user's account as frozen
     pub(super) async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
         debug!("Freezing user with id: {}", user_id);
-        let mut result = User::freeze(user_id, &mut self.pool.connect()?)?;
-        result
+        User::freeze(user_id, &mut self.pool.connect()?)?
             .pop()
-            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {}", user_id)).into())
+            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
 
+    /// Creates a new unauthenticated user
     pub(super) async fn create_user(&self, email: &str, username: &str) -> Result<User, Error> {
         debug!("Creating user with email: {}", email);
         User::create(email, username, &mut self.pool.connect()?)
     }
 
+    /// Updates the user's password field
     pub(super) async fn update_user_password(
         &self,
         user_id: &str,
         password: &str,
     ) -> Result<User, Error> {
         debug!("Updating password for user: {}", user_id);
-        let mut result = User::update_password(user_id, password, &mut self.pool.connect()?)?;
-        result
+        User::update_password(user_id, password, &mut self.pool.connect()?)?
             .pop()
-            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {}", user_id)).into())
+            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
 
+    /// Updates the user's email_verified_at field upon successfully verifying their registration token
     pub(super) async fn update_email_verified_at(&self, user_id: &str) -> Result<User, Error> {
         debug!("Updating verification status for: {}", user_id);
-        let mut result = User::update_email_verified_at(user_id, &mut self.pool.connect()?)?;
-        result
+        User::update_email_verified_at(user_id, &mut self.pool.connect()?)?
             .pop()
-            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {}", user_id)).into())
+            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
+    }
+
+    /// Generates a random OTP secret and stores it to the user
+    pub(super) async fn set_user_otp_secret(
+        &self,
+        user_id: &str,
+        secret: &str,
+    ) -> Result<User, Error> {
+        debug!("Setting OTP secret for: {}", user_id);
+        User::update_otp_secret(user_id, secret, &mut self.pool.connect()?)?
+            .pop()
+            .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
 }

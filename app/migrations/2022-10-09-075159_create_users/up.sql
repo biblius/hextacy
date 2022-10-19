@@ -4,7 +4,7 @@ CREATE TABLE users(
   username VARCHAR(32) NOT NULL,
   "role" VARCHAR(32) NOT NULL DEFAULT 'user',
   "password" VARCHAR(255),
-  otp_secret VARCHAR(255),
+  otp_secret VARCHAR(320),
   phone VARCHAR(32),
   google_id VARCHAR(255),
   github_id VARCHAR(255),

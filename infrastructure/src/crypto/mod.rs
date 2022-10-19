@@ -23,4 +23,6 @@ pub enum CryptoError {
     DataEncoding(#[from] data_encoding::DecodeError),
     #[error("{0}")]
     Thotp(#[from] thotp::ThotpError),
+    #[error("{0}")]
+    FromUtf8(#[from] std::string::FromUtf8Error),
 }

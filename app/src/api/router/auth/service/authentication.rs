@@ -1,19 +1,18 @@
+use std::sync::Arc;
+
 use super::{cache::Cache, email::Email, postgres::Postgres};
 use crate::{
     api::router::auth::{
-        data::{
-            login::{Credentials, Otp},
-            registration::{RegistrationData, SetPassword},
-        },
+        data::{Credentials, Otp, RegistrationData, SetPassword},
         response::{
-            login::{AuthenticationSuccess, FreezeAccount, Prompt2FA},
-            registration::{RegistrationSuccess, TokenVerified},
+            AuthenticationSuccess, FreezeAccount, Prompt2FA, RegistrationSuccess, TokenVerified,
         },
     },
     error::{AuthenticationError, Error},
     models::user::User,
 };
-use actix_web::HttpResponse;
+use actix_web::{body::BoxBody, cookie::SameSite, HttpResponse, HttpResponseBuilder};
+use data_encoding::BASE64URL;
 use infrastructure::{
     config::constants::{
         MAXIMUM_LOGIN_ATTEMPTS, OTP_TOKEN_DURATION_SECONDS, PW_TOKEN_DURATION_SECONDS,
@@ -21,35 +20,53 @@ use infrastructure::{
     },
     crypto::{
         self,
-        utils::{bcrypt_verify, generate_hmac},
+        utils::{bcrypt_verify, generate_hmac, uuid},
     },
+    email::lettre::SmtpTransport,
     http::{cookie, response::Response},
-    storage::redis::CacheId,
+    storage::{
+        postgres::Pg,
+        redis::{CacheId, Rd},
+    },
 };
-use reqwest::StatusCode;
+use reqwest::{
+    header::{self, HeaderName, HeaderValue},
+    StatusCode,
+};
 use tracing::info;
 
 pub(crate) struct Authentication {
-    pub database: Postgres,
-    pub cache: Cache,
-    pub email: Email,
+    database: Postgres,
+    cache: Cache,
+    email: Email,
 }
 
 // #[async_trait]
 impl Authentication {
+    pub(crate) fn new(pg: Arc<Pg>, rd: Arc<Rd>, email: Arc<SmtpTransport>) -> Self {
+        Self {
+            database: Postgres::new(pg),
+            cache: Cache::new(rd),
+            email: Email::new(email),
+        }
+    }
+
+    /// Verifies the user's credentials and returns a response based on their 2fa status
     pub(crate) async fn verify_credentials(
         &self,
         credentials: Credentials,
     ) -> Result<HttpResponse, Error> {
         let (email, password) = credentials.data();
 
-        let user = match self.database.find_user_by_email(email).await {
+        info!("Verifying credentials for {}", email);
+
+        let user = match self.database.get_user_by_email(email).await {
             Ok(u) => u,
             Err(_) => return Err(AuthenticationError::InvalidCredentials.into()),
         };
 
         if user.email_verified_at.is_none() || user.password.is_none() {
-            return Err(AuthenticationError::UnverifiedEmail.into());
+            return Err(AuthenticationError::InvalidCredentials.into());
         }
 
         if user.frozen {
@@ -74,18 +91,23 @@ impl Authentication {
 
         // If the user has 2FA turned on, stop here and cache the user so we can quickly verify their otp
         if user.otp_secret.is_some() {
-            let temp = generate_hmac("OTP_HMAC_SECRET", None)?;
+            info!(
+                "verfiy_credentials - User {:?} requires 2FA, caching token",
+                user.id
+            );
+
+            let token = generate_hmac("OTP_HMAC_SECRET", &user.password.unwrap(), BASE64URL)?;
 
             self.cache
                 .set_token(
                     CacheId::OTPToken,
-                    &temp,
-                    &user,
+                    &token,
+                    &user.id,
                     Some(OTP_TOKEN_DURATION_SECONDS),
                 )
                 .await?;
 
-            return Ok(Prompt2FA::new(&user.username, &temp).to_response(
+            return Ok(Prompt2FA::new(&user.username, &token).to_response(
                 StatusCode::OK,
                 None,
                 None,
@@ -99,10 +121,18 @@ impl Authentication {
     pub(crate) async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
         let (password, token) = otp.data();
 
-        let user = self
+        let user_id = match self
             .cache
-            .get_token::<User>(CacheId::OTPToken, token)
-            .await?;
+            .get_token::<String>(CacheId::OTPToken, token)
+            .await
+        {
+            Ok(id) => id,
+            Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::OTPToken).into()),
+        };
+
+        info!("Verifying OTP for {} ", user_id);
+
+        let user = self.database.get_user_by_id(&user_id).await?;
 
         if let Some(ref secret) = user.otp_secret {
             let (result, _) = crypto::utils::verify_otp(password, secret)?;
@@ -126,25 +156,27 @@ impl Authentication {
     ) -> Result<HttpResponse, Error> {
         let (email, username) = data.inner();
 
-        if self.database.find_user_by_email(email).await.is_ok() {
+        info!("Starting registration for {}", email);
+
+        if self.database.get_user_by_email(email).await.is_ok() {
             return Err(AuthenticationError::EmailTaken.into());
         }
 
         let user = self.database.create_user(email, username).await?;
 
-        let reg_token = generate_hmac("EMAIL_HMAC_SECRET", Some(&user.id))?;
+        let token = generate_hmac("EMAIL_HMAC_SECRET", &user.id, BASE64URL)?;
 
         self.cache
             .set_token(
                 CacheId::RegToken,
-                &reg_token,
+                &token,
                 &user.id,
                 Some(REGISTRATION_TOKEN_EXPIRATION_SECONDS),
             )
             .await?;
 
         self.email
-            .send_registration_token(&reg_token, &user.username, email)?;
+            .send_registration_token(&token, &user.username, email)?;
 
         Ok(RegistrationSuccess::new(
             "Successfully sent registration token",
@@ -166,14 +198,21 @@ impl Authentication {
             .await
         {
             Ok(id) => id,
-            Err(_) => return Err(AuthenticationError::InvalidToken.into()),
+            Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::RegToken).into()),
         };
+
+        info!("Verfiying registration token for {user_id}");
+
+        // Verify the token with the hashed user ID, error if they mismatch
+        if !crypto::utils::verify_hmac("EMAIL_HMAC_SECRET", &user_id, token, BASE64URL)? {
+            return Err(AuthenticationError::InvalidToken(CacheId::RegToken).into());
+        }
 
         self.database.update_email_verified_at(&user_id).await?;
 
         self.cache.delete_token(CacheId::RegToken, token).await?;
 
-        let pw_token = generate_hmac("PW_TOKEN_SECRET", None)?;
+        let pw_token = generate_hmac("PW_TOKEN_SECRET", &user_id, BASE64URL)?;
 
         self.cache
             .set_token(
@@ -193,48 +232,66 @@ impl Authentication {
         )
     }
 
+    /// Set the user's password after successful email token verification
     pub(crate) async fn set_password(
         &self,
-        user_identifier: String,
+        user_id: &str,
         data: SetPassword,
     ) -> Result<HttpResponse, Error> {
         let (token, password) = data.inner();
 
-        let user_id = match self
+        let cached_user_id = match self
             .cache
             .get_token::<String>(CacheId::PWToken, token)
             .await
         {
             Ok(id) => id,
-            Err(_) => return Err(AuthenticationError::InvalidToken.into()),
+            Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::PWToken).into()),
         };
 
-        if user_identifier != user_id {
-            return Err(AuthenticationError::InvalidToken.into());
+        if user_id != cached_user_id {
+            return Err(AuthenticationError::InvalidToken(CacheId::PWToken).into());
         }
 
         let user = self
             .database
-            .update_user_password(&user_id, password)
+            .update_user_password(user_id, password)
             .await?;
 
         self.cache.delete_token(CacheId::PWToken, token).await?;
 
+        info!("Successfully set password for {user_id}");
+
         self.generate_session_response(user).await
     }
 
-    /// Generates a 200 OK HTTP response with a CSRF token and the user's session.
-    pub(crate) async fn generate_session_response(
-        &self,
-        user: User,
-    ) -> Result<HttpResponse, Error> {
-        let session = self.database.create_session(&user).await?;
+    /// Generates an OTP secret for the user and returns it in a QR code in the response
+    pub(crate) async fn set_otp_secret(&self, user_id: &str) -> Result<HttpResponse, Error> {
+        let secret = crypto::utils::generate_otp_secret();
 
-        let csrf_token = generate_hmac("CSRF_SECRET", Some(&session.id))?;
+        let user = self.database.set_user_otp_secret(user_id, &secret).await?;
 
-        let session_cookie = cookie::create("session", &session, None)?;
+        let qr = crypto::utils::generate_totp_qr_code(&secret, &user.email)?;
 
-        let csrf_cookie = cookie::csrf(&csrf_token);
+        info!("Successfully set OTP secret for {}", user.id);
+
+        let response = HttpResponseBuilder::new(StatusCode::OK)
+            .append_header((
+                header::CONTENT_TYPE,
+                header::HeaderValue::from_static("image/svg+xml"),
+            ))
+            .body(BoxBody::new(qr));
+
+        Ok(response)
+    }
+
+    /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
+    async fn generate_session_response(&self, user: User) -> Result<HttpResponse, Error> {
+        let csrf_token = uuid();
+
+        let session = self.database.create_session(&user, &csrf_token).await?;
+
+        let session_cookie = cookie::create("session_id", &session.id, Some(SameSite::None))?;
 
         // Delete login attempts on success
         match self.cache.delete_login_attempts(&user.id).await {
@@ -245,10 +302,17 @@ impl Authentication {
         // Cache the session initially
         self.cache.set_session(&csrf_token, &session).await?;
 
+        info!("Successfully created session for {}", user.id);
+        info!("Cookie {:?}", session_cookie);
+
+        // Respond with the x-csrf header and the session ID
         Ok(AuthenticationSuccess::new(user, session).to_response(
             StatusCode::OK,
-            Some(vec![session_cookie, csrf_cookie]),
-            None,
+            Some(vec![session_cookie]),
+            Some(vec![(
+                HeaderName::from_static("x-csrf-token"),
+                HeaderValue::from_str(&csrf_token)?,
+            )]),
         ))
     }
 }

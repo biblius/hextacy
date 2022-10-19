@@ -6,10 +6,9 @@ diesel::table! {
         user_id -> Varchar,
         username -> Varchar,
         user_role -> Varchar,
-        frozen -> Bool,
+        csrf_token -> Varchar,
         created_at -> Timestamptz,
         updated_at -> Timestamptz,
-        soft_expires_at -> Timestamptz,
         expires_at -> Timestamptz,
     }
 }
@@ -34,7 +33,4 @@ diesel::table! {
 
 diesel::joinable!(sessions -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    sessions,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(sessions, users,);

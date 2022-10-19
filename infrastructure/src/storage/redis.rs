@@ -114,8 +114,9 @@ impl Cache {
         key: &str,
         conn: &mut RedisPoolConnection,
     ) -> Result<T, DatabaseError> {
-        let key = Self::prefix_key(cache_id, &key);
+        let key = Self::prefix_id(cache_id, &key);
         let result = conn.get::<&str, String>(&key)?;
+        trace!("Found redis key : {}", result);
         serde_json::from_str::<T>(&result).map_err(|e| e.into())
     }
 
@@ -126,7 +127,7 @@ impl Cache {
         ex: Option<usize>,
         conn: &mut RedisPoolConnection,
     ) -> Result<(), DatabaseError> {
-        let key = Self::prefix_key(cache_id, &key);
+        let key = Self::prefix_id(cache_id, &key);
         let value = serde_json::to_string(&val)?;
         if let Some(ex) = ex {
             conn.set_ex::<&str, String, ()>(&key, value, ex)
@@ -142,15 +143,17 @@ impl Cache {
         key: &str,
         conn: &mut RedisPoolConnection,
     ) -> Result<(), DatabaseError> {
-        conn.del::<String, ()>(Self::prefix_key(cache_id, &key))
+        trace!("Deleting value under {}:{}", cache_id, key);
+        conn.del::<String, ()>(Self::prefix_id(cache_id, &key))
             .map_err(|e| e.into())
     }
 
-    pub fn prefix_key<T: ToRedisArgs + Display>(cache_id: CacheId, key: &T) -> String {
+    pub fn prefix_id<T: ToRedisArgs + Display>(cache_id: CacheId, key: &T) -> String {
         format!("{}:{}", cache_id, key)
     }
 }
 
+#[derive(Debug)]
 pub enum CacheId {
     LoginAttempts,
     Session,

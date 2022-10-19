@@ -41,6 +41,12 @@ impl User {
             .map_err(|e| e.into())
     }
 
+    pub fn get_all(conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
+        use super::schema::users::dsl::*;
+
+        users.load::<Self>(conn).map_err(|e| e.into())
+    }
+
     /// Fetches a user by their ID
     pub fn get_by_id(user_id: &str, conn: &mut PgPoolConnection) -> Result<Self, Error> {
         use super::schema::users::dsl::*;
@@ -70,17 +76,7 @@ impl User {
         let hashed = crypto::utils::bcrypt_hash(pw)?;
 
         diesel::update(users.filter(id.eq(user_id)))
-            .set(password.eq(hashed))
-            .load::<Self>(conn)
-            .map_err(|e| e.into())
-    }
-
-    /// Sets the user's frozen flag to true.
-    pub fn freeze(user_id: &str, conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
-        use super::schema::users::dsl::*;
-
-        diesel::update(users.filter(id.eq(user_id)))
-            .set(frozen.eq(true))
+            .set(password.eq(Some(hashed)))
             .load::<Self>(conn)
             .map_err(|e| e.into())
     }
@@ -91,9 +87,30 @@ impl User {
         conn: &mut PgPoolConnection,
     ) -> Result<Vec<Self>, Error> {
         use super::schema::users::dsl::*;
-
         diesel::update(users.filter(id.eq(user_id)))
             .set(email_verified_at.eq(chrono::Utc::now()))
+            .load::<Self>(conn)
+            .map_err(|e| e.into())
+    }
+
+    /// Updates the user's OTP secret to the given key
+    pub fn update_otp_secret(
+        user_id: &str,
+        secret: &str,
+        conn: &mut PgPoolConnection,
+    ) -> Result<Vec<Self>, Error> {
+        use super::schema::users::dsl::*;
+        diesel::update(users.filter(id.eq(user_id)))
+            .set(otp_secret.eq(Some(secret)))
+            .load::<Self>(conn)
+            .map_err(|e| e.into())
+    }
+
+    /// Sets the user's frozen flag to true.
+    pub fn freeze(user_id: &str, conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
+        use super::schema::users::dsl::*;
+        diesel::update(users.filter(id.eq(user_id)))
+            .set(frozen.eq(true))
             .load::<Self>(conn)
             .map_err(|e| e.into())
     }

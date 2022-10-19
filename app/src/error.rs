@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::storage::redis;
+use infrastructure::storage::redis::{self, CacheId};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -23,6 +23,8 @@ pub enum Error {
     Email(#[from] infrastructure::email::EmailError),
     #[error("Reqwest Header Error: {0}")]
     Reqwest(#[from] reqwest::header::InvalidHeaderValue),
+    #[error("Reqwest Header Error: {0}")]
+    ToStr(#[from] reqwest::header::ToStrError),
 }
 
 impl Error {
@@ -30,18 +32,21 @@ impl Error {
     pub fn message_and_description(&self) -> (&'static str, &'static str) {
         match self {
             Self::Authentication(e) => match e {
+                AuthenticationError::SessionNotFound => ("INVALID_SESSION", "Session not found"),
                 AuthenticationError::InvalidCredentials => {
                     ("INVALID_CREDENTIALS", "Invalid credentials")
                 }
-                AuthenticationError::InvalidOTP => ("INVALID_2FA", "Invalid 2FA code"),
-                AuthenticationError::InsufficientPrivileges => (
-                    "FORBIDDEN",
+                AuthenticationError::InvalidOTP => ("INVALID_OTP", "Invalid OTP provided"),
+                AuthenticationError::InvalidCsrfHeader => (
+                    "INVALID_CSRF",
                     "You do not have the rights to access this page",
                 ),
-                AuthenticationError::InvalidToken => {
-                    ("INVALID_TOKEN", "Invalid registration token")
-                }
-                AuthenticationError::UnverifiedEmail => ("UNVERIFIED_EMAIL", "Email not verified"),
+                AuthenticationError::InvalidToken(id) => match id {
+                    CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
+                    CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
+                    CacheId::PWToken => ("INVALID_TOKEN", "Invalid password token"),
+                    _ => ("INVALID_TOKEN", "Invalid token"),
+                },
                 AuthenticationError::AccountFrozen => {
                     ("ACCOUNT_FROZEN", "Account has been suspended")
                 }
@@ -97,16 +102,16 @@ impl Display for ErrorResponse<'_> {
 
 #[derive(Debug, Error)]
 pub enum AuthenticationError {
+    #[error("Session not found")]
+    SessionNotFound,
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Invalid token")]
-    InvalidToken,
+    InvalidToken(CacheId),
     #[error("Invalid OTP")]
     InvalidOTP,
-    #[error("Insufficient privileges")]
-    InsufficientPrivileges,
-    #[error("Unverified email")]
-    UnverifiedEmail,
+    #[error("Invalid CSRF header")]
+    InvalidCsrfHeader,
     #[error("Account frozen")]
     AccountFrozen,
     #[error("Email taken")]
@@ -116,11 +121,11 @@ pub enum AuthenticationError {
 impl AuthenticationError {
     pub fn status_code(&self) -> StatusCode {
         match self {
+            Self::SessionNotFound => StatusCode::UNAUTHORIZED,
             Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
-            Self::InvalidToken => StatusCode::UNAUTHORIZED,
+            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
             Self::InvalidOTP => StatusCode::UNAUTHORIZED,
-            Self::InsufficientPrivileges => StatusCode::FORBIDDEN,
-            Self::UnverifiedEmail => StatusCode::UNAUTHORIZED,
+            Self::InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
             Self::AccountFrozen => StatusCode::UNAUTHORIZED,
             Self::EmailTaken => StatusCode::CONFLICT,
         }

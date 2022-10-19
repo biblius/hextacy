@@ -36,7 +36,7 @@ tracing = "0.1.35"
 
 actix-cors = "0.6.3"
 actix-web = "4"
-cookie = "0.16.1"
+cookie = { version = "0.16.1", features = ["secure"] }
 
 # Websocket
 

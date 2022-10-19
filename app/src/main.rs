@@ -10,7 +10,6 @@ use tracing::info;
 use api::router;
 mod api;
 mod error;
-mod middleware;
 mod models;
 
 pub async fn hello_world() -> impl actix_web::Responder {

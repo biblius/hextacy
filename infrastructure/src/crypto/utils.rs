@@ -1,11 +1,14 @@
 use super::CryptoError;
 use crate::config::env;
 use bcrypt;
-use data_encoding::BASE64URL;
+use data_encoding::{Encoding, BASE32};
 use hmac::{self, Mac};
-use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::Sha256;
-use std::fmt::Write;
+use tracing::debug;
+
+pub fn uuid() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
 
 #[inline]
 pub fn bcrypt_hash(password: &str) -> Result<String, CryptoError> {
@@ -19,62 +22,76 @@ pub fn bcrypt_verify(password: &str, hash: &str) -> Result<bool, CryptoError> {
 
 /// Generate an HMAC token with the given environment secret and the provided buffer.
 ///
+/// The token is Base 64 URL encoded.
+///
 /// Panics if the provided `env_key` is not set in the .env file.
-pub fn generate_hmac(env_key: &str, nonce: Option<&str>) -> Result<String, CryptoError> {
+pub fn generate_hmac(
+    env_key: &str,
+    nonce: &str,
+    encoding: Encoding,
+) -> Result<String, CryptoError> {
+    debug!("Generating HMAC with key {}", env_key);
+
     let hmac_secret =
         env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{}'", env_key));
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
 
-    let nonce = if let Some(nonce) = nonce {
-        nonce.to_string()
-    } else {
-        random_nonce()
-    };
-
     hmac::Mac::update(&mut mac, nonce.as_bytes());
 
-    Ok(BASE64URL.encode(&mac.finalize().into_bytes()))
+    Ok(encoding.encode(&mac.finalize().into_bytes()))
 }
 
 /// Verifies the given HMAC with the given nonce. Returns `Ok(true)` if the resulting hashes match, `Ok(false)` otherwise.
-pub fn verify_hmac(env_key: &str, nonce: &str, hmac: &str) -> Result<bool, CryptoError> {
+pub fn verify_hmac(
+    env_key: &str,
+    nonce: &str,
+    hmac: &str,
+    encoding: Encoding,
+) -> Result<bool, CryptoError> {
+    debug!("Verifying HMAC with key {}", env_key);
     let hmac_secret =
         env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{}'", env_key));
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
     hmac::Mac::update(&mut mac, nonce.as_bytes());
 
-    let original = BASE64URL.decode(hmac.as_bytes())?;
+    let original = encoding.decode(hmac.as_bytes())?;
 
-    mac.verify_slice(&original)
+    mac.verify_slice(&original[..])
         .map_or_else(|_| Ok(false), |_| Ok(true))
 }
 
+pub fn generate_otp_secret() -> String {
+    debug!("Generating OTP secret");
+    thotp::encoding::encode(&thotp::generate_secret(160), BASE32)
+}
+
+pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, CryptoError> {
+    debug!("Generating TOTP");
+    let uri = thotp::qr::otp_uri(
+        "totp",
+        secret,
+        &format!("RPSChat:{}", user_email),
+        "RPS Chat",
+        None,
+    )?;
+    thotp::qr::generate_code_svg(&uri, None, None, thotp::qr::EcLevel::M).map_err(|e| e.into())
+}
+
 pub fn verify_otp(password: &str, secret: &str) -> Result<(bool, i16), CryptoError> {
-    let secret = secret.as_bytes();
-    thotp::verify_totp(password, secret, 0).map_err(|e| e.into())
-}
-
-/// Generates a random nonce, useful for caching temporary tokens
-fn random_nonce() -> String {
-    let mut buff = [0_u8; 256];
-    let mut rng = StdRng::from_entropy();
-    rng.fill_bytes(&mut buff);
-    to_hex(&buff)
-}
-
-/// Utility for encoding a buffer to a hex string
-fn to_hex(buf: &[u8]) -> String {
-    let mut r = String::new();
-    for b in buf {
-        write!(r, "{:02x}", b).unwrap();
-    }
-    r
+    debug!(
+        "Verifying TOTP for password {} and secret {}",
+        password, secret
+    );
+    let secret = BASE32.decode(secret.as_bytes())?;
+    thotp::verify_totp(password, &secret, 0).map_err(|e| e.into())
 }
 
 #[cfg(test)]
 mod tests {
+    use data_encoding::{BASE64, BASE64URL};
+
     use crate::config;
 
     use super::*;
@@ -86,7 +103,23 @@ mod tests {
             "0e7cfad46e31c2bfd76bb0687385b87536898b209a9aef13e94b430d7d3585f7",
         );
         let nonce = uuid::Uuid::new_v4().to_string();
-        let hmac = generate_hmac("CSRF_SECRET", Some(&nonce)).unwrap();
-        assert!(matches!(verify_hmac("CSRF_SECRET", &hmac, &nonce), Ok(_)))
+        let hmac = generate_hmac("CSRF_SECRET", &nonce, BASE64).unwrap();
+        println!("{hmac}");
+        let res = verify_hmac("CSRF_SECRET", &nonce, &hmac, BASE64).unwrap();
+        assert!(res);
+
+        let nonce = uuid::Uuid::new_v4().to_string();
+        let hmac = generate_hmac("CSRF_SECRET", &nonce, BASE32).unwrap();
+        assert!(matches!(
+            verify_hmac("CSRF_SECRET", &nonce, &hmac, BASE32),
+            Ok(res) if res
+        ));
+
+        let nonce = uuid::Uuid::new_v4().to_string();
+        let hmac = generate_hmac("CSRF_SECRET", &nonce, BASE64URL).unwrap();
+        assert!(matches!(
+            verify_hmac("CSRF_SECRET", &nonce, &hmac, BASE64URL),
+            Ok(res) if res
+        ))
     }
 }

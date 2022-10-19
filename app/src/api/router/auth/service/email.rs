@@ -6,12 +6,12 @@ use infrastructure::{
 use std::sync::Arc;
 use tracing::debug;
 
-pub struct Email {
+pub(super) struct Email {
     client: Arc<SmtpTransport>,
 }
 
 impl Email {
-    pub(crate) fn new(client: Arc<SmtpTransport>) -> Self {
+    pub(super) fn new(client: Arc<SmtpTransport>) -> Self {
         Self { client }
     }
 
