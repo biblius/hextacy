@@ -5,12 +5,13 @@ use crate::models::user::User;
 
 #[derive(Debug, Serialize)]
 pub struct UserResponse {
+    count: usize,
     users: Vec<User>,
 }
 
 impl UserResponse {
-    pub fn new(users: Vec<User>) -> Self {
-        Self { users }
+    pub fn new(count: usize, users: Vec<User>) -> Self {
+        Self { count, users }
     }
 }
 

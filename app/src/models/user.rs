@@ -24,6 +24,13 @@ pub struct User {
     pub updated_at: NaiveDateTime,
 }
 
+#[derive(Debug, Deserialize, Serialize, Insertable)]
+#[diesel(table_name = users)]
+pub struct NewUserBasic<'a> {
+    email: &'a str,
+    username: &'a str,
+}
+
 impl User {
     /// Creates a user entry with all the default properties
     pub fn create(
@@ -38,13 +45,38 @@ impl User {
                 username: user_name,
             })
             .get_result::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
-    pub fn get_all(conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
+    /// Returns the total count of users and a vec of users constrained by the options as
+    /// the first and second element respectively
+    pub fn get_paginated(
+        page: u16,
+        per_page: u16,
+        sort: SortOptions,
+        conn: &mut PgPoolConnection,
+    ) -> Result<(i64, Vec<Self>), Error> {
         use super::schema::users::dsl::*;
 
-        users.load::<Self>(conn).map_err(|e| e.into())
+        let count = users.count().get_result::<i64>(conn)?;
+
+        let mut query = users.into_boxed();
+
+        match sort {
+            SortOptions::UsernameAsc => query = query.order(username.asc()),
+            SortOptions::UsernameDesc => query = query.order(username.desc()),
+            SortOptions::EmailAsc => query = query.order(email.asc()),
+            SortOptions::EmailDesc => query = query.order(email.desc()),
+            SortOptions::CreatedAtAsc => query = query.order(created_at.asc()),
+            SortOptions::CreatedAtDesc => query = query.order(created_at.desc()),
+        };
+
+        query = query.offset(((page - 1) * per_page) as i64);
+        query = query.limit(per_page as i64);
+
+        let result = query.load::<Self>(conn)?;
+
+        Ok((count, result))
     }
 
     /// Fetches a user by their ID
@@ -53,7 +85,7 @@ impl User {
         users
             .filter(id.eq(user_id))
             .first::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Fetches a user by their email
@@ -62,7 +94,7 @@ impl User {
         users
             .filter(email.eq(user_email))
             .first::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
@@ -73,12 +105,12 @@ impl User {
     ) -> Result<Vec<Self>, Error> {
         use super::schema::users::dsl::*;
 
-        let hashed = crypto::utils::bcrypt_hash(pw)?;
+        let hashed = crypto::utility::bcrypt_hash(pw)?;
 
         diesel::update(users.filter(id.eq(user_id)))
             .set(password.eq(Some(hashed)))
             .load::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Sets the user's frozen flag to true.
@@ -90,7 +122,7 @@ impl User {
         diesel::update(users.filter(id.eq(user_id)))
             .set(email_verified_at.eq(chrono::Utc::now()))
             .load::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Updates the user's OTP secret to the given key
@@ -103,7 +135,7 @@ impl User {
         diesel::update(users.filter(id.eq(user_id)))
             .set(otp_secret.eq(Some(secret)))
             .load::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Sets the user's frozen flag to true.
@@ -112,13 +144,22 @@ impl User {
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
             .load::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Insertable)]
-#[diesel(table_name = users)]
-pub struct NewUserBasic<'a> {
-    email: &'a str,
-    username: &'a str,
+#[derive(Debug, Deserialize)]
+pub enum SortOptions {
+    #[serde(rename = "username")]
+    UsernameAsc,
+    #[serde(rename = "-username")]
+    UsernameDesc,
+    #[serde(rename = "email")]
+    EmailAsc,
+    #[serde(rename = "-email")]
+    EmailDesc,
+    #[serde(rename = "createdAt")]
+    CreatedAtAsc,
+    #[serde(rename = "-createdAt")]
+    CreatedAtDesc,
 }

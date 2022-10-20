@@ -34,10 +34,10 @@ impl Session {
         diesel::insert_into(sessions)
             .values(new)
             .get_result::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
-    /// Gets an unexpired session with a valid CSRF token
+    /// Gets an unexpired session with its corresponding CSRF token
     pub fn get_valid_by_id(
         session_id: &str,
         csrf: &str,
@@ -50,7 +50,7 @@ impl Session {
             .filter(expires_at.gt(chrono::Utc::now()))
             .filter(csrf_token.eq(csrf))
             .first::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
@@ -61,7 +61,7 @@ impl Session {
             .filter(id.eq(session_id))
             .set(expires_at.eq(Utc::now() + Duration::minutes(30)))
             .load::<Self>(conn)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 }
 
@@ -72,23 +72,4 @@ pub struct NewSession<'a> {
     username: &'a str,
     user_role: &'a Role,
     csrf_token: &'a str,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CacheableSession {
-    id: String,
-    user_id: String,
-    username: String,
-    user_role: Role,
-}
-
-impl From<Session> for CacheableSession {
-    fn from(s: Session) -> Self {
-        Self {
-            id: s.id,
-            user_id: s.user_id,
-            username: s.username,
-            user_role: s.user_role,
-        }
-    }
 }

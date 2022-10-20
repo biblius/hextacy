@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
-use super::{cache::Cache, email::Email, postgres::Postgres};
+use super::infrastructure::{cache::Cache, email::Email, postgres::Postgres};
 use crate::{
     api::router::auth::{
         data::{Credentials, Otp, RegistrationData, SetPassword},
         response::{
-            AuthenticationSuccess, FreezeAccount, Prompt2FA, RegistrationSuccess, TokenVerified,
+            AuthenticationSuccess, FreezeAccount, Prompt2FA, RegistrationSuccess, ResendPWToken,
+            TokenVerified,
         },
     },
     error::{AuthenticationError, Error},
@@ -20,7 +21,7 @@ use infrastructure::{
     },
     crypto::{
         self,
-        utils::{bcrypt_verify, generate_hmac, uuid},
+        utility::{bcrypt_verify, generate_hmac, uuid},
     },
     email::lettre::SmtpTransport,
     http::{cookie, response::Response},
@@ -35,7 +36,7 @@ use reqwest::{
 };
 use tracing::info;
 
-pub(crate) struct Authentication {
+pub(super) struct Authentication {
     database: Postgres,
     cache: Cache,
     email: Email,
@@ -43,7 +44,7 @@ pub(crate) struct Authentication {
 
 // #[async_trait]
 impl Authentication {
-    pub(crate) fn new(pg: Arc<Pg>, rd: Arc<Rd>, email: Arc<SmtpTransport>) -> Self {
+    pub(super) fn new(pg: Arc<Pg>, rd: Arc<Rd>, email: Arc<SmtpTransport>) -> Self {
         Self {
             database: Postgres::new(pg),
             cache: Cache::new(rd),
@@ -52,7 +53,7 @@ impl Authentication {
     }
 
     /// Verifies the user's credentials and returns a response based on their 2fa status
-    pub(crate) async fn verify_credentials(
+    pub(super) async fn verify_credentials(
         &self,
         credentials: Credentials,
     ) -> Result<HttpResponse, Error> {
@@ -65,12 +66,36 @@ impl Authentication {
             Err(_) => return Err(AuthenticationError::InvalidCredentials.into()),
         };
 
-        if user.email_verified_at.is_none() || user.password.is_none() {
+        // If the account is frozen
+        if user.frozen {
+            return Err(AuthenticationError::AccountFrozen.into());
+        }
+
+        // Unverified email
+        if user.email_verified_at.is_none() {
             return Err(AuthenticationError::InvalidCredentials.into());
         }
 
-        if user.frozen {
-            return Err(AuthenticationError::AccountFrozen.into());
+        // If the user doesn't have their pw set up, resend a temporary password token
+        if user.password.is_none() {
+            let token = crypto::utility::token(BASE64URL)?;
+
+            self.cache
+                .set_token(
+                    CacheId::PWToken,
+                    &token,
+                    &user.id,
+                    Some(PW_TOKEN_DURATION_SECONDS),
+                )
+                .await?;
+
+            return Ok(
+                ResendPWToken::new("Please set your password to continue", &token).to_response(
+                    StatusCode::OK,
+                    None,
+                    None,
+                ),
+            );
         }
 
         // Cache the attempt if it was wrong
@@ -118,7 +143,7 @@ impl Authentication {
     }
 
     /// Verifies the given OTP using the token generated on the credentials login.
-    pub(crate) async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
+    pub(super) async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
         let (password, token) = otp.data();
 
         let user_id = match self
@@ -134,8 +159,23 @@ impl Authentication {
 
         let user = self.database.get_user_by_id(&user_id).await?;
 
+        // Something went wrong if the user doesn't have a pw set up here
+        if user.password.is_none() {
+            return Err(AuthenticationError::InvalidCredentials.into());
+        }
+
+        // Verify the user's token that was created from their password
+        if !crypto::utility::verify_hmac(
+            "OTP_HMAC_SECRET",
+            user.password.as_ref().unwrap(),
+            token,
+            BASE64URL,
+        )? {
+            return Err(AuthenticationError::InvalidToken(CacheId::OTPToken).into());
+        }
+
         if let Some(ref secret) = user.otp_secret {
-            let (result, _) = crypto::utils::verify_otp(password, secret)?;
+            let (result, _) = crypto::utility::verify_otp(password, secret)?;
 
             if !result {
                 return Err(AuthenticationError::InvalidOTP.into());
@@ -150,7 +190,7 @@ impl Authentication {
     }
 
     /// Stores the initial data in the users table and sends an email to the user with the registration link.
-    pub(crate) async fn start_registration(
+    pub(super) async fn start_registration(
         &self,
         data: RegistrationData,
     ) -> Result<HttpResponse, Error> {
@@ -188,7 +228,7 @@ impl Authentication {
 
     /// Verifies the registration token sent via email upon registration. Upon success, generates
     /// a one time password token to be used when setting a password.
-    pub(crate) async fn verify_registration_token(
+    pub(super) async fn verify_registration_token(
         &self,
         token: &str,
     ) -> Result<HttpResponse, Error> {
@@ -204,7 +244,7 @@ impl Authentication {
         info!("Verfiying registration token for {user_id}");
 
         // Verify the token with the hashed user ID, error if they mismatch
-        if !crypto::utils::verify_hmac("EMAIL_HMAC_SECRET", &user_id, token, BASE64URL)? {
+        if !crypto::utility::verify_hmac("EMAIL_HMAC_SECRET", &user_id, token, BASE64URL)? {
             return Err(AuthenticationError::InvalidToken(CacheId::RegToken).into());
         }
 
@@ -233,14 +273,10 @@ impl Authentication {
     }
 
     /// Set the user's password after successful email token verification
-    pub(crate) async fn set_password(
-        &self,
-        user_id: &str,
-        data: SetPassword,
-    ) -> Result<HttpResponse, Error> {
+    pub(super) async fn set_password(&self, data: SetPassword) -> Result<HttpResponse, Error> {
         let (token, password) = data.inner();
 
-        let cached_user_id = match self
+        let user_id = match self
             .cache
             .get_token::<String>(CacheId::PWToken, token)
             .await
@@ -249,13 +285,9 @@ impl Authentication {
             Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::PWToken).into()),
         };
 
-        if user_id != cached_user_id {
-            return Err(AuthenticationError::InvalidToken(CacheId::PWToken).into());
-        }
-
         let user = self
             .database
-            .update_user_password(user_id, password)
+            .update_user_password(&user_id, password)
             .await?;
 
         self.cache.delete_token(CacheId::PWToken, token).await?;
@@ -266,12 +298,12 @@ impl Authentication {
     }
 
     /// Generates an OTP secret for the user and returns it in a QR code in the response
-    pub(crate) async fn set_otp_secret(&self, user_id: &str) -> Result<HttpResponse, Error> {
-        let secret = crypto::utils::generate_otp_secret();
+    pub(super) async fn set_otp_secret(&self, user_id: &str) -> Result<HttpResponse, Error> {
+        let secret = crypto::utility::generate_otp_secret();
 
         let user = self.database.set_user_otp_secret(user_id, &secret).await?;
 
-        let qr = crypto::utils::generate_totp_qr_code(&secret, &user.email)?;
+        let qr = crypto::utility::generate_totp_qr_code(&secret, &user.email)?;
 
         info!("Successfully set OTP secret for {}", user.id);
 
@@ -303,7 +335,6 @@ impl Authentication {
         self.cache.set_session(&csrf_token, &session).await?;
 
         info!("Successfully created session for {}", user.id);
-        info!("Cookie {:?}", session_cookie);
 
         // Respond with the x-csrf header and the session ID
         Ok(AuthenticationSuccess::new(user, session).to_response(

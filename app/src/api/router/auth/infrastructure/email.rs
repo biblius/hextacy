@@ -6,16 +6,16 @@ use infrastructure::{
 use std::sync::Arc;
 use tracing::debug;
 
-pub(super) struct Email {
+pub(in super::super) struct Email {
     client: Arc<SmtpTransport>,
 }
 
 impl Email {
-    pub(super) fn new(client: Arc<SmtpTransport>) -> Self {
+    pub(in super::super) fn new(client: Arc<SmtpTransport>) -> Self {
         Self { client }
     }
 
-    pub(super) fn send_registration_token(
+    pub(in super::super) fn send_registration_token(
         &self,
         token: &str,
         username: &str,
@@ -24,11 +24,11 @@ impl Email {
         debug!("Sending registration token to {}", email);
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
-        let mail = email::generate_from_template(
+        let mail = email::from_template(
             "registration_token",
             &[("username", username), ("registration_uri", &uri)],
         );
-        email::send_email(
+        email::send(
             None,
             username,
             email,
@@ -36,6 +36,6 @@ impl Email {
             mail,
             &self.client,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }

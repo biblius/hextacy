@@ -4,6 +4,7 @@ use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
 use thiserror::{self, Error};
+use validator::{ValidationError, ValidationErrors};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -25,9 +26,23 @@ pub enum Error {
     Reqwest(#[from] reqwest::header::InvalidHeaderValue),
     #[error("Reqwest Header Error: {0}")]
     ToStr(#[from] reqwest::header::ToStrError),
+    #[error("Validation error detected")]
+    Validation(Vec<ValidationError>),
+}
+
+impl From<ValidationErrors> for Error {
+    fn from(e: ValidationErrors) -> Self {
+        let mut errors = vec![];
+        Self::nest_validation_errors(e, &mut errors);
+        Self::Validation(errors)
+    }
 }
 
 impl Error {
+    pub fn new<E: Into<Self>>(e: E) -> Self {
+        e.into()
+    }
+
     /// Returns error description
     pub fn message_and_description(&self) -> (&'static str, &'static str) {
         match self {
@@ -41,10 +56,17 @@ impl Error {
                     "INVALID_CSRF",
                     "You do not have the rights to access this page",
                 ),
+                AuthenticationError::InsufficientRights => (
+                    "FORBIDDEN",
+                    "You do not have the necessary rights to view this page",
+                ),
                 AuthenticationError::InvalidToken(id) => match id {
                     CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
                     CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
-                    CacheId::PWToken => ("INVALID_TOKEN", "Invalid password token"),
+                    CacheId::PWToken => (
+                        "INVALID_TOKEN",
+                        "Temporary password expired. Log in to obtain a new one",
+                    ),
                     _ => ("INVALID_TOKEN", "Invalid token"),
                 },
                 AuthenticationError::AccountFrozen => {
@@ -52,7 +74,35 @@ impl Error {
                 }
                 AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
             },
+            Self::Validation(_) => ("VALIDATION_ERROR", "Invalid data detected"),
             _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
+        }
+    }
+
+    fn check_validation_errors(&self) -> Option<Vec<ValidationError>> {
+        match self {
+            Error::Validation(errors) => Some(errors.clone()),
+            _ => None,
+        }
+    }
+
+    fn nest_validation_errors(errs: ValidationErrors, buff: &mut Vec<ValidationError>) {
+        for err in errs.errors().values() {
+            match err {
+                validator::ValidationErrorsKind::Struct(box_error) => {
+                    Self::nest_validation_errors(*box_error.clone(), buff);
+                }
+                validator::ValidationErrorsKind::List(e) => {
+                    for er in e.clone().into_values() {
+                        Self::nest_validation_errors(*er.clone(), buff);
+                    }
+                }
+                validator::ValidationErrorsKind::Field(e) => {
+                    for er in e {
+                        buff.push(er.clone());
+                    }
+                }
+            }
         }
     }
 }
@@ -67,8 +117,13 @@ impl ResponseError for Error {
 
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let status = self.status_code();
+
         let (message, description) = self.message_and_description();
-        let error_response = ErrorResponse::new(status.as_u16(), description, message);
+
+        let validation_errors = self.check_validation_errors();
+
+        let error_response =
+            ErrorResponse::new(status.as_u16(), description, message, validation_errors);
         Response::new(status).json(error_response)
     }
 }
@@ -78,14 +133,21 @@ pub struct ErrorResponse<'a> {
     code: u16,
     message: &'a str,
     description: &'a str,
+    validation_errors: Option<Vec<ValidationError>>,
 }
 
 impl<'a> ErrorResponse<'a> {
-    pub fn new(code: u16, description: &'a str, message: &'a str) -> Self {
+    pub fn new(
+        code: u16,
+        description: &'a str,
+        message: &'a str,
+        validation_errors: Option<Vec<ValidationError>>,
+    ) -> Self {
         Self {
             code,
             message,
             description,
+            validation_errors,
         }
     }
 }
@@ -112,6 +174,8 @@ pub enum AuthenticationError {
     InvalidOTP,
     #[error("Invalid CSRF header")]
     InvalidCsrfHeader,
+    #[error("Insufficient right")]
+    InsufficientRights,
     #[error("Account frozen")]
     AccountFrozen,
     #[error("Email taken")]
@@ -124,6 +188,7 @@ impl AuthenticationError {
             Self::SessionNotFound => StatusCode::UNAUTHORIZED,
             Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
+            Self::InsufficientRights => StatusCode::FORBIDDEN,
             Self::InvalidOTP => StatusCode::UNAUTHORIZED,
             Self::InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
             Self::AccountFrozen => StatusCode::UNAUTHORIZED,

@@ -37,7 +37,7 @@ pub fn generate(
     expires_in: cookie::time::Duration,
     algo: Algorithm,
 ) -> Result<String, CryptoError> {
-    let priv_key = fs::read(Path::new("../crypto/key_pair/priv_key.pem"))?;
+    let priv_key = fs::read(Path::new("../encryption/key_pair/priv_key.pem"))?;
     let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
 
     let now = jsonwebtoken::get_current_timestamp();
@@ -53,7 +53,7 @@ pub fn generate(
 pub fn parse<T: Serialize + DeserializeOwned>(token: &str) -> Result<T, CryptoError> {
     info!("{}", "Verifying JWT".cyan());
     // Fetch public key
-    let pub_key = fs::read(Path::new("../crypto/key_pair/pub_key.pem"))?;
+    let pub_key = fs::read(Path::new("../encryption/key_pair/pub_key.pem"))?;
 
     let decoding_key = DecodingKey::from_rsa_pem(&pub_key)?;
 
@@ -78,10 +78,10 @@ mod tests {
     #[test]
     fn encode_decode_jwt() {
         //Fetch the private key
-        let priv_key = fs::read(Path::new("../crypto/key_pair/priv_key.pem"))
+        let priv_key = fs::read(Path::new("../encryption/key_pair/priv_key.pem"))
             .expect("Couldn't open private key");
         //Fetch the public key
-        let pub_key = fs::read(Path::new("../crypto/key_pair/pub_key.pem"))
+        let pub_key = fs::read(Path::new("../encryption/key_pair/pub_key.pem"))
             .expect("Couldn't open public key");
 
         //Transmogrify the key key par to the encoding and decoding keys as arrays of u8
@@ -122,6 +122,5 @@ mod tests {
         assert_eq!(expires, decoded.claims.exp);
         assert_eq!(now, decoded.claims.iat);
         assert_eq!(Algorithm::RS256, decoded.header.alg);
-        //assert_eq!(claims.sub, decoded.claims.sub)
     }
 }

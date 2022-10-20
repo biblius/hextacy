@@ -1,3 +1,5 @@
+//! Generates a random password and stores it in
+
 use rand::{thread_rng, Rng};
 use std::env;
 
@@ -25,5 +27,5 @@ fn main() {
         pw.push(ALPHABET[rng.gen_range(0..60) as usize]);
     }
 
-    std::fs::write(std::path::Path::new("./crypto/password"), pw).unwrap();
+    std::fs::write(std::path::Path::new("./encryption/password"), pw).unwrap();
 }

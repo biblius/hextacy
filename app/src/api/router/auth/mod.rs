@@ -1,5 +1,6 @@
-pub mod data;
-pub mod handler;
-pub mod response;
-pub mod service;
+pub(super) mod data;
+pub(super) mod handler;
+pub(super) mod infrastructure;
+pub(super) mod response;
+pub(super) mod service;
 pub mod setup;

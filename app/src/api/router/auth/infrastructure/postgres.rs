@@ -6,29 +6,29 @@ use infrastructure::storage::{postgres::Pg, DatabaseError};
 use std::sync::Arc;
 use tracing::debug;
 
-pub(super) struct Postgres {
+pub(in super::super) struct Postgres {
     pool: Arc<Pg>,
 }
 
 impl Postgres {
-    pub(super) fn new(pool: Arc<Pg>) -> Self {
+    pub(in super::super) fn new(pool: Arc<Pg>) -> Self {
         Self { pool }
     }
 
     /// Gets a user by their id
-    pub(super) async fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
+    pub(in super::super) async fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
         debug!("Getting user with ID {}", id);
         User::get_by_id(id, &mut self.pool.connect()?)
     }
 
     /// Gets a user by their email
-    pub(super) async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
+    pub(in super::super) async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
         debug!("Getting user with email {}", email);
         User::get_by_email(email, &mut self.pool.connect()?)
     }
 
     /// Creates session for given user
-    pub(super) async fn create_session(
+    pub(in super::super) async fn create_session(
         &self,
         user: &User,
         csrf_token: &str,
@@ -38,7 +38,7 @@ impl Postgres {
     }
 
     /// Marks the user's account as frozen
-    pub(super) async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
+    pub(in super::super) async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
         debug!("Freezing user with id: {}", user_id);
         User::freeze(user_id, &mut self.pool.connect()?)?
             .pop()
@@ -46,13 +46,17 @@ impl Postgres {
     }
 
     /// Creates a new unauthenticated user
-    pub(super) async fn create_user(&self, email: &str, username: &str) -> Result<User, Error> {
+    pub(in super::super) async fn create_user(
+        &self,
+        email: &str,
+        username: &str,
+    ) -> Result<User, Error> {
         debug!("Creating user with email: {}", email);
         User::create(email, username, &mut self.pool.connect()?)
     }
 
     /// Updates the user's password field
-    pub(super) async fn update_user_password(
+    pub(in super::super) async fn update_user_password(
         &self,
         user_id: &str,
         password: &str,
@@ -64,7 +68,10 @@ impl Postgres {
     }
 
     /// Updates the user's email_verified_at field upon successfully verifying their registration token
-    pub(super) async fn update_email_verified_at(&self, user_id: &str) -> Result<User, Error> {
+    pub(in super::super) async fn update_email_verified_at(
+        &self,
+        user_id: &str,
+    ) -> Result<User, Error> {
         debug!("Updating verification status for: {}", user_id);
         User::update_email_verified_at(user_id, &mut self.pool.connect()?)?
             .pop()
@@ -72,7 +79,7 @@ impl Postgres {
     }
 
     /// Generates a random OTP secret and stores it to the user
-    pub(super) async fn set_user_otp_secret(
+    pub(in super::super) async fn set_user_otp_secret(
         &self,
         user_id: &str,
         secret: &str,

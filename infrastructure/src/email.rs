@@ -1,4 +1,5 @@
 use crate::config;
+pub use lettre;
 use lettre::{
     message::header::ContentType, transport::smtp::authentication::Credentials, Message,
     SmtpTransport, Transport,
@@ -6,8 +7,7 @@ use lettre::{
 use std::{fmt::Write, fs, path::Path};
 use thiserror::Error;
 
-pub use lettre;
-
+/// Build an email client from the environment.
 pub fn build_client() -> SmtpTransport {
     let mut params =
         config::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
@@ -28,7 +28,9 @@ pub fn build_client() -> SmtpTransport {
         .build()
 }
 
-pub fn generate_from_template(template_name: &str, replacements: &[(&str, &str)]) -> String {
+/// Load a template from an HTML file and replace all the keywords with the targets.
+/// Keywords must be formatted as `{{keyword}}`.
+pub fn from_template(template_name: &str, replacements: &[(&str, &str)]) -> String {
     let template = fs::read_to_string(Path::new(&format!("emails/{}.html", template_name)))
         .expect("Couldn't load template");
 
@@ -46,7 +48,8 @@ pub fn generate_from_template(template_name: &str, replacements: &[(&str, &str)]
     email
 }
 
-pub fn send_email(
+/// Send an email with the given params
+pub fn send(
     from: Option<&str>,
     to_uname: &str,
     to_email: &str,

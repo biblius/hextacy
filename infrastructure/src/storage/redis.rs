@@ -1,5 +1,6 @@
 use super::DatabaseError;
 use crate::config::env;
+use diesel::r2d2::State;
 use r2d2_redis::{
     r2d2::{Pool, PooledConnection},
     redis::{Client, ConnectionInfo, IntoConnectionInfo},
@@ -100,6 +101,10 @@ impl Rd {
             Err(e) => Err(DatabaseError::RdDirectConnection(e)),
         }
     }
+
+    pub fn health_check(&self) -> State {
+        self.pool.state()
+    }
 }
 
 use serde::{de::DeserializeOwned, Serialize};
@@ -117,7 +122,7 @@ impl Cache {
         let key = Self::prefix_id(cache_id, &key);
         let result = conn.get::<&str, String>(&key)?;
         trace!("Found redis key : {}", result);
-        serde_json::from_str::<T>(&result).map_err(|e| e.into())
+        serde_json::from_str::<T>(&result).map_err(Into::into)
     }
 
     pub fn set<T: Serialize>(
@@ -131,10 +136,10 @@ impl Cache {
         let value = serde_json::to_string(&val)?;
         if let Some(ex) = ex {
             conn.set_ex::<&str, String, ()>(&key, value, ex)
-                .map_err(|e| e.into())
+                .map_err(Into::into)
         } else {
             conn.set::<&str, String, ()>(&key, value)
-                .map_err(|e| e.into())
+                .map_err(Into::into)
         }
     }
 
@@ -145,7 +150,7 @@ impl Cache {
     ) -> Result<(), DatabaseError> {
         trace!("Deleting value under {}:{}", cache_id, key);
         conn.del::<String, ()>(Self::prefix_id(cache_id, &key))
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 
     pub fn prefix_id<T: ToRedisArgs + Display>(cache_id: CacheId, key: &T) -> String {

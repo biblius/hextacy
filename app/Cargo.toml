@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 infrastructure = { path = "../infrastructure" }
-validator = "0.16.0"
 async-trait = "0.1.42"
 actix-web = "4"
 tracing = "0.1.35"
@@ -18,6 +17,7 @@ reqwest = "0.11.12"
 serde = { version = "1.0.145", features = ["derive"] }
 data-encoding = "2.3.2"
 serde_json = "1.0.85"
+validator = { version = "0.16", features = ["derive"] }
 futures-util = "0.3.24"
 diesel = { version = "2.0.1", features = [
   "postgres",

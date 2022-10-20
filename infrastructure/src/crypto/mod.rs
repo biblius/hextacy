@@ -1,5 +1,5 @@
 pub mod jwt;
-pub mod utils;
+pub mod utility;
 
 pub use bcrypt::BcryptError;
 

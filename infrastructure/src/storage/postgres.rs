@@ -1,7 +1,7 @@
 use super::DatabaseError;
 use crate::config::env;
 use diesel::{
-    r2d2::{ConnectionManager, Pool, PooledConnection},
+    r2d2::{ConnectionManager, Pool, PooledConnection, State},
     Connection, PgConnection,
 };
 use tracing::{info, trace};
@@ -63,9 +63,11 @@ impl Pg {
     pub fn connect_direct() -> Result<PgConnection, DatabaseError> {
         let db_url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
 
-        match PgConnection::establish(&db_url) {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(e.into()),
-        }
+        PgConnection::establish(&db_url).map_err(Into::into)
+    }
+
+    /// Returns the state of the pool
+    pub fn health_check(&self) -> State {
+        self.pool.state()
     }
 }

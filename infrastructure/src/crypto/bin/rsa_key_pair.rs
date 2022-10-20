@@ -6,7 +6,7 @@ use rsa::{
 use std::fs;
 use std::path::Path;
 
-const KEY_PATH: &str = "./crypto/key_pair";
+const KEY_PATH: &str = "./encryption/key_pair";
 
 #[allow(dead_code)]
 /// Generates an RSA key pair.
@@ -31,8 +31,8 @@ fn generate_rsa_key_pair() -> Result<(), WriteError> {
     let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("Failed to generate private key");
     let pub_key = RsaPublicKey::from(&priv_key);
 
-    if fs::create_dir(Path::new("./crypto")).is_err() {
-        println!("Directory `crypto` already exists, generating key pair");
+    if fs::create_dir(Path::new("./encryption")).is_err() {
+        println!("Directory `encryption` already exists, generating key pair");
         println!("Attempting to remove old key pair dir");
 
         match fs::remove_dir_all(Path::new(KEY_PATH)) {

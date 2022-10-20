@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::{cmp::Ordering, io::Write};
 
 use diesel::{
     deserialize::{self, FromSql},
@@ -9,13 +9,30 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq)]
+#[derive(
+    Debug, Clone, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq, PartialOrd,
+)]
 #[diesel(sql_type = Text)]
 pub enum Role {
     #[serde(rename = "admin")]
     Admin,
     #[serde(rename = "user")]
     User,
+}
+
+impl Ord for Role {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self {
+            Role::Admin => match other {
+                Role::Admin => Ordering::Equal,
+                Role::User => Ordering::Greater,
+            },
+            Role::User => match other {
+                Role::Admin => Ordering::Less,
+                Role::User => Ordering::Equal,
+            },
+        }
+    }
 }
 
 impl ToSql<Text, Pg> for Role {

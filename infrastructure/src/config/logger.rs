@@ -7,7 +7,7 @@ use log4rs::{
     Config,
 };
 use std::io::Write;
-use tracing::log::LevelFilter;
+use tracing::log::{Level, LevelFilter};
 
 pub fn init(level: &str) {
     match level {
@@ -22,15 +22,22 @@ pub fn init(level: &str) {
         .format_suffix("\n")
         .format(|buf, record| {
             let mut style = buf.style();
-            style.set_color(Color::White);
+
+            match record.level() {
+                Level::Error => style.set_color(Color::Red),
+                Level::Warn => style.set_color(Color::Yellow),
+                Level::Info => style.set_color(Color::Green),
+                Level::Debug => style.set_color(Color::Rgb(200, 200, 200)),
+                Level::Trace => style.set_color(Color::Rgb(170, 170, 170)),
+            };
 
             writeln!(
                 buf,
-                "{} {} | {} | {}",
-                format_args!("{:^5}", record.level()),
+                "{} | {} | {} | {}",
                 &chrono::Utc::now().to_string().replace('T', " ")[0..21],
+                format_args!("{:^5}", style.value(record.level())),
                 format_args!("{:^50}", record.target()),
-                style.value(record.args()),
+                record.args(),
             )
         })
         .init()

@@ -1,3 +1,5 @@
+//! Writes a random secret to the .env file located in the root.
+
 use data_encoding::{Encoding, BASE32, BASE64, BASE64URL};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{env, fmt::Write, fs, path::Path};

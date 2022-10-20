@@ -13,38 +13,44 @@ use tracing::debug;
 
 use crate::{
     error::{AuthenticationError, Error},
-    models::session::Session,
+    models::{role::Role, session::Session},
 };
 
 pub(super) struct AuthenticationGuard {
     database: Postgres,
     cache: Cache,
+    auth_level: Role,
 }
 
 impl AuthenticationGuard {
-    pub(super) fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>) -> Self {
+    pub(super) fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>, auth_level: Role) -> Self {
         Self {
             database: Postgres { pool: pg_pool },
             cache: Cache { pool: rd_pool },
+            auth_level,
         }
     }
 
+    /// Extracts the x-csrf-token header from the request
     pub(super) async fn get_csrf_header(req: &ServiceRequest) -> Result<&str, Error> {
         req.headers().get("x-csrf-token").map_or_else(
             || Err(AuthenticationError::InvalidCsrfHeader.into()),
-            |value| value.to_str().map_err(|e| e.into()),
+            |value| value.to_str().map_err(Into::into),
         )
     }
 
+    /// Extracts the `session_id` cookie from the request
     pub(super) async fn get_session_cookie(req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
         req.cookie("session_id")
             .ok_or_else(|| AuthenticationError::SessionNotFound.into())
     }
 
+    /// Attempts to obtain a session cached behind a csrf token
     pub(super) async fn get_cached_session(&self, token: &str) -> Result<Session, Error> {
         self.cache.get_session_by_csrf(token).await
     }
 
+    /// Attempts to obtain a valid (unexpired) session corresponding to the user's csrf token
     pub(super) async fn get_valid_session(
         &self,
         session_id: &str,
@@ -56,6 +62,7 @@ impl AuthenticationGuard {
             .map_err(|_| AuthenticationError::SessionNotFound.into())
     }
 
+    /// Refreshes and caches the user session
     pub(super) async fn refresh_and_cache(
         &self,
         token: &str,
@@ -65,6 +72,12 @@ impl AuthenticationGuard {
         self.cache.cache_session(token, &session).await?;
         Ok(session)
     }
+
+    /// Returns true if the role is equal to or greater than the auth_level of this guard instance
+    #[inline]
+    pub(super) fn check_valid_role(&self, role: &Role) -> bool {
+        role >= &self.auth_level
+    }
 }
 
 struct Postgres {
@@ -73,10 +86,12 @@ struct Postgres {
 
 impl Postgres {
     async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
+        debug!("Getting valid session with id {id} and csrf {csrf}");
         Session::get_valid_by_id(id, csrf, &mut self.pool.connect()?)
     }
 
     async fn refresh_session(&self, id: &str) -> Result<Session, Error> {
+        debug!("Refreshing session with id {id}");
         Session::refresh(id, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("Session ID: {id}")).into())
@@ -93,7 +108,7 @@ impl Cache {
             "Getting session under {}",
             format!("{}:{}", CacheId::Session, token)
         );
-        Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(|e| e.into())
+        Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(Into::into)
     }
 
     async fn cache_session(&self, token: &str, session: &Session) -> Result<(), Error> {
@@ -108,6 +123,6 @@ impl Cache {
             Some(SESSION_CACHE_DURATION_SECONDS),
             &mut self.pool.connect()?,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }

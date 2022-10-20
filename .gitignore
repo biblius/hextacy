@@ -1,6 +1,5 @@
 /target
 /Cargo.lock
+/encryption
 .env
-./crypto
-/crypto
 server.log

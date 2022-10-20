@@ -1,13 +1,13 @@
 use ::actors::actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
 use ::actors::Signal;
-use infrastructure::websocket::signals::WsSignal;
+use infrastructure::websocket::message::WsMessage;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::io::Error;
 use std::{collections::HashMap, marker::PhantomData, sync::mpsc};
 use tracing::{debug, error, info};
 
-/// Also tests WsSignal conversion to a system signal
+/// Also tests WsMessage conversion to system message
 pub fn simple_message_handling() -> Result<(), Error> {
     info!("\n========== TEST - SIMPLE MESSAGE HANDLING ==========\n");
     // Initialize system
@@ -20,7 +20,7 @@ pub fn simple_message_handling() -> Result<(), Error> {
     };
 
     // Initialize the signal
-    let sig: Signal<SampleData> = WsSignal::__mock(SampleData {
+    let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
         lol: "lol".to_string(),
         lel: "lel".to_string(),
     })
@@ -72,7 +72,7 @@ pub fn simple_broadcast() -> Result<(), Error> {
     };
 
     // Initialize the signal
-    let sig: Signal<SampleData> = WsSignal::__mock(SampleData {
+    let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
         lol: "lmao".to_string(),
         lel: "lmeo".to_string(),
     })

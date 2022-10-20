@@ -1,5 +1,5 @@
 //! Actor that manages client JSON messages
-use super::signals::WsSignal;
+use super::message::WsMessage;
 use super::WsError;
 use ::actors::signal::Signal;
 use actix::prelude::*;
@@ -85,7 +85,7 @@ where
         json: String,
         ctx: &mut ws::WebsocketContext<Self>,
     ) -> Result<(), WsError> {
-        let sig: Signal<T> = WsSignal::from_json(&json)?.into();
+        let sig: Signal<T> = WsMessage::from_json(&json)?.into();
         debug!("{} {:?}", "WsSession -- parsed signal:".blue(), sig);
         if let Some(to) = sig.to() {
             self.address_book

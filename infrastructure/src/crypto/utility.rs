@@ -3,6 +3,7 @@ use crate::config::env;
 use bcrypt;
 use data_encoding::{Encoding, BASE32};
 use hmac::{self, Mac};
+use rand::{rngs::StdRng, RngCore, SeedableRng};
 use sha2::Sha256;
 use tracing::debug;
 
@@ -12,17 +13,30 @@ pub fn uuid() -> String {
 
 #[inline]
 pub fn bcrypt_hash(password: &str) -> Result<String, CryptoError> {
-    bcrypt::hash(password, 10).map_err(|e| e.into())
+    bcrypt::hash(password, 10).map_err(Into::into)
 }
 
 #[inline]
 pub fn bcrypt_verify(password: &str, hash: &str) -> Result<bool, CryptoError> {
-    bcrypt::verify(password, hash).map_err(|e| e.into())
+    bcrypt::verify(password, hash).map_err(Into::into)
+}
+
+/// Generate a random token encoded to the provided encoding.
+pub fn token(encoding: Encoding) -> Result<String, CryptoError> {
+    debug!("Generating random token");
+
+    let mut rng = StdRng::from_entropy();
+    let mut buff = [0_u8; 256];
+    rng.fill_bytes(&mut buff);
+
+    let mac = hmac::Hmac::<Sha256>::new_from_slice(&buff)?;
+
+    Ok(encoding.encode(&mac.finalize().into_bytes()))
 }
 
 /// Generate an HMAC token with the given environment secret and the provided buffer.
 ///
-/// The token is Base 64 URL encoded.
+/// The token is encoded to the provided encoding.
 ///
 /// Panics if the provided `env_key` is not set in the .env file.
 pub fn generate_hmac(
@@ -76,7 +90,7 @@ pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, C
         "RPS Chat",
         None,
     )?;
-    thotp::qr::generate_code_svg(&uri, None, None, thotp::qr::EcLevel::M).map_err(|e| e.into())
+    thotp::qr::generate_code_svg(&uri, None, None, thotp::qr::EcLevel::M).map_err(Into::into)
 }
 
 pub fn verify_otp(password: &str, secret: &str) -> Result<(bool, i16), CryptoError> {
@@ -85,7 +99,7 @@ pub fn verify_otp(password: &str, secret: &str) -> Result<(bool, i16), CryptoErr
         password, secret
     );
     let secret = BASE32.decode(secret.as_bytes())?;
-    thotp::verify_totp(password, &secret, 0).map_err(|e| e.into())
+    thotp::verify_totp(password, &secret, 0).map_err(Into::into)
 }
 
 #[cfg(test)]

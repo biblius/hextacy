@@ -1,4 +1,6 @@
 use super::service::AuthenticationGuard;
+use crate::error::{AuthenticationError, Error};
+use crate::models::role::Role;
 use crate::models::session::Session;
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
@@ -16,9 +18,9 @@ pub struct Auth {
 }
 
 impl Auth {
-    pub fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>) -> Self {
+    pub fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>, auth_level: Role) -> Self {
         Self {
-            guard: Rc::new(AuthenticationGuard::new(pg_pool, rd_pool)),
+            guard: Rc::new(AuthenticationGuard::new(pg_pool, rd_pool, auth_level)),
         }
     }
 }
@@ -83,12 +85,19 @@ where
                 Err(e) => return Ok(error_response(e, req)),
             };
 
-            debug!("Found session ID cookie: {}", session_id.value());
+            debug!("Found session ID cookie with value {}", session_id.value());
 
             // Check if the session is cached and return it in the request
             match guard.get_cached_session(csrf).await {
                 Ok(session) => {
-                    debug!("Found cached session: {session_id}");
+                    debug!("Found cached session with id {session_id}");
+
+                    if !guard.check_valid_role(&session.user_role) {
+                        return Ok(error_response(
+                            Error::new(AuthenticationError::InsufficientRights),
+                            req,
+                        ));
+                    }
 
                     req.extensions_mut().insert::<Session>(session);
 
@@ -98,16 +107,24 @@ where
                 }
                 Err(_) => {
                     debug!("Cached session not found, searching in PG");
+
                     // Otherwise check for a valid session in the db
                     let session = match guard.get_valid_session(session_id.value(), csrf).await {
                         Ok(session) => session,
                         Err(e) => return Ok(error_response(e, req)),
                     };
 
-                    debug!("Found session {}, caching", session.id);
+                    debug!("Found valid session with id {}, caching", session.id);
 
                     if let Err(e) = guard.refresh_and_cache(csrf, &session).await {
                         return Ok(error_response(e, req));
+                    }
+
+                    if !guard.check_valid_role(&session.user_role) {
+                        return Ok(error_response(
+                            Error::new(AuthenticationError::InsufficientRights),
+                            req,
+                        ));
                     }
 
                     req.extensions_mut().insert::<Session>(session);

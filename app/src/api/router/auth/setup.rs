@@ -1,4 +1,5 @@
-use super::{handler, service::authentication::Authentication};
+use super::{handler, service::Authentication};
+use crate::{api::middleware::auth::interceptor, models::role::Role};
 use actix_web::web::{self, Data};
 use infrastructure::{
     email::lettre::SmtpTransport,
@@ -6,8 +7,14 @@ use infrastructure::{
 };
 use std::sync::Arc;
 
-pub fn init(pg: Arc<Pg>, rd: Arc<Rd>, email: Arc<SmtpTransport>, cfg: &mut web::ServiceConfig) {
-    let service = Authentication::new(pg, rd, email);
+pub(crate) fn init(
+    pg: Arc<Pg>,
+    rd: Arc<Rd>,
+    email: Arc<SmtpTransport>,
+    cfg: &mut web::ServiceConfig,
+) {
+    let service = Authentication::new(pg.clone(), rd.clone(), email);
+    let guard = interceptor::Auth::new(pg, rd, Role::User);
 
     cfg.app_data(Data::new(service));
 
@@ -33,6 +40,8 @@ pub fn init(pg: Arc<Pg>, rd: Arc<Rd>, email: Arc<SmtpTransport>, cfg: &mut web::
 
     // Set otp
     cfg.service(
-        web::resource("/auth/{user_id}/set-otp").route(web::get().to(handler::set_otp_secret)),
+        web::resource("/auth/set-otp")
+            .route(web::get().to(handler::set_otp_secret))
+            .wrap(guard),
     );
 }
