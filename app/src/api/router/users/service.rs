@@ -14,7 +14,7 @@ impl Users {
         data: GetUsersPaginated,
     ) -> Result<HttpResponse, Error> {
         let (total, result) = self.database.get_paginated(
-            data.page.unwrap_or(1 as u16),
+            data.page.unwrap_or(1_u16),
             data.per_page.unwrap_or(25),
             data.sort_by,
         )?;

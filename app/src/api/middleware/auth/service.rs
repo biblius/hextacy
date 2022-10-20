@@ -16,6 +16,7 @@ use crate::{
     models::{role::Role, session::Session},
 };
 
+#[derive(Debug, Clone)]
 pub(super) struct AuthenticationGuard {
     database: Postgres,
     cache: Cache,
@@ -35,14 +36,14 @@ impl AuthenticationGuard {
     pub(super) async fn get_csrf_header(req: &ServiceRequest) -> Result<&str, Error> {
         req.headers().get("x-csrf-token").map_or_else(
             || Err(AuthenticationError::InvalidCsrfHeader.into()),
-            |value| value.to_str().map_err(Into::into),
+            |value| value.to_str().map_err(Error::new),
         )
     }
 
     /// Extracts the `session_id` cookie from the request
     pub(super) async fn get_session_cookie(req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
         req.cookie("session_id")
-            .ok_or_else(|| AuthenticationError::SessionNotFound.into())
+            .ok_or_else(|| AuthenticationError::Unauthenticated.into())
     }
 
     /// Attempts to obtain a session cached behind a csrf token
@@ -59,7 +60,7 @@ impl AuthenticationGuard {
         self.database
             .get_valid_session(session_id, csrf_token)
             .await
-            .map_err(|_| AuthenticationError::SessionNotFound.into())
+            .map_err(|_| AuthenticationError::Unauthenticated.into())
     }
 
     /// Refreshes and caches the user session
@@ -80,6 +81,7 @@ impl AuthenticationGuard {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Postgres {
     pool: Arc<Pg>,
 }
@@ -98,6 +100,7 @@ impl Postgres {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Cache {
     pool: Arc<Rd>,
 }
@@ -108,7 +111,7 @@ impl Cache {
             "Getting session under {}",
             format!("{}:{}", CacheId::Session, token)
         );
-        Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(Into::into)
+        Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(Error::new)
     }
 
     async fn cache_session(&self, token: &str, session: &Session) -> Result<(), Error> {
@@ -123,6 +126,6 @@ impl Cache {
             Some(SESSION_CACHE_DURATION_SECONDS),
             &mut self.pool.connect()?,
         )
-        .map_err(Into::into)
+        .map_err(Error::new)
     }
 }

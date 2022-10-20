@@ -1,12 +1,9 @@
 use super::{
-    data::{Credentials, EmailToken, Otp, RegistrationData, SetPassword},
+    data::{Credentials, EmailToken, Logout, Otp, RegistrationData, SetPassword},
     service::Authentication,
 };
-use crate::{
-    error::{AuthenticationError, Error},
-    models::session::Session,
-};
-use actix_web::{web, HttpMessage, HttpRequest, Responder};
+use crate::{error::Error, utility::request::extract_session};
+use actix_web::{web, HttpRequest, Responder};
 use tracing::info;
 use validator::Validate;
 
@@ -16,9 +13,9 @@ pub(super) async fn verify_credentials(
     auth_form: web::Form<Credentials>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
-    info!("Credentials login : {:?}", auth_form.0);
+    auth_form.0.validate().map_err(Error::new)?;
 
-    auth_form.0.validate().map_err(|e| Error::new(e))?;
+    info!("Credentials login : {:?}", auth_form.0);
 
     service.verify_credentials(auth_form.0).await
 }
@@ -28,9 +25,9 @@ pub(super) async fn verify_otp(
     otp: web::Form<Otp>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
-    info!("OTP login : {:?}", otp.0);
+    otp.0.validate().map_err(Error::new)?;
 
-    otp.0.validate().map_err(|e| Error::new(e))?;
+    info!("OTP login : {:?}", otp.0);
 
     service.verify_otp(otp.0).await
 }
@@ -41,9 +38,9 @@ pub(super) async fn start_registration(
     data: web::Form<RegistrationData>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
-    info!("Start Registration: {:?}", data.0);
+    data.0.validate().map_err(Error::new)?;
 
-    data.0.validate().map_err(|e| Error::new(e))?;
+    info!("Start Registration: {:?}", data.0);
 
     service.start_registration(data.0).await
 }
@@ -53,24 +50,26 @@ pub(super) async fn verify_registration_token(
     token: web::Query<EmailToken>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
+    token.0.validate().map_err(Error::new)?;
+
     info!("Verify registration token: {:?}", token);
 
-    token.0.validate().map_err(|e| Error::new(e))?;
-
-    service.verify_registration_token(token.inner()).await
+    service.verify_registration_token(token.0).await
 }
 
 /// Sets the user's password after successful email token verification. Requires a token generated
 /// after successful email verification
-pub(super) async fn set_password(
+pub(super) async fn change_password(
     data: web::Form<SetPassword>,
     service: web::Data<Authentication>,
+    req: HttpRequest,
 ) -> Result<impl Responder, Error> {
-    info!("Set password: {:?}", data);
+    data.0.validate().map_err(Error::new)?;
 
-    data.0.validate().map_err(|e| Error::new(e))?;
+    let session = extract_session(req)?;
 
-    service.set_password(data.0).await
+    info!("Updating password for {}", session.user_id);
+    service.change_password(&session.user_id, data.0).await
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
@@ -78,14 +77,24 @@ pub(super) async fn set_otp_secret(
     service: web::Data<Authentication>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
-    let extentions = req.extensions();
-    let session = extentions.get::<Session>();
+    let session = extract_session(req)?;
 
-    if let Some(session) = session {
-        info!("Registering OTP secret for: {}", session.user_id);
+    info!("Registering OTP secret for: {}", session.user_id);
 
-        service.set_otp_secret(&session.user_id).await
-    } else {
-        Err(AuthenticationError::SessionNotFound.into())
-    }
+    service.set_otp_secret(&session.user_id).await
+}
+
+/// Sets the user's OTP secret. Requires a valid session to be established beforehand
+pub(super) async fn logout(
+    service: web::Data<Authentication>,
+    expire: web::Json<Logout>,
+    req: HttpRequest,
+) -> Result<impl Responder, Error> {
+    let session = extract_session(req)?;
+
+    info!("Logging out {}", session.user_id);
+
+    service
+        .logout(&session.id, &session.user_id, expire.0)
+        .await
 }

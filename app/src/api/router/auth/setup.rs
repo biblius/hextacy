@@ -18,14 +18,17 @@ pub(crate) fn init(
 
     cfg.app_data(Data::new(service));
 
+    // Initial registration
+    cfg.service(web::resource("/auth/register").route(web::post().to(handler::start_registration)));
+
     // Credentials login
     cfg.service(web::resource("/auth/login").route(web::post().to(handler::verify_credentials)));
 
+    // Logout
+    cfg.service(web::resource("/auth/logout").route(web::post().to(handler::logout)));
+
     // OTP login
     cfg.service(web::resource("/auth/verify-otp").route(web::post().to(handler::verify_otp)));
-
-    // Initial registration
-    cfg.service(web::resource("/auth/register").route(web::post().to(handler::start_registration)));
 
     // Verify registration token
     cfg.service(
@@ -35,7 +38,9 @@ pub(crate) fn init(
 
     // Set password
     cfg.service(
-        web::resource("/auth/{user_id}/set-password").route(web::post().to(handler::set_password)),
+        web::resource("/auth/change-password")
+            .route(web::post().to(handler::change_password))
+            .wrap(guard.clone()),
     );
 
     // Set otp

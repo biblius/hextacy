@@ -13,6 +13,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, info};
 
+#[derive(Debug, Clone)]
 pub struct Auth {
     guard: Rc<AuthenticationGuard>,
 }

@@ -39,7 +39,7 @@ impl Postgres {
 
     /// Marks the user's account as frozen
     pub(in super::super) async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
-        debug!("Freezing user with id: {}", user_id);
+        debug!("Freezing user with id: {user_id}");
         User::freeze(user_id, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
@@ -50,19 +50,20 @@ impl Postgres {
         &self,
         email: &str,
         username: &str,
+        password: &str,
     ) -> Result<User, Error> {
         debug!("Creating user with email: {}", email);
-        User::create(email, username, &mut self.pool.connect()?)
+        User::create(email, username, password, &mut self.pool.connect()?)
     }
 
     /// Updates the user's password field
     pub(in super::super) async fn update_user_password(
         &self,
         user_id: &str,
-        password: &str,
+        pw_hash: &str,
     ) -> Result<User, Error> {
-        debug!("Updating password for user: {}", user_id);
-        User::update_password(user_id, password, &mut self.pool.connect()?)?
+        debug!("Updating password for user: {user_id}");
+        User::update_password(user_id, pw_hash, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
@@ -72,7 +73,7 @@ impl Postgres {
         &self,
         user_id: &str,
     ) -> Result<User, Error> {
-        debug!("Updating verification status for: {}", user_id);
+        debug!("Updating verification status for: {user_id}");
         User::update_email_verified_at(user_id, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
@@ -84,9 +85,30 @@ impl Postgres {
         user_id: &str,
         secret: &str,
     ) -> Result<User, Error> {
-        debug!("Setting OTP secret for: {}", user_id);
+        debug!("Setting OTP secret for: {user_id}");
         User::update_otp_secret(user_id, secret, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
+    }
+
+    /// Expires user session
+    pub(in super::super) async fn expire_session(
+        &self,
+        session_id: &str,
+    ) -> Result<Session, Error> {
+        debug!("Expiring session for: {session_id}");
+        Session::expire(session_id, &mut self.pool.connect()?)?
+            .pop()
+            .ok_or_else(|| DatabaseError::DoesNotExist(format!("Session ID: {session_id}")).into())
+    }
+
+    /// Expires all user sessions
+    pub(in super::super) async fn purge_sessions(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<Session>, Error> {
+        debug!("Purging all sessions for: {user_id}");
+        Session::purge(user_id, &mut self.pool.connect()?)
+            .map_err(|_| DatabaseError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
 }

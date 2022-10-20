@@ -1,19 +1,38 @@
-use crate::config::constants::{COOKIE_EXPIRATION, COOKIE_SAME_SITE_DEFAULT};
-use cookie::{Cookie, CookieBuilder, SameSite};
+use cookie::{time::Duration, Cookie, CookieBuilder, SameSite};
 use serde::Serialize;
 
-/// Creates a cookie with the given properties. SameSite defaults to Lax if None is provided.
+const PATH: &str = "/";
+const HTTP_ONLY: bool = true;
+const SECURE: bool = false;
+const DOMAIN: &str = "";
+const MAX_AGE: Duration = Duration::days(1);
+const SAME_SITE: SameSite = SameSite::Lax;
+
+/// Creates a cookie with the given session id
+pub fn create_session(session_id: &str, expire: bool) -> Cookie<'_> {
+    CookieBuilder::new("S_ID", session_id)
+        .path(PATH)
+        .domain(DOMAIN)
+        .max_age(if expire { Duration::ZERO } else { MAX_AGE })
+        .same_site(SAME_SITE)
+        .http_only(HTTP_ONLY)
+        .secure(SECURE)
+        .finish()
+}
+
+/// Creates a cookie with the given properties.
 pub fn create<'a, T: Serialize>(
     key: &'a str,
     value: &T,
-    same_site: Option<SameSite>,
+    expire: bool,
 ) -> Result<Cookie<'a>, serde_json::Error> {
     let json = serde_json::to_string(value)?;
     Ok(CookieBuilder::new(key, json)
-        .max_age(COOKIE_EXPIRATION)
-        .path("/")
-        .same_site(same_site.unwrap_or(COOKIE_SAME_SITE_DEFAULT))
-        .http_only(true)
-        .secure(false)
+        .path(PATH)
+        .domain(DOMAIN)
+        .max_age(if expire { Duration::ZERO } else { MAX_AGE })
+        .same_site(SAME_SITE)
+        .http_only(HTTP_ONLY)
+        .secure(SECURE)
         .finish())
 }

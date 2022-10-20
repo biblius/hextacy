@@ -9,15 +9,19 @@ use diesel::{
 };
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Debug, Clone, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq, PartialOrd,
-)]
+#[derive(Debug, Clone, Deserialize, Serialize, FromSqlRow, AsExpression, PartialEq, Eq)]
 #[diesel(sql_type = Text)]
 pub enum Role {
     #[serde(rename = "admin")]
     Admin,
     #[serde(rename = "user")]
     User,
+}
+
+impl PartialOrd for Role {
+    fn partial_cmp(&self, other: &Role) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for Role {

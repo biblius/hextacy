@@ -32,7 +32,7 @@ pub fn build_pool() -> PgPool {
         .unwrap_or_else(|e| panic!("Failed to create postgres pool: {}", e))
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Pg {
     pool: PgPool,
 }

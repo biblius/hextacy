@@ -19,7 +19,7 @@ diesel::table! {
         email -> Varchar,
         username -> Varchar,
         role -> Varchar,
-        password -> Nullable<Varchar>,
+        password -> Varchar,
         otp_secret -> Nullable<Varchar>,
         phone -> Nullable<Varchar>,
         google_id -> Nullable<Varchar>,
@@ -33,4 +33,7 @@ diesel::table! {
 
 diesel::joinable!(sessions -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(sessions, users,);
+diesel::allow_tables_to_appear_in_same_query!(
+    sessions,
+    users,
+);

@@ -1,4 +1,6 @@
 pub mod jwt;
+pub mod otp;
+pub mod token;
 pub mod utility;
 
 pub use bcrypt::BcryptError;

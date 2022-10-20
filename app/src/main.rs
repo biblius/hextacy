@@ -1,4 +1,10 @@
+mod api;
+mod error;
+mod models;
+mod utility;
+
 use actix_web::{middleware::Logger, App, HttpServer};
+use api::router;
 use infrastructure::{
     config::{env, logger},
     email, http,
@@ -6,11 +12,6 @@ use infrastructure::{
 };
 use std::sync::Arc;
 use tracing::info;
-
-use api::router;
-mod api;
-mod error;
-mod models;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {

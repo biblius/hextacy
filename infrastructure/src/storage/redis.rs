@@ -6,7 +6,7 @@ use r2d2_redis::{
     redis::{Client, ConnectionInfo, IntoConnectionInfo},
     RedisConnectionManager,
 };
-use tracing::{info, trace};
+use tracing::{debug, info, trace};
 
 pub use r2d2_redis::redis::Commands;
 pub use r2d2_redis::redis::FromRedisValue;
@@ -70,7 +70,7 @@ fn connection_info() -> ConnectionInfo {
     conn_info
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Rd {
     pool: RedisPool,
 }
@@ -119,9 +119,9 @@ impl Cache {
         key: &str,
         conn: &mut RedisPoolConnection,
     ) -> Result<T, DatabaseError> {
+        debug!("Getting {}:{}", cache_id, key);
         let key = Self::prefix_id(cache_id, &key);
         let result = conn.get::<&str, String>(&key)?;
-        trace!("Found redis key : {}", result);
         serde_json::from_str::<T>(&result).map_err(Into::into)
     }
 
@@ -132,6 +132,7 @@ impl Cache {
         ex: Option<usize>,
         conn: &mut RedisPoolConnection,
     ) -> Result<(), DatabaseError> {
+        debug!("Setting {}:{}", cache_id, key);
         let key = Self::prefix_id(cache_id, &key);
         let value = serde_json::to_string(&val)?;
         if let Some(ex) = ex {
@@ -148,7 +149,7 @@ impl Cache {
         key: &str,
         conn: &mut RedisPoolConnection,
     ) -> Result<(), DatabaseError> {
-        trace!("Deleting value under {}:{}", cache_id, key);
+        trace!("Deleting {}:{}", cache_id, key);
         conn.del::<String, ()>(Self::prefix_id(cache_id, &key))
             .map_err(Into::into)
     }

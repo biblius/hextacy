@@ -43,19 +43,16 @@ impl Error {
         e.into()
     }
 
-    /// Returns error description
+    /// Returns error message and description
     pub fn message_and_description(&self) -> (&'static str, &'static str) {
         match self {
             Self::Authentication(e) => match e {
-                AuthenticationError::SessionNotFound => ("INVALID_SESSION", "Session not found"),
-                AuthenticationError::InvalidCredentials => {
-                    ("INVALID_CREDENTIALS", "Invalid credentials")
-                }
+                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "Invalid session"),
+                AuthenticationError::InvalidCsrfHeader => ("UNAUTHORIZED", "Invalid CSRF header"),
+                AuthenticationError::InvalidCredentials => ("UNAUTHORIZED", "Invalid credentials"),
                 AuthenticationError::InvalidOTP => ("INVALID_OTP", "Invalid OTP provided"),
-                AuthenticationError::InvalidCsrfHeader => (
-                    "INVALID_CSRF",
-                    "You do not have the rights to access this page",
-                ),
+                AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
+                AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
                 AuthenticationError::InsufficientRights => (
                     "FORBIDDEN",
                     "You do not have the necessary rights to view this page",
@@ -63,22 +60,16 @@ impl Error {
                 AuthenticationError::InvalidToken(id) => match id {
                     CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
                     CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
-                    CacheId::PWToken => (
-                        "INVALID_TOKEN",
-                        "Temporary password expired. Log in to obtain a new one",
-                    ),
+                    CacheId::PWToken => ("INVALID_TOKEN", "Temporary password expired"),
                     _ => ("INVALID_TOKEN", "Invalid token"),
                 },
-                AuthenticationError::AccountFrozen => {
-                    ("ACCOUNT_FROZEN", "Account has been suspended")
-                }
-                AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
             },
-            Self::Validation(_) => ("VALIDATION_ERROR", "Invalid data detected"),
-            _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
+            Self::Validation(_) => ("VALIDATION", "Invalid input"),
+            _ => ("INTERNAL", "Internal server error"),
         }
     }
 
+    /// Check whether the error is a validation error
     fn check_validation_errors(&self) -> Option<Vec<ValidationError>> {
         match self {
             Error::Validation(errors) => Some(errors.clone()),
@@ -86,6 +77,7 @@ impl Error {
         }
     }
 
+    /// Nests validation errors to one vec
     fn nest_validation_errors(errs: ValidationErrors, buff: &mut Vec<ValidationError>) {
         for err in errs.errors().values() {
             match err {
@@ -115,13 +107,12 @@ impl ResponseError for Error {
         }
     }
 
+    /// Transform the error to an `ErrorResponse` struct that implements actix's `ErrorResponse` trait.
+    /// Flattens all validation errors to a vec, if any
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let status = self.status_code();
-
         let (message, description) = self.message_and_description();
-
         let validation_errors = self.check_validation_errors();
-
         let error_response =
             ErrorResponse::new(status.as_u16(), description, message, validation_errors);
         Response::new(status).json(error_response)
@@ -165,7 +156,7 @@ impl Display for ErrorResponse<'_> {
 #[derive(Debug, Error)]
 pub enum AuthenticationError {
     #[error("Session not found")]
-    SessionNotFound,
+    Unauthenticated,
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Invalid token")]
@@ -185,7 +176,7 @@ pub enum AuthenticationError {
 impl AuthenticationError {
     pub fn status_code(&self) -> StatusCode {
         match self {
-            Self::SessionNotFound => StatusCode::UNAUTHORIZED,
+            Self::Unauthenticated => StatusCode::UNAUTHORIZED,
             Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
             Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientRights => StatusCode::FORBIDDEN,

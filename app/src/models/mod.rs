@@ -40,7 +40,7 @@ mod tests {
             (s, v)
         };
         let email = format!("{}@{}.com", name, domain);
-        let user = User::create(&email, "bebliuskhan", &mut pool).unwrap();
+        let user = User::create(&email, "bebliuskhan", "lmeo", &mut pool).unwrap();
         assert_eq!(user.email, email);
         assert!(matches!(user.role, Role::User))
     }

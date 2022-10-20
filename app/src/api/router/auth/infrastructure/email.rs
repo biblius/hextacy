@@ -21,7 +21,7 @@ impl Email {
         username: &str,
         email: &str,
     ) -> Result<(), Error> {
-        debug!("Sending registration token to {}", email);
+        debug!("Sending registration token email to {email}");
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
         let mail = email::from_template(
@@ -36,6 +36,23 @@ impl Email {
             mail,
             &self.client,
         )
-        .map_err(Into::into)
+        .map_err(Error::new)
+    }
+
+    pub(in super::super) fn send_password_change(
+        &self,
+        token: &str,
+        username: &str,
+        email: &str,
+    ) -> Result<(), Error> {
+        debug!("Sending change password email to {email}");
+        let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
+        let uri = format!("{domain}/auth/verify-registration-token?token={token}");
+        let mail = email::from_template(
+            "registration_token",
+            &[("username", username), ("change_password_uri", &uri)],
+        );
+        email::send(None, username, email, "Password change", mail, &self.client)
+            .map_err(Error::new)
     }
 }
