@@ -13,6 +13,6 @@ pub(crate) fn init(pg: Arc<Pg>, rd: Arc<Rd>, cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::resource("/users")
             .route(web::get().to(handler::get_paginated))
-            .wrap(interceptor::Auth::new(pg, rd, Role::Admin)),
+            .wrap(interceptor::Auth::new(pg, rd, Role::User)),
     );
 }

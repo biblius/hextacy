@@ -25,7 +25,11 @@ pub(crate) fn init(
     cfg.service(web::resource("/auth/login").route(web::post().to(handler::verify_credentials)));
 
     // Logout
-    cfg.service(web::resource("/auth/logout").route(web::post().to(handler::logout)));
+    cfg.service(
+        web::resource("/auth/logout")
+            .route(web::post().to(handler::logout))
+            .wrap(guard.clone()),
+    );
 
     // OTP login
     cfg.service(web::resource("/auth/verify-otp").route(web::post().to(handler::verify_otp)));

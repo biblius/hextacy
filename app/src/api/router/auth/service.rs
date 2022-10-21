@@ -5,9 +5,10 @@ use super::{
 };
 use crate::{
     api::router::auth::{
-        data::{Credentials, Otp, RegistrationData, SetPassword},
+        data::{ChangePassword, Credentials, Otp, RegistrationData},
         response::{
-            AuthenticationSuccess, FreezeAccount, Prompt2FA, RegistrationSuccess, TokenVerified,
+            AuthenticationSuccess, ChangedPassword, FreezeAccount, Prompt2FA, RegistrationSuccess,
+            TokenVerified,
         },
     },
     error::{AuthenticationError, Error},
@@ -23,7 +24,7 @@ use infrastructure::{
     crypto::{
         self,
         token::{generate_hmac, verify_hmac},
-        utility::{bcrypt_hash, bcrypt_verify, token, uuid},
+        utility::{bcrypt_hash, bcrypt_verify, token},
     },
     email::lettre::SmtpTransport,
     http::{cookie, response::Response},
@@ -59,8 +60,12 @@ impl Authentication {
         &self,
         credentials: Credentials,
     ) -> Result<HttpResponse, Error> {
-        let (email, password) = (credentials.email.as_str(), credentials.password.as_str());
-        info!("Verifying credentials for {}", email);
+        let (email, password, remember) = (
+            credentials.email.as_str(),
+            credentials.password.as_str(),
+            credentials.remember,
+        );
+        info!("Verifying credentials for {email}");
 
         let user = match self.database.get_user_by_email(email).await {
             Ok(u) => u,
@@ -95,10 +100,7 @@ impl Authentication {
 
         // If the user has 2FA turned on, stop here and cache the user so we can quickly verify their otp
         if user.otp_secret.is_some() {
-            info!(
-                "verfiy_credentials - User {:?} requires 2FA, caching token",
-                user.id
-            );
+            info!("User {} requires 2FA, caching token", user.id);
 
             let token = generate_hmac("OTP_TOKEN_SECRET", &user.password, BASE64URL)?;
 
@@ -111,19 +113,21 @@ impl Authentication {
                 )
                 .await?;
 
-            return Ok(Prompt2FA::new(&user.username, &token).to_response(
-                StatusCode::OK,
-                None,
-                None,
-            ));
+            return Ok(
+                Prompt2FA::new(&user.username, &token, remember).to_response(
+                    StatusCode::OK,
+                    None,
+                    None,
+                ),
+            );
         }
 
-        self.generate_session_response(user).await
+        self.generate_session_response(user, remember).await
     }
 
     /// Verifies the given OTP using the token generated on the credentials login.
     pub(super) async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
-        let (password, token) = (otp.password.as_str(), otp.token.as_str());
+        let (password, token, remember) = (otp.password.as_str(), otp.token.as_str(), otp.remember);
 
         let user_id = match self
             .cache
@@ -152,7 +156,7 @@ impl Authentication {
 
             self.cache.delete_token(CacheId::OTPToken, token).await?;
 
-            self.generate_session_response(user).await
+            self.generate_session_response(user, remember).await
         } else {
             Err(AuthenticationError::InvalidOTP.into())
         }
@@ -250,7 +254,7 @@ impl Authentication {
     pub(super) async fn change_password(
         &self,
         user_id: &str,
-        data: SetPassword,
+        data: ChangePassword,
     ) -> Result<HttpResponse, Error> {
         let password = data.password.as_str();
         let hashed = crypto::utility::bcrypt_hash(password)?;
@@ -271,7 +275,7 @@ impl Authentication {
 
         info!("Successfully changed password for {user_id}");
 
-        self.generate_session_response(user).await
+        Ok(ChangedPassword::new("Successfully changed password. All sessions have been purged, please log in again to continue.").to_response(StatusCode::OK, None, None))
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions
@@ -289,7 +293,8 @@ impl Authentication {
                 .delete_token(CacheId::Session, &session.csrf_token)
                 .await?;
         }
-        let cookie = cookie::create_session(session_id, true);
+        let cookie = cookie::create_session(session_id, true, false);
+
         Ok(Logout::new("Successfully logged out, bye!").to_response(
             StatusCode::OK,
             Some(vec![cookie]),
@@ -297,6 +302,7 @@ impl Authentication {
         ))
     }
 
+    /// Expires all sessions in the database and deletes all corresponding cached sessions
     async fn purge_and_clear_sessions(&self, user_id: &str) -> Result<(), Error> {
         let sessions = self.database.purge_sessions(user_id).await?;
         for s in sessions {
@@ -309,10 +315,17 @@ impl Authentication {
     }
 
     /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
-    async fn generate_session_response(&self, user: User) -> Result<HttpResponse, Error> {
-        let csrf_token = uuid();
-        let session = self.database.create_session(&user, &csrf_token).await?;
-        let session_cookie = cookie::create_session(&session.id, false);
+    async fn generate_session_response(
+        &self,
+        user: User,
+        remember: bool,
+    ) -> Result<HttpResponse, Error> {
+        let csrf_token = token(BASE64URL, 160)?;
+        let session = self
+            .database
+            .create_session(&user, &csrf_token, remember)
+            .await?;
+        let session_cookie = cookie::create_session(&session.id, false, remember);
 
         // Delete login attempts on success
         match self.cache.delete_login_attempts(&user.id).await {
@@ -320,7 +333,10 @@ impl Authentication {
             Err(_) => info!("No login attempts found for user {}, proceeding", user.id),
         };
 
-        self.cache.set_session(&csrf_token, &session).await?;
+        // If the session is permanent, cache it initially
+        if remember {
+            self.cache.set_session(&csrf_token, &session).await?;
+        }
 
         info!("Successfully created session for {}", user.id);
 

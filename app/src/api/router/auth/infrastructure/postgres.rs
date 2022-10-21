@@ -32,9 +32,10 @@ impl Postgres {
         &self,
         user: &User,
         csrf_token: &str,
+        permanent: bool,
     ) -> Result<Session, Error> {
         debug!("Creating session for user: {}", &user.id);
-        Session::create(user, csrf_token, &mut self.pool.connect()?)
+        Session::create(user, csrf_token, permanent, &mut self.pool.connect()?)
     }
 
     /// Marks the user's account as frozen

@@ -10,6 +10,7 @@ pub(super) struct Credentials {
     pub email: String,
     #[validate(length(min = 1))]
     pub password: String,
+    pub remember: bool,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -30,11 +31,12 @@ pub(super) struct Otp {
     pub password: String,
     #[validate(length(min = 1))]
     pub token: String,
+    pub remember: bool,
 }
 
 #[derive(Debug, Deserialize, Validate)]
 /// Received when updating a password
-pub(super) struct SetPassword {
+pub(super) struct ChangePassword {
     #[validate(length(min = 8))]
     pub password: String,
 }

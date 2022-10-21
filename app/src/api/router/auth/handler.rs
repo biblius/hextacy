@@ -1,5 +1,5 @@
 use super::{
-    data::{Credentials, EmailToken, Logout, Otp, RegistrationData, SetPassword},
+    data::{ChangePassword, Credentials, EmailToken, Logout, Otp, RegistrationData},
     service::Authentication,
 };
 use crate::{error::Error, utility::request::extract_session};
@@ -10,7 +10,7 @@ use validator::Validate;
 /// Verifies the user's login credentials and either establishes a session if the user
 /// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
 pub(super) async fn verify_credentials(
-    auth_form: web::Form<Credentials>,
+    auth_form: web::Json<Credentials>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
     auth_form.0.validate().map_err(Error::new)?;
@@ -22,7 +22,7 @@ pub(super) async fn verify_credentials(
 
 /// Verifies the user's OTP if they have 2FA enabled
 pub(super) async fn verify_otp(
-    otp: web::Form<Otp>,
+    otp: web::Json<Otp>,
     service: web::Data<Authentication>,
 ) -> Result<impl Responder, Error> {
     otp.0.validate().map_err(Error::new)?;
@@ -60,7 +60,7 @@ pub(super) async fn verify_registration_token(
 /// Sets the user's password after successful email token verification. Requires a token generated
 /// after successful email verification
 pub(super) async fn change_password(
-    data: web::Form<SetPassword>,
+    data: web::Form<ChangePassword>,
     service: web::Data<Authentication>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {

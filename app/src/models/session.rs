@@ -20,8 +20,13 @@ pub struct Session {
 }
 
 impl Session {
-    /// Create a new user session
-    pub fn create(user: &User, csrf: &str, conn: &mut PgPoolConnection) -> Result<Self, Error> {
+    /// Create a new user session. If the permanent flag is true, the session's `expires_at` field will be set to the maximum possible value
+    pub fn create(
+        user: &User,
+        csrf: &str,
+        permanent: bool,
+        conn: &mut PgPoolConnection,
+    ) -> Result<Self, Error> {
         use super::schema::sessions::dsl::*;
 
         let new = NewSession {
@@ -29,6 +34,11 @@ impl Session {
             username: &user.username,
             user_role: &user.role,
             csrf_token: csrf,
+            expires_at: if permanent {
+                NaiveDateTime::MAX
+            } else {
+                (Utc::now() + Duration::minutes(30)).naive_utc()
+            },
         };
 
         diesel::insert_into(sessions)
@@ -54,7 +64,10 @@ impl Session {
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
-    pub fn refresh(session_id: &str, conn: &mut PgPoolConnection) -> Result<Vec<Self>, Error> {
+    pub fn refresh_temporary(
+        session_id: &str,
+        conn: &mut PgPoolConnection,
+    ) -> Result<Vec<Self>, Error> {
         use super::schema::sessions::dsl::*;
 
         diesel::update(sessions)
@@ -85,6 +98,11 @@ impl Session {
             .load::<Self>(conn)
             .map_err(Error::new)
     }
+
+    #[inline]
+    pub fn is_permanent(&self) -> bool {
+        self.expires_at.timestamp() == NaiveDateTime::MAX.timestamp()
+    }
 }
 
 #[derive(Debug, Serialize, Insertable)]
@@ -94,4 +112,5 @@ pub struct NewSession<'a> {
     username: &'a str,
     user_role: &'a Role,
     csrf_token: &'a str,
+    expires_at: NaiveDateTime,
 }

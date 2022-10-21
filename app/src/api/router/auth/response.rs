@@ -16,6 +16,7 @@ impl Response for AuthenticationSuccess {}
 pub(super) struct Prompt2FA<'a> {
     username: &'a str,
     token: &'a str,
+    remember: bool,
 }
 impl<'a> Response for Prompt2FA<'a> {}
 
@@ -51,7 +52,7 @@ pub(super) struct Logout<'a> {
 impl<'a> Response for Logout<'a> {}
 
 #[derive(Debug, Serialize, new)]
-pub(super) struct UpdatedPassword<'a> {
+pub(super) struct ChangedPassword<'a> {
     message: &'a str,
 }
-impl<'a> Response for UpdatedPassword<'a> {}
+impl<'a> Response for ChangedPassword<'a> {}

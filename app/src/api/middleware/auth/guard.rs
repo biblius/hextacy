@@ -3,6 +3,7 @@ use std::sync::Arc;
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use infrastructure::{
     config::constants::SESSION_CACHE_DURATION_SECONDS,
+    http::cookie::S_ID,
     storage::{
         postgres::Pg,
         redis::{Cache as Cacher, CacheId, Rd},
@@ -32,6 +33,40 @@ impl AuthenticationGuard {
         }
     }
 
+    /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
+    /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
+    /// If it can't find a session returns an `Unauthenticated` error.
+    pub(super) async fn process_session(
+        &self,
+        session_id: &str,
+        csrf: &str,
+    ) -> Result<Session, Error> {
+        // Check cache
+        if let Ok(session) = self.cache.get_session_by_csrf(csrf).await {
+            debug!("Found cached session with {session_id}");
+            Ok(session)
+        } else {
+            // Check DB
+            if let Ok(session) = self.database.get_valid_session(session_id, csrf).await {
+                debug!("Found valid session with id {}", session.id);
+
+                // Cache if permanent
+                if session.is_permanent() {
+                    debug!("Session permanent, caching {}", session.id);
+                    self.cache.cache_session(csrf, &session).await?;
+                    return Ok(session);
+                }
+
+                // Otherwise refresh
+                debug!("Refreshing session {}", session.id);
+                self.database.refresh_session(&session.id).await?;
+                Ok(session)
+            } else {
+                Err(Error::new(AuthenticationError::Unauthenticated))
+            }
+        }
+    }
+
     /// Extracts the x-csrf-token header from the request
     pub(super) async fn get_csrf_header(req: &ServiceRequest) -> Result<&str, Error> {
         req.headers().get("x-csrf-token").map_or_else(
@@ -40,38 +75,10 @@ impl AuthenticationGuard {
         )
     }
 
-    /// Extracts the `session_id` cookie from the request
+    /// Extracts the `S_ID` cookie from the request
     pub(super) async fn get_session_cookie(req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
-        req.cookie("session_id")
+        req.cookie(S_ID)
             .ok_or_else(|| AuthenticationError::Unauthenticated.into())
-    }
-
-    /// Attempts to obtain a session cached behind a csrf token
-    pub(super) async fn get_cached_session(&self, token: &str) -> Result<Session, Error> {
-        self.cache.get_session_by_csrf(token).await
-    }
-
-    /// Attempts to obtain a valid (unexpired) session corresponding to the user's csrf token
-    pub(super) async fn get_valid_session(
-        &self,
-        session_id: &str,
-        csrf_token: &str,
-    ) -> Result<Session, Error> {
-        self.database
-            .get_valid_session(session_id, csrf_token)
-            .await
-            .map_err(|_| AuthenticationError::Unauthenticated.into())
-    }
-
-    /// Refreshes and caches the user session
-    pub(super) async fn refresh_and_cache(
-        &self,
-        token: &str,
-        session: &Session,
-    ) -> Result<Session, Error> {
-        let session = self.database.refresh_session(&session.id).await?;
-        self.cache.cache_session(token, &session).await?;
-        Ok(session)
     }
 
     /// Returns true if the role is equal to or greater than the auth_level of this guard instance
@@ -87,14 +94,14 @@ struct Postgres {
 }
 
 impl Postgres {
+    /// Attempts to find an unexpired session with its corresponding CSRF
     async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
-        debug!("Getting valid session with id {id} and csrf {csrf}");
         Session::get_valid_by_id(id, csrf, &mut self.pool.connect()?)
     }
 
+    /// Extends session `expires_at` for 30 minutes
     async fn refresh_session(&self, id: &str) -> Result<Session, Error> {
-        debug!("Refreshing session with id {id}");
-        Session::refresh(id, &mut self.pool.connect()?)?
+        Session::refresh_temporary(id, &mut self.pool.connect()?)?
             .pop()
             .ok_or_else(|| DatabaseError::DoesNotExist(format!("Session ID: {id}")).into())
     }
@@ -107,18 +114,10 @@ struct Cache {
 
 impl Cache {
     async fn get_session_by_csrf(&self, token: &str) -> Result<Session, Error> {
-        debug!(
-            "Getting session under {}",
-            format!("{}:{}", CacheId::Session, token)
-        );
         Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(Error::new)
     }
 
     async fn cache_session(&self, token: &str, session: &Session) -> Result<(), Error> {
-        debug!(
-            "Caching session under {}",
-            format!("{}:{}", CacheId::Session, token)
-        );
         Cacher::set(
             CacheId::Session,
             token,
