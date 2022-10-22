@@ -3,13 +3,15 @@ mod health_check;
 mod users;
 
 use actix_web::web::{self, ServiceConfig};
-use infrastructure::{
-    email::lettre::SmtpTransport,
-    storage::{postgres::Pg, redis::Rd},
-};
+use infrastructure::clients::{email::lettre::SmtpTransport, postgres::Postgres, redis::Redis};
 use std::sync::Arc;
 
-pub fn init(pg: Arc<Pg>, rd: Arc<Rd>, email_client: Arc<SmtpTransport>, cfg: &mut ServiceConfig) {
+pub fn init(
+    pg: Arc<Postgres>,
+    rd: Arc<Redis>,
+    email_client: Arc<SmtpTransport>,
+    cfg: &mut ServiceConfig,
+) {
     // Configure health check
     cfg.service(
         web::scope("/health")
@@ -22,7 +24,7 @@ pub fn init(pg: Arc<Pg>, rd: Arc<Rd>, email_client: Arc<SmtpTransport>, cfg: &mu
             ),
     );
 
-    auth::setup::init(pg.clone(), rd.clone(), email_client, cfg);
+    auth::setup::routes(pg.clone(), rd.clone(), email_client, cfg);
 
-    users::setup::init(pg, rd, cfg);
+    users::setup::routes(pg, rd, cfg);
 }

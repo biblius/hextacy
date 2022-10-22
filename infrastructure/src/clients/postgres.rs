@@ -1,4 +1,4 @@
-use super::DatabaseError;
+use super::ClientError;
 use crate::config::env;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection, State},
@@ -33,34 +33,34 @@ pub fn build_pool() -> PgPool {
 }
 
 #[derive(Debug, Clone)]
-pub struct Pg {
+pub struct Postgres {
     pool: PgPool,
 }
 
-impl Default for Pg {
+impl Default for Postgres {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Pg {
+impl Postgres {
     pub fn new() -> Self {
         info!("Intitializing Postgres pool");
         Self { pool: build_pool() }
     }
 
     /// Attempts to establish a pooled connection.
-    pub fn connect(&self) -> Result<PgPoolConnection, DatabaseError> {
-        trace!("Pg - Attempting pooled connection");
+    pub fn connect(&self) -> Result<PgPoolConnection, ClientError> {
+        trace!("Postgres - Attempting pooled connection");
         match self.pool.get() {
             Ok(conn) => Ok(conn),
-            Err(e) => Err(DatabaseError::PgPoolConnection(e.to_string())),
+            Err(e) => Err(ClientError::PgPoolConnection(e.to_string())),
         }
     }
 
     /// Attempts to establish a direct connection to the postgres server. Panics if `POSTGRES_URL` is not set
     /// in the environment.
-    pub fn connect_direct() -> Result<PgConnection, DatabaseError> {
+    pub fn connect_direct() -> Result<PgConnection, ClientError> {
         let db_url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
 
         PgConnection::establish(&db_url).map_err(Into::into)

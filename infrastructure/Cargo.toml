@@ -49,6 +49,7 @@ lettre = "0.10.1"
 
 # Storage
 
+r2d2 = "0.8.10"
 uuid = { version = "1.1.2", features = ["v4"] }
 mongodb = { version = "2.3.1", features = ["tokio-runtime", "tokio-sync"] }
 r2d2_redis = "0.14.0"
@@ -76,6 +77,7 @@ regex = "1.6.0"
 
 # Utility and pretty
 
+async-trait = "0.1.42"
 lazy_static = "1.4.0"
 thiserror = "1.0.37"
 colored = "2.0.0"

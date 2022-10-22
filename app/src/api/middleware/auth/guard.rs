@@ -1,53 +1,63 @@
-use std::sync::Arc;
-
+use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
+use crate::error::{AuthenticationError, Error};
+use crate::services::cache::{Cache as CacheService, CacheId};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
+use async_trait::async_trait;
+use infrastructure::adapters::postgres::session::PgSessionAdapter;
+use infrastructure::clients::postgres::Postgres;
 use infrastructure::{
+    adapters::postgres::PgAdapterError,
+    clients::redis::Redis,
     config::constants::SESSION_CACHE_DURATION_SECONDS,
-    http::cookie::S_ID,
-    storage::{
-        postgres::Pg,
-        redis::{Cache as Cacher, CacheId, Rd},
-        DatabaseError,
+    repository::{
+        role::Role,
+        session::{Session, SessionRepository},
     },
+    utility::http::cookie::S_ID,
 };
+use std::sync::Arc;
 use tracing::debug;
 
-use crate::{
-    error::{AuthenticationError, Error},
-    models::{role::Role, session::Session},
-};
-
 #[derive(Debug, Clone)]
-pub(super) struct AuthenticationGuard {
-    database: Postgres,
-    cache: Cache,
-    auth_level: Role,
+pub(super) struct AuthenticationGuard<R: RepositoryContract, C: CacheContract> {
+    pub repository: R,
+    pub cache: C,
+    pub auth_level: Role,
 }
 
-impl AuthenticationGuard {
-    pub(super) fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>, auth_level: Role) -> Self {
+impl AuthenticationGuard<Repository<PgSessionAdapter>, Cache> {
+    pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
         Self {
-            database: Postgres { pool: pg_pool },
-            cache: Cache { pool: rd_pool },
-            auth_level,
+            repository: Repository {
+                session_repo: PgSessionAdapter {
+                    client: pg_client.clone(),
+                },
+            },
+            cache: Cache {
+                client: rd_client.clone(),
+            },
+            auth_level: role,
         }
     }
+}
 
+#[async_trait]
+impl<R, C> AuthGuardContract for AuthenticationGuard<R, C>
+where
+    R: RepositoryContract + Send + Sync,
+    C: CacheContract + Send + Sync,
+{
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
     /// If it can't find a session returns an `Unauthenticated` error.
-    pub(super) async fn process_session(
-        &self,
-        session_id: &str,
-        csrf: &str,
-    ) -> Result<Session, Error> {
+    async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error> {
         // Check cache
         if let Ok(session) = self.cache.get_session_by_csrf(csrf).await {
             debug!("Found cached session with {session_id}");
             Ok(session)
         } else {
             // Check DB
-            if let Ok(session) = self.database.get_valid_session(session_id, csrf).await {
+            if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
                 debug!("Found valid session with id {}", session.id);
 
                 // Cache if permanent
@@ -59,7 +69,7 @@ impl AuthenticationGuard {
 
                 // Otherwise refresh
                 debug!("Refreshing session {}", session.id);
-                self.database.refresh_session(&session.id).await?;
+                self.repository.refresh_session(&session.id, csrf).await?;
                 Ok(session)
             } else {
                 Err(Error::new(AuthenticationError::Unauthenticated))
@@ -68,7 +78,7 @@ impl AuthenticationGuard {
     }
 
     /// Extracts the x-csrf-token header from the request
-    pub(super) async fn get_csrf_header(req: &ServiceRequest) -> Result<&str, Error> {
+    fn get_csrf_header<'a>(&self, req: &'a ServiceRequest) -> Result<&'a str, Error> {
         req.headers().get("x-csrf-token").map_or_else(
             || Err(AuthenticationError::InvalidCsrfHeader.into()),
             |value| value.to_str().map_err(Error::new),
@@ -76,54 +86,63 @@ impl AuthenticationGuard {
     }
 
     /// Extracts the `S_ID` cookie from the request
-    pub(super) async fn get_session_cookie(req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
+    fn get_session_cookie(&self, req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
         req.cookie(S_ID)
             .ok_or_else(|| AuthenticationError::Unauthenticated.into())
     }
 
     /// Returns true if the role is equal to or greater than the auth_level of this guard instance
     #[inline]
-    pub(super) fn check_valid_role(&self, role: &Role) -> bool {
+    fn check_valid_role(&self, role: &Role) -> bool {
         role >= &self.auth_level
     }
 }
 
 #[derive(Debug, Clone)]
-struct Postgres {
-    pool: Arc<Pg>,
+pub struct Repository<SR: SessionRepository> {
+    pub session_repo: SR,
 }
 
-impl Postgres {
+#[async_trait]
+impl<SR> RepositoryContract for Repository<SR>
+where
+    SR: SessionRepository<Error = PgAdapterError> + Send + Sync,
+{
     /// Attempts to find an unexpired session with its corresponding CSRF
     async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
-        Session::get_valid_by_id(id, csrf, &mut self.pool.connect()?)
+        self.session_repo
+            .get_valid_by_id(id, csrf)
+            .await
+            .map_err(Error::new)
     }
 
     /// Extends session `expires_at` for 30 minutes
-    async fn refresh_session(&self, id: &str) -> Result<Session, Error> {
-        Session::refresh_temporary(id, &mut self.pool.connect()?)?
-            .pop()
-            .ok_or_else(|| DatabaseError::DoesNotExist(format!("Session ID: {id}")).into())
+    async fn refresh_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
+        self.session_repo
+            .refresh(id, csrf)
+            .await
+            .map_err(Error::new)
     }
 }
 
 #[derive(Debug, Clone)]
-struct Cache {
-    pool: Arc<Rd>,
+pub struct Cache {
+    pub client: Arc<Redis>,
 }
 
-impl Cache {
+#[async_trait]
+impl CacheContract for Cache {
     async fn get_session_by_csrf(&self, token: &str) -> Result<Session, Error> {
-        Cacher::get(CacheId::Session, token, &mut self.pool.connect()?).map_err(Error::new)
+        CacheService::get(CacheId::Session, token, &mut self.client.connect()?).map_err(Error::new)
     }
 
     async fn cache_session(&self, token: &str, session: &Session) -> Result<(), Error> {
-        Cacher::set(
+        CacheService::set(
             CacheId::Session,
             token,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
-            &mut self.pool.connect()?,
+            &mut self.client.connect()?,
         )
         .map_err(Error::new)
     }

@@ -1,6 +1,6 @@
 use super::{
+    contract::ServiceContract,
     data::{ChangePassword, Credentials, EmailToken, Logout, Otp, RegistrationData},
-    service::Authentication,
 };
 use crate::{error::Error, utility::request::extract_session};
 use actix_web::{web, HttpRequest, Responder};
@@ -9,9 +9,9 @@ use validator::Validate;
 
 /// Verifies the user's login credentials and either establishes a session if the user
 /// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
-pub(super) async fn verify_credentials(
+pub(super) async fn verify_credentials<T: ServiceContract>(
     auth_form: web::Json<Credentials>,
-    service: web::Data<Authentication>,
+    service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     auth_form.0.validate().map_err(Error::new)?;
 
@@ -21,9 +21,9 @@ pub(super) async fn verify_credentials(
 }
 
 /// Verifies the user's OTP if they have 2FA enabled
-pub(super) async fn verify_otp(
+pub(super) async fn verify_otp<T: ServiceContract>(
     otp: web::Json<Otp>,
-    service: web::Data<Authentication>,
+    service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     otp.0.validate().map_err(Error::new)?;
 
@@ -34,9 +34,9 @@ pub(super) async fn verify_otp(
 
 /// Starts the registration process for the user and sends an email containing a temporary
 /// token used to complete the registration
-pub(super) async fn start_registration(
+pub(super) async fn start_registration<T: ServiceContract>(
     data: web::Form<RegistrationData>,
-    service: web::Data<Authentication>,
+    service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     data.0.validate().map_err(Error::new)?;
 
@@ -46,9 +46,9 @@ pub(super) async fn start_registration(
 }
 
 /// Verifies the user's registration token
-pub(super) async fn verify_registration_token(
+pub(super) async fn verify_registration_token<T: ServiceContract>(
     token: web::Query<EmailToken>,
-    service: web::Data<Authentication>,
+    service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     token.0.validate().map_err(Error::new)?;
 
@@ -59,9 +59,9 @@ pub(super) async fn verify_registration_token(
 
 /// Sets the user's password after successful email token verification. Requires a token generated
 /// after successful email verification
-pub(super) async fn change_password(
+pub(super) async fn change_password<T: ServiceContract>(
     data: web::Form<ChangePassword>,
-    service: web::Data<Authentication>,
+    service: web::Data<T>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
     data.0.validate().map_err(Error::new)?;
@@ -73,8 +73,8 @@ pub(super) async fn change_password(
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
-pub(super) async fn set_otp_secret(
-    service: web::Data<Authentication>,
+pub(super) async fn set_otp_secret<T: ServiceContract>(
+    service: web::Data<T>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {
     let session = extract_session(req)?;
@@ -85,8 +85,8 @@ pub(super) async fn set_otp_secret(
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
-pub(super) async fn logout(
-    service: web::Data<Authentication>,
+pub(super) async fn logout<T: ServiceContract>(
+    service: web::Data<T>,
     expire: web::Json<Logout>,
     req: HttpRequest,
 ) -> Result<impl Responder, Error> {

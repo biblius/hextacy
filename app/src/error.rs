@@ -1,5 +1,6 @@
+use crate::services::cache::CacheId;
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::storage::redis::{self, CacheId};
+use infrastructure::clients::redis::{self};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -10,18 +11,20 @@ use validator::{ValidationError, ValidationErrors};
 pub enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
-    #[error("Database Error: {0}")]
-    Database(#[from] infrastructure::storage::DatabaseError),
+    #[error("Client Error: {0}")]
+    ClientError(#[from] infrastructure::clients::ClientError),
+    #[error("Diesel Error: {0}")]
+    Cache(#[from] crate::services::cache::CacheError),
     #[error("Diesel Error: {0}")]
     Diesel(#[from] diesel::result::Error),
+    #[error("Pg adapter Error: {0}")]
+    PgAdapter(#[from] infrastructure::adapters::postgres::PgAdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Bcrypt Error: {0}")]
     Bcrypt(#[from] infrastructure::crypto::CryptoError),
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
-    #[error("Email Error: {0}")]
-    Email(#[from] infrastructure::email::EmailError),
     #[error("Reqwest Header Error: {0}")]
     Reqwest(#[from] reqwest::header::InvalidHeaderValue),
     #[error("Reqwest Header Error: {0}")]

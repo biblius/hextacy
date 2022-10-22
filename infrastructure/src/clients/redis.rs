@@ -1,4 +1,4 @@
-use super::DatabaseError;
+use super::ClientError;
 use crate::config::env;
 use diesel::r2d2::State;
 use r2d2_redis::{
@@ -6,7 +6,7 @@ use r2d2_redis::{
     redis::{Client, ConnectionInfo, IntoConnectionInfo},
     RedisConnectionManager,
 };
-use tracing::{debug, info, trace};
+use tracing::{info, trace};
 
 pub use r2d2_redis::redis::Commands;
 pub use r2d2_redis::redis::FromRedisValue;
@@ -71,111 +71,38 @@ fn connection_info() -> ConnectionInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct Rd {
+pub struct Redis {
     pool: RedisPool,
 }
 
-impl Default for Rd {
+impl Default for Redis {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Rd {
+impl Redis {
     pub fn new() -> Self {
         info!("Initializing redis pool");
         Self { pool: build_pool() }
     }
 
-    pub fn connect(&self) -> Result<RedisPoolConnection, DatabaseError> {
+    pub fn connect(&self) -> Result<RedisPoolConnection, ClientError> {
         match self.pool.get() {
             Ok(conn) => Ok(conn),
-            Err(e) => Err(DatabaseError::RdPoolConnection(e.to_string())),
+            Err(e) => Err(ClientError::RdPoolConnection(e.to_string())),
         }
     }
 
-    pub fn connect_direct() -> Result<Client, DatabaseError> {
+    pub fn connect_direct() -> Result<Client, ClientError> {
         let db_url = env::get("REDIS_URL").expect("REDIS_URL must be set");
         match Client::open(db_url) {
             Ok(conn) => Ok(conn),
-            Err(e) => Err(DatabaseError::RdDirectConnection(e)),
+            Err(e) => Err(ClientError::RdDirectConnection(e)),
         }
     }
 
     pub fn health_check(&self) -> State {
         self.pool.state()
-    }
-}
-
-use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Display;
-
-/// Utility struct
-pub struct Cache;
-
-impl Cache {
-    pub fn get<T: DeserializeOwned>(
-        cache_id: CacheId,
-        key: &str,
-        conn: &mut RedisPoolConnection,
-    ) -> Result<T, DatabaseError> {
-        debug!("Getting {}:{}", cache_id, key);
-        let key = Self::prefix_id(cache_id, &key);
-        let result = conn.get::<&str, String>(&key)?;
-        serde_json::from_str::<T>(&result).map_err(Into::into)
-    }
-
-    pub fn set<T: Serialize>(
-        cache_id: CacheId,
-        key: &str,
-        val: &T,
-        ex: Option<usize>,
-        conn: &mut RedisPoolConnection,
-    ) -> Result<(), DatabaseError> {
-        debug!("Setting {}:{}", cache_id, key);
-        let key = Self::prefix_id(cache_id, &key);
-        let value = serde_json::to_string(&val)?;
-        if let Some(ex) = ex {
-            conn.set_ex::<&str, String, ()>(&key, value, ex)
-                .map_err(Into::into)
-        } else {
-            conn.set::<&str, String, ()>(&key, value)
-                .map_err(Into::into)
-        }
-    }
-
-    pub fn delete(
-        cache_id: CacheId,
-        key: &str,
-        conn: &mut RedisPoolConnection,
-    ) -> Result<(), DatabaseError> {
-        trace!("Deleting {}:{}", cache_id, key);
-        conn.del::<String, ()>(Self::prefix_id(cache_id, &key))
-            .map_err(Into::into)
-    }
-
-    pub fn prefix_id<T: ToRedisArgs + Display>(cache_id: CacheId, key: &T) -> String {
-        format!("{}:{}", cache_id, key)
-    }
-}
-
-#[derive(Debug)]
-pub enum CacheId {
-    LoginAttempts,
-    Session,
-    OTPToken,
-    RegToken,
-    PWToken,
-}
-
-impl Display for CacheId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CacheId::LoginAttempts => write!(f, "auth:login_attempts"),
-            CacheId::OTPToken => write!(f, "auth:otp"),
-            CacheId::Session => write!(f, "auth:session"),
-            CacheId::RegToken => write!(f, "auth:registration_token"),
-            CacheId::PWToken => write!(f, "auth:set_pw"),
-        }
     }
 }

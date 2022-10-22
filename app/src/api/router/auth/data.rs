@@ -1,5 +1,9 @@
-use infrastructure::validation::EMAIL_REGEX;
-use serde::Deserialize;
+use derive_new::new;
+use infrastructure::{
+    repository::{session::Session, user::User},
+    utility::{http::response::Response, validation::EMAIL_REGEX},
+};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use validator::Validate;
 
@@ -53,3 +57,59 @@ pub(super) struct EmailToken {
 pub(super) struct Logout {
     pub purge: bool,
 }
+
+/// Sent when the user completely authenticates
+#[derive(Debug, Serialize, new)]
+pub(super) struct AuthenticationSuccessResponse {
+    user: User,
+    session: Session,
+}
+impl Response for AuthenticationSuccessResponse {}
+
+/// Sent when the user successfully authenticates with credentials and has 2FA enabled
+#[derive(Debug, Serialize, new)]
+pub(super) struct TwoFactorAuthResponse<'a> {
+    username: &'a str,
+    token: &'a str,
+    remember: bool,
+}
+impl<'a> Response for TwoFactorAuthResponse<'a> {}
+
+/// Sent when the user exceeds the maximum invalid login attempts
+#[derive(Debug, Serialize, new)]
+pub(super) struct FreezeAccountResponse<'a> {
+    email: &'a str,
+    message: &'a str,
+}
+impl<'a> Response for FreezeAccountResponse<'a> {}
+
+/// Sent when a user registers for the very first time
+#[derive(Debug, Serialize, new)]
+pub(super) struct RegistrationSuccessResponse<'a> {
+    message: &'a str,
+    username: &'a str,
+    email: &'a str,
+}
+impl<'a> Response for RegistrationSuccessResponse<'a> {}
+
+/// Sent when a user successfully verifies their registration token
+#[derive(Debug, Serialize, new)]
+pub(super) struct TokenVerifiedResponse<'a> {
+    user_id: &'a str,
+    message: &'a str,
+}
+impl<'a> Response for TokenVerifiedResponse<'a> {}
+
+/// Sent when a user successfully logs out
+#[derive(Debug, Serialize, new)]
+pub(super) struct LogoutResponse<'a> {
+    message: &'a str,
+}
+impl<'a> Response for LogoutResponse<'a> {}
+
+/// Sent when a user successfully changes their password
+#[derive(Debug, Serialize, new)]
+pub(super) struct ChangePasswordResponse<'a> {
+    message: &'a str,
+}
+impl<'a> Response for ChangePasswordResponse<'a> {}

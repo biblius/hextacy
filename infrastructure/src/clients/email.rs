@@ -1,3 +1,4 @@
+use super::ClientError;
 use crate::config;
 pub use lettre;
 use lettre::{
@@ -5,7 +6,6 @@ use lettre::{
     SmtpTransport, Transport,
 };
 use std::{fmt::Write, fs, path::Path};
-use thiserror::Error;
 
 /// Build an email client from the environment.
 pub fn build_client() -> SmtpTransport {
@@ -56,7 +56,7 @@ pub fn send(
     subject: &str,
     body: String,
     client: &SmtpTransport,
-) -> Result<(), EmailError> {
+) -> Result<(), ClientError> {
     let sender = config::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
 
     let from = from.map_or_else(
@@ -74,12 +74,4 @@ pub fn send(
 
     client.send(&email)?;
     Ok(())
-}
-
-#[derive(Debug, Error)]
-pub enum EmailError {
-    #[error("Lettre Error: {0}")]
-    Lettre(#[from] lettre::error::Error),
-    #[error("SMTP Error: {0}")]
-    SmtpTransport(#[from] lettre::transport::smtp::Error),
 }

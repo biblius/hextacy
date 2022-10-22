@@ -1,8 +1,7 @@
 pub mod actors;
 pub mod config;
 pub mod schema;
-pub mod storage_t;
-pub mod websocket;
+pub mod storage;
 
 use env_logger::fmt::Color;
 use env_logger::Env;
@@ -33,12 +32,12 @@ pub fn main() {
     actors::broker_test::handle_subscribe();
 
     // Postgres
-    storage_t::establish_pg_connection();
-    storage_t::pg_transaction();
-    storage_t::pg_transaction_fail();
+    storage::establish_pg_connection();
+    storage::pg_transaction();
+    storage::pg_transaction_fail();
 
     // Redis
-    storage_t::establish_rd_connection();
+    storage::establish_rd_connection();
 
     // Mongo
     // storage::mongo_insert_with_transaction();

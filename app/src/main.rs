@@ -1,14 +1,14 @@
 mod api;
 mod error;
-mod models;
+mod services;
 mod utility;
 
 use actix_web::{middleware::Logger, App, HttpServer};
 use api::router;
 use infrastructure::{
+    clients::{email, postgres::Postgres, redis::Redis},
     config::{env, logger},
-    email, http,
-    storage::{postgres::Pg, redis::Rd},
+    utility::http,
 };
 use std::sync::Arc;
 use tracing::info;
@@ -20,10 +20,10 @@ async fn main() -> std::io::Result<()> {
     logger::init("debug");
     // logger::init_file("debug", "server.log");
 
-    let pg = Arc::new(Pg::new());
+    let pg = Arc::new(Postgres::new());
     info!("Postgres pool initialized");
 
-    let rd = Arc::new(Rd::new());
+    let rd = Arc::new(Redis::new());
     info!("Redis pool initialized");
 
     let email_client = Arc::new(email::build_client());

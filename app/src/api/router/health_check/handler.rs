@@ -1,5 +1,5 @@
 use actix_web::{web, HttpResponseBuilder};
-use infrastructure::storage::{postgres::Pg, redis::Rd};
+use infrastructure::clients::{postgres::Postgres, redis::Redis};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::sync::Arc;
@@ -16,8 +16,8 @@ pub async fn health_check(pools: web::Data<Pools>) -> impl actix_web::Responder 
 }
 
 pub struct Pools {
-    pub pg: Arc<Pg>,
-    pub rd: Arc<Rd>,
+    pub pg: Arc<Postgres>,
+    pub rd: Arc<Redis>,
 }
 
 #[derive(Debug, Serialize)]

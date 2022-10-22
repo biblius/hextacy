@@ -3,27 +3,27 @@ use diesel::{
     query_dsl::methods::{FilterDsl, LimitDsl, OrderDsl, SelectDsl},
     ExpressionMethods, Insertable, Queryable, RunQueryDsl,
 };
-use infrastructure::storage::{mongo::MongoSync, postgres::Pg, redis::Rd};
+use infrastructure::clients::{mongo::MongoSync, postgres::Postgres, redis::Redis};
 use mongodb::bson::doc;
 use tracing::{info, trace};
 
 pub fn establish_pg_connection() {
     info!("\n========== TEST - ESTABLISH PG CONNECTION (POOL + DIRECT) ==========\n");
 
-    let pool = Pg::default();
+    let pool = Postgres::default();
     let conn = pool.connect();
     assert!(matches!(conn, Ok(_)));
-    let dir_conn = Pg::connect_direct();
+    let dir_conn = Postgres::connect_direct();
     assert!(matches!(dir_conn, Ok(_)));
 }
 
 pub fn establish_rd_connection() {
     info!("\n========== TEST - ESTABLISH RD CONNECTION (POOL + DIRECT) ==========\n");
 
-    let pool = Rd::new();
+    let pool = Redis::new();
     let conn = pool.connect();
     assert!(matches!(conn, Ok(_)));
-    let dir_conn = Rd::connect_direct();
+    let dir_conn = Redis::connect_direct();
     assert!(matches!(dir_conn, Ok(_)));
 }
 
@@ -57,7 +57,7 @@ pub fn mongo_insert_with_transaction() {
 pub fn pg_transaction() {
     info!("\n========== TEST - PG INSERT WITH TRANSACTION SUCCESS ==========\n");
 
-    let mut conn = Pg::connect_direct().unwrap();
+    let mut conn = Postgres::connect_direct().unwrap();
 
     let user = NewTestUser {
         username: "i am user".to_string(),
@@ -93,7 +93,7 @@ pub fn pg_transaction() {
 
 pub fn pg_transaction_fail() {
     info!("\n========== TEST - PG INSERT WITH TRANSACTION FAIL ==========\n");
-    let mut conn = Pg::connect_direct().unwrap();
+    let mut conn = Postgres::connect_direct().unwrap();
 
     let user = NewTestUser {
         username: "i am user".to_string(),

@@ -1,3 +1,4 @@
+pub mod email;
 pub mod mongo;
 pub mod postgres;
 pub mod redis;
@@ -5,7 +6,7 @@ pub mod redis;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum DatabaseError {
+pub enum ClientError {
     #[error("Postgres pool error: {0}")]
     PgPoolConnection(String),
     #[error("Redis pool error: {0}")]
@@ -16,8 +17,8 @@ pub enum DatabaseError {
     RdDirectConnection(#[from] r2d2_redis::redis::RedisError),
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),
-    #[error("Serde Error: {0}")]
-    Serde(#[from] serde_json::Error),
-    #[error("Does not exist: {0}")]
-    DoesNotExist(String),
+    #[error("Lettre Error: {0}")]
+    Lettre(#[from] lettre::error::Error),
+    #[error("SMTP Error: {0}")]
+    SmtpTransport(#[from] lettre::transport::smtp::Error),
 }

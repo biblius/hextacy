@@ -1,39 +1,48 @@
-use super::guard::AuthenticationGuard;
+use super::contract::{CacheContract, RepositoryContract};
+use super::guard::{AuthenticationGuard, Cache, Repository};
+use crate::api::middleware::auth::contract::AuthGuardContract;
 use crate::error::{AuthenticationError, Error};
-use crate::models::role::Role;
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
-use infrastructure::storage::postgres::Pg;
-use infrastructure::storage::redis::Rd;
+use infrastructure::adapters::postgres::session::PgSessionAdapter;
+use infrastructure::clients::postgres::Postgres;
+use infrastructure::clients::redis::Redis;
+use infrastructure::repository::role::Role;
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
-pub struct Auth {
-    guard: Rc<AuthenticationGuard>,
+pub(crate) struct AuthGuard<R, C>
+where
+    R: RepositoryContract,
+    C: CacheContract,
+{
+    guard: Rc<AuthenticationGuard<R, C>>,
 }
 
-impl Auth {
-    pub fn new(pg_pool: Arc<Pg>, rd_pool: Arc<Rd>, auth_level: Role) -> Self {
+impl AuthGuard<Repository<PgSessionAdapter>, Cache> {
+    pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
         Self {
-            guard: Rc::new(AuthenticationGuard::new(pg_pool, rd_pool, auth_level)),
+            guard: Rc::new(AuthenticationGuard::new(pg_client, rd_client, role)),
         }
     }
 }
 
-impl<S> Transform<S, ServiceRequest> for Auth
+impl<S, R, C> Transform<S, ServiceRequest> for AuthGuard<R, C>
 where
     S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
     S::Future: 'static,
+    R: RepositoryContract + Send + Sync + 'static,
+    C: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
     type Error = actix_web::Error;
     type InitError = ();
-    type Transform = AuthMiddleware<S>;
+    type Transform = AuthMiddleware<S, R, C>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -44,15 +53,21 @@ where
     }
 }
 
-pub struct AuthMiddleware<S> {
-    guard: Rc<AuthenticationGuard>,
+pub(crate) struct AuthMiddleware<S, R, C>
+where
+    R: RepositoryContract,
+    C: CacheContract,
+{
+    guard: Rc<AuthenticationGuard<R, C>>,
     service: Rc<S>,
 }
 
-impl<S> Service<ServiceRequest> for AuthMiddleware<S>
+impl<S, R, C> Service<ServiceRequest> for AuthMiddleware<S, R, C>
 where
     S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
     S::Future: 'static,
+    R: RepositoryContract + Send + Sync + 'static,
+    C: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
     type Error = actix_web::Error;
@@ -72,7 +87,7 @@ where
                 |e, r: ServiceRequest| ServiceResponse::from_err(e, r.request().to_owned());
 
             // Get the csrf header
-            let csrf = match AuthenticationGuard::get_csrf_header(&req).await {
+            let csrf = match guard.get_csrf_header(&req) {
                 Ok(token) => token,
                 Err(e) => return Ok(error_response(e, req)),
             };
@@ -80,14 +95,14 @@ where
             debug!("Found csrf header: {csrf}");
 
             // Get the session ID
-            let session_id = match AuthenticationGuard::get_session_cookie(&req).await {
+            let session_id = match guard.get_session_cookie(&req) {
                 Ok(id) => id,
                 Err(e) => return Ok(error_response(e, req)),
             };
 
             debug!("Found session ID cookie with value {session_id}");
 
-            let session = guard.process_session(session_id.value(), csrf).await?;
+            let session = guard.get_valid_session(session_id.value(), csrf).await?;
 
             if !guard.check_valid_role(&session.user_role) {
                 return Ok(error_response(

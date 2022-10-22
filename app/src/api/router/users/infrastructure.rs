@@ -1,30 +1,33 @@
-use crate::{
-    error::Error,
-    models::user::{SortOptions, User},
+use crate::error::Error;
+use async_trait::async_trait;
+use infrastructure::{
+    adapters::postgres::PgAdapterError,
+    repository::user::{SortOptions, User, UserRepository},
 };
-use infrastructure::storage::postgres::Pg;
-use std::sync::Arc;
 
-pub(super) struct Postgres {
-    pool: Arc<Pg>,
+use super::contract::RepositoryContract;
+
+pub(super) struct Repository<UR>
+where
+    UR: UserRepository,
+{
+    pub user_repo: UR,
 }
 
-impl Postgres {
-    pub(super) fn new(pool: Arc<Pg>) -> Self {
-        Self { pool }
-    }
-
-    pub(super) fn get_paginated(
+#[async_trait]
+impl<UR> RepositoryContract for Repository<UR>
+where
+    UR: UserRepository<Error = PgAdapterError> + Send + Sync,
+{
+    async fn get_paginated(
         &self,
         page: u16,
         per_page: u16,
         sort_by: Option<SortOptions>,
-    ) -> Result<(i64, Vec<User>), Error> {
-        User::get_paginated(
-            page,
-            per_page,
-            sort_by.unwrap_or(SortOptions::CreatedAtDesc),
-            &mut self.pool.connect().unwrap(),
-        )
+    ) -> Result<Vec<User>, Error> {
+        self.user_repo
+            .get_paginated(page, per_page, sort_by)
+            .await
+            .map_err(Error::new)
     }
 }

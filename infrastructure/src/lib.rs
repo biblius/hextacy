@@ -1,13 +1,10 @@
 #[cfg(feature = "actors")]
 pub use actors;
+
+pub mod adapters;
+pub mod clients;
 pub mod config;
 pub mod crypto;
-pub mod email;
-pub mod http;
-pub mod storage;
-pub mod validation;
+pub mod repository;
+pub mod utility;
 pub mod websocket;
-pub mod utility {
-    pub use rand;
-    pub use uuid;
-}

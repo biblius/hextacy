@@ -1,8 +1,6 @@
-use crate::{
-    error::{AuthenticationError, Error},
-    models::session::Session,
-};
+use crate::error::{AuthenticationError, Error};
 use actix_web::{HttpMessage, HttpRequest};
+use infrastructure::repository::session::Session;
 
 /// Utility for quickly dropping the request extensions reference and getting the
 /// cloned session
