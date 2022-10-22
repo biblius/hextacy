@@ -15,14 +15,12 @@ pub enum Error {
     ClientError(#[from] infrastructure::clients::ClientError),
     #[error("Diesel Error: {0}")]
     Cache(#[from] crate::services::cache::CacheError),
-    #[error("Diesel Error: {0}")]
-    Diesel(#[from] diesel::result::Error),
     #[error("Pg adapter Error: {0}")]
     PgAdapter(#[from] infrastructure::adapters::postgres::PgAdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
-    #[error("Bcrypt Error: {0}")]
-    Bcrypt(#[from] infrastructure::crypto::CryptoError),
+    #[error("Crypto Error: {0}")]
+    Crypto(#[from] infrastructure::crypto::CryptoError),
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Reqwest Header Error: {0}")]

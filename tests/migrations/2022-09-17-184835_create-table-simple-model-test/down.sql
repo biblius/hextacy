@@ -1,1 +1,0 @@
-DROP TABLE simple_models;

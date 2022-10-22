@@ -24,6 +24,45 @@ pub struct User {
     pub updated_at: NaiveDateTime,
 }
 
+impl User {
+    pub fn __mock(
+        id: String,
+        email: &str,
+        username: &str,
+        password: String,
+        with_otp: bool,
+        verified: bool,
+        frozen: bool,
+    ) -> Self {
+        Self {
+            id: id.to_string(),
+            email: email.to_string(),
+            username: username.to_string(),
+            role: Role::User,
+            password,
+            otp_secret: if with_otp {
+                Some(data_encoding::BASE32.encode(b"super_scret"))
+            } else {
+                None
+            },
+            phone: None,
+            google_id: None,
+            github_id: None,
+            frozen,
+            email_verified_at: if verified {
+                Some(NaiveDateTime::from_timestamp(
+                    chrono::Utc::now().timestamp(),
+                    0,
+                ))
+            } else {
+                None
+            },
+            created_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+            updated_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub enum SortOptions {
     #[serde(rename = "username")]

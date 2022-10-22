@@ -3,32 +3,30 @@ name = "app"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 infrastructure = { path = "../infrastructure" }
-
 
 # Date and time
 
 chrono = { version = "0.4.22", features = ["serde"] }
 
-async-trait = "0.1.42"
+# Web
+
 actix-web = "4"
+reqwest = "0.11.12"
+
+# Utility 
+
+thotp = "0.1.11"
+mockall = "0.11.3"
+async-trait = "0.1.42"
 derive-new = "0.5.9"
 tracing = "0.1.35"
+tracing-test = "0.2.3"
 thiserror = "1.0.37"
-thotp = { version = "0.1.11" }
-reqwest = "0.11.12"
 serde = { version = "1.0.145", features = ["derive"] }
 data-encoding = "2.3.2"
 serde_json = "1.0.85"
 validator = { version = "0.16", features = ["derive"] }
 futures-util = "0.3.24"
 lazy_static = "1.4.0"
-diesel = { version = "2.0.1", features = [
-  "postgres",
-  "chrono",
-  "r2d2",
-  "serde_json",
-] }

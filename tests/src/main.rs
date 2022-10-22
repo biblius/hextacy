@@ -1,12 +1,11 @@
-pub mod actors;
-pub mod config;
-pub mod schema;
-pub mod storage;
+mod unit;
 
 use env_logger::fmt::Color;
 use env_logger::Env;
 use std::env;
 use std::io::Write;
+use unit::infrastructure::actors;
+use unit::infrastructure::config;
 
 const ENV_PATH: &str = "tests/.env";
 
@@ -30,15 +29,4 @@ pub fn main() {
     actors::direct_message_handling::simple_broadcast().unwrap();
     actors::broker_test::add_sub();
     actors::broker_test::handle_subscribe();
-
-    // Postgres
-    storage::establish_pg_connection();
-    storage::pg_transaction();
-    storage::pg_transaction_fail();
-
-    // Redis
-    storage::establish_rd_connection();
-
-    // Mongo
-    // storage::mongo_insert_with_transaction();
 }

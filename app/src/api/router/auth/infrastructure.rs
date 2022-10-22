@@ -2,7 +2,6 @@ use super::contract::{CacheContract, EmailContract, RepositoryContract};
 use crate::services::cache::Cache as Cacher;
 use crate::{error::Error, services::cache::CacheId};
 use async_trait::async_trait;
-use derive_new::new;
 use infrastructure::clients::email;
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
@@ -17,7 +16,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tracing::debug;
 
-#[derive(Debug, new)]
+#[derive(Debug)]
 pub(super) struct Repository<UR, SR>
 where
     UR: UserRepository,

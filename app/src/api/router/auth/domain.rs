@@ -30,7 +30,7 @@ use reqwest::{
     header::{self, HeaderName, HeaderValue},
     StatusCode,
 };
-use tracing::info;
+use tracing::{debug, info};
 
 pub(super) struct Authentication<R, C, E>
 where
@@ -57,6 +57,7 @@ where
             credentials.password.as_str(),
             credentials.remember,
         );
+
         info!("Verifying credentials for {email}");
 
         let user = match self.repository.get_user_by_email(email).await {
@@ -92,9 +93,9 @@ where
 
         // If the user has 2FA turned on, stop here and cache the user so we can quickly verify their otp
         if user.otp_secret.is_some() {
-            info!("User {} requires 2FA, caching token", user.id);
-
             let token = generate_hmac("OTP_TOKEN_SECRET", &user.password, BASE64URL)?;
+
+            debug!("User {} requires 2FA, caching token {}", user.id, token);
 
             self.cache
                 .set_token(
@@ -121,6 +122,8 @@ where
     async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
         let (password, token, remember) = (otp.password.as_str(), otp.token.as_str(), otp.remember);
 
+        debug!("Searching for otp token {token}");
+
         let user_id = match self
             .cache
             .get_token::<String>(CacheId::OTPToken, token)
@@ -130,7 +133,7 @@ where
             Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::OTPToken).into()),
         };
 
-        info!("Verifying OTP for {} ", user_id);
+        info!("Verifying OTP for {user_id}");
 
         let user = self.repository.get_user_by_id(&user_id).await?;
 
@@ -140,7 +143,10 @@ where
         }
 
         if let Some(ref secret) = user.otp_secret {
-            let (result, _) = crypto::otp::verify_otp(password, secret)?;
+            debug!("Found secret {secret} and {password}");
+            let (result, d) = crypto::otp::verify_otp(password, secret)?;
+
+            debug!("OTP success: {result}{d}");
 
             if !result {
                 return Err(AuthenticationError::InvalidOTP.into());

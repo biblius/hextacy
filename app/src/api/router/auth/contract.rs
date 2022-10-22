@@ -6,6 +6,7 @@ use serde::{de::DeserializeOwned, Serialize};
 
 use super::data::{ChangePassword, Credentials, EmailToken, Logout, Otp, RegistrationData};
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub(super) trait ServiceContract {
     async fn verify_credentials(&self, credentails: Credentials) -> Result<HttpResponse, Error>;
@@ -28,6 +29,7 @@ pub(super) trait ServiceContract {
     async fn session_response(&self, user: User, remember: bool) -> Result<HttpResponse, Error>;
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub(super) trait RepositoryContract {
     async fn create_user(&self, email: &str, username: &str, password: &str)
@@ -48,17 +50,18 @@ pub(super) trait RepositoryContract {
     async fn purge_sessions(&self, user_id: &str) -> Result<Vec<Session>, Error>;
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub(super) trait CacheContract {
     async fn set_session(&self, csrf_token: &str, session: &Session) -> Result<(), Error>;
-    async fn set_token<T: Serialize + Sync + Send>(
+    async fn set_token<T: Serialize + Sync + Send + 'static>(
         &self,
         cache_id: CacheId,
         key: &str,
         value: &T,
         ex: Option<usize>,
     ) -> Result<(), Error>;
-    async fn get_token<T: DeserializeOwned + Sync + Send>(
+    async fn get_token<T: DeserializeOwned + Sync + Send + 'static>(
         &self,
         cache_id: CacheId,
         key: &str,
@@ -68,6 +71,7 @@ pub(super) trait CacheContract {
     async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error>;
 }
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub(super) trait EmailContract {
     async fn send_registration_token(

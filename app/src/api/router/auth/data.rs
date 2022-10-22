@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use validator::Validate;
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 /// Received on initial login
 pub(super) struct Credentials {
     #[validate(regex = "EMAIL_REGEX")]
@@ -17,7 +17,7 @@ pub(super) struct Credentials {
     pub remember: bool,
 }
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Clone, Deserialize, Validate)]
 /// Received when registering
 pub(super) struct RegistrationData {
     #[validate(regex = "EMAIL_REGEX")]

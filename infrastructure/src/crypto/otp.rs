@@ -4,14 +4,16 @@ use tracing::debug;
 use super::CryptoError;
 
 /// Generates an OTP secret of length 160
+#[inline]
 pub fn generate_secret() -> String {
     debug!("Generating OTP secret");
     thotp::encoding::encode(&thotp::generate_secret(160), BASE32)
 }
 
 /// Generates a QR code svg with the given secret
+#[inline]
 pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, CryptoError> {
-    debug!("Generating TOTP");
+    debug!("Generating TOTP QR");
     let uri = thotp::qr::otp_uri(
         "totp",
         secret,
@@ -23,11 +25,9 @@ pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, C
 }
 
 /// Verifies a timed OTP against the given secret
+#[inline]
 pub fn verify_otp(password: &str, secret: &str) -> Result<(bool, i16), CryptoError> {
-    debug!(
-        "Verifying TOTP for password {} and secret {}",
-        password, secret
-    );
+    debug!("Verifying TOTP for password {password} and secret {secret}");
     let secret = BASE32.decode(secret.as_bytes())?;
     thotp::verify_totp(password, &secret, 0).map_err(Into::into)
 }

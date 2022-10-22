@@ -25,6 +25,24 @@ impl Session {
     pub fn is_permanent(&self) -> bool {
         self.expires_at.timestamp() == NaiveDateTime::MAX.timestamp()
     }
+
+    pub fn __mock(id: String, user: &User, csrf: String, permanent: bool) -> Self {
+        Self {
+            id,
+            user_id: user.id.clone(),
+            username: user.username.clone(),
+            user_role: user.role.clone(),
+            csrf_token: csrf,
+            created_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+            updated_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+            expires_at: if permanent {
+                NaiveDateTime::MAX
+            } else {
+                NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0)
+                    + chrono::Duration::minutes(30)
+            },
+        }
+    }
 }
 
 #[async_trait]
