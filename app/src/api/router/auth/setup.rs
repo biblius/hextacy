@@ -22,19 +22,15 @@ pub(in super::super) fn routes(
         user_repo: PgUserAdapter { client: pg.clone() },
         session_repo: PgSessionAdapter { client: pg.clone() },
     };
-
     let cache = Cache { client: rd.clone() };
-
     let email = Email {
         client: email.clone(),
     };
-
     let service = Authentication {
         repository,
         cache,
         email,
     };
-
     let guard = interceptor::AuthGuard::new(pg.clone(), rd.clone(), Role::User);
 
     cfg.app_data(Data::new(service));
@@ -48,7 +44,7 @@ pub(in super::super) fn routes(
 
     // Credentials login
     cfg.service(
-        web::resource("/auth/login").route(web::post().to(handler::verify_credentials::<
+        web::resource("/auth/login").route(web::post().to(handler::login::<
             Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
         >)),
     );
@@ -78,7 +74,7 @@ pub(in super::super) fn routes(
         )),
     );
 
-    // Set password
+    // Change password
     cfg.service(
         web::resource("/auth/change-password")
             .route(web::post().to(handler::change_password::<
@@ -86,6 +82,13 @@ pub(in super::super) fn routes(
             >))
             .wrap(guard.clone()),
     );
+
+    // Change password
+    cfg.service(web::resource("/auth/reset-password").route(web::get().to(
+        handler::reset_password::<
+            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+        >,
+    )));
 
     // Set otp
     cfg.service(

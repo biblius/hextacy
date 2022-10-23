@@ -115,10 +115,14 @@ where
     }
 
     /// Expires all user sessions
-    async fn purge_sessions(&self, user_id: &str) -> Result<Vec<Session>, Error> {
+    async fn purge_sessions<'a>(
+        &self,
+        user_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<Vec<Session>, Error> {
         debug!("Purging all sessions for: {user_id}");
         self.session_repo
-            .purge(user_id)
+            .purge(user_id, skip)
             .await
             .map_err(|_| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
@@ -222,17 +226,31 @@ impl EmailContract for Email {
         .map_err(Error::new)
     }
 
+    async fn send_reset_password(
+        &self,
+        username: &str,
+        email: &str,
+        temp_pw: &str,
+    ) -> Result<(), Error> {
+        debug!("Sending reset password email to {email}");
+        let mail = email::from_template(
+            "reset_password",
+            &[("username", username), ("temp_password", temp_pw)],
+        );
+        email::send(None, username, email, "Reset password", mail, &self.client).map_err(Error::new)
+    }
+
     async fn alert_password_change(
         &self,
         token: &str,
         username: &str,
         email: &str,
     ) -> Result<(), Error> {
-        debug!("Sending change password email to {email}");
+        debug!("Sending change password email alert to {email}");
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
-        let uri = format!("{domain}/auth/verify-registration-token?token={token}");
+        let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
-            "registration_token",
+            "change_password",
             &[("username", username), ("change_password_uri", &uri)],
         );
         email::send(None, username, email, "Password change", mail, &self.client)

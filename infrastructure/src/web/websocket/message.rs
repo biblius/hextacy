@@ -78,7 +78,7 @@ impl<'a, T: Debug + Serialize + Deserialize<'a>> From<WsMessage<'_, T>> for Sign
 
 #[cfg(test)]
 mod tests {
-    use crate::websocket::message::WsMessage;
+    use crate::web::websocket::message::WsMessage;
     use actors::Signal;
     use serde::{Deserialize, Serialize};
 

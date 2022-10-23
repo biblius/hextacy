@@ -31,14 +31,20 @@ pub fn init(level: &str) {
                 Level::Trace => style.set_color(Color::Rgb(170, 170, 170)),
             };
 
-            writeln!(
-                buf,
-                "{} | {} | {} | {}",
-                &chrono::Utc::now().to_string().replace('T', " ")[0..21],
-                format_args!("{:^5}", style.value(record.level())),
-                format_args!("{:^50}", record.target()),
-                record.args(),
-            )
+            // Pings in this module are at debug level for some reason so we don't want to
+            // include it in the output
+            if !record.target().contains("h2::codec") {
+                writeln!(
+                    buf,
+                    "{} | {} | {} | {}",
+                    &chrono::Utc::now().to_string().replace('T', " ")[0..21],
+                    format_args!("{:^5}", style.value(record.level())),
+                    format_args!("{:^50}", record.target()),
+                    record.args(),
+                )
+            } else {
+                Ok(())
+            }
         })
         .init()
 }

@@ -1,15 +1,15 @@
 mod api;
 mod error;
 mod services;
-mod utility;
 
 use actix_web::{middleware::Logger, App, HttpServer};
 use api::router;
 use infrastructure::{
     clients::{email, postgres::Postgres, redis::Redis},
     config::{env, logger},
-    utility::http,
+    web::http,
 };
+use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use std::sync::Arc;
 use tracing::info;
 
@@ -37,6 +37,14 @@ async fn main() -> std::io::Result<()> {
     let addr = format!("{host}:{port}");
     info!("Starting server on {addr}");
 
+    let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
+    builder
+        .set_private_key_file("./openssl/key.pem", SslFiletype::PEM)
+        .unwrap();
+    builder
+        .set_certificate_chain_file("./openssl/cert.pem")
+        .unwrap();
+
     HttpServer::new(move || {
         App::new()
             .configure(|cfg| router::init(pg.clone(), rd.clone(), email_client.clone(), cfg))
@@ -44,7 +52,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(http::security_headers::default())
             .wrap(Logger::default())
     })
-    .bind(addr)?
+    .bind_openssl(addr, builder)?
     .run()
     .await
 }

@@ -102,12 +102,24 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    async fn purge(&self, usr_id: &str) -> Result<Vec<Session>, PgAdapterError> {
+    async fn purge<'a>(
+        &self,
+        usr_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<Vec<Session>, PgAdapterError> {
         use super::schema::sessions::dsl::*;
 
-        diesel::update(sessions)
+        let mut query = diesel::update(sessions)
             .filter(user_id.eq(usr_id))
+            .filter(expires_at.ge(Utc::now()))
             .set(expires_at.eq(Utc::now()))
+            .into_boxed();
+
+        if let Some(skip) = skip {
+            query = query.filter(id.ne(skip))
+        }
+
+        query
             .load::<Session>(&mut self.client.connect()?)
             .map_err(PgAdapterError::new)
     }

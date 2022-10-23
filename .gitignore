@@ -3,3 +3,8 @@
 /encryption
 .env
 server.log
+
+/openssl/ca.pem
+/openssl/cert.pem
+/openssl/ca-key.pem
+/openssl/key.pem

@@ -14,7 +14,10 @@ mod tests {
         data::{AuthenticationSuccessResponse, Credentials, Otp, RegistrationData},
         domain::Authentication,
     };
-    use crate::{api::router::auth::contract::MockRepositoryContract, error::Error};
+    use crate::{
+        api::router::auth::contract::MockRepositoryContract,
+        error::{AuthenticationError, Error},
+    };
     use actix_web::body::to_bytes;
     use data_encoding::BASE32;
     use derive_new::new;
@@ -23,7 +26,7 @@ mod tests {
         config::env,
         crypto::utility::{bcrypt_hash, uuid},
         repository::{session::Session, user::User},
-        utility::http::response::Response,
+        web::http::response::Response,
     };
     use lazy_static::lazy_static;
     use reqwest::StatusCode;
@@ -155,7 +158,7 @@ mod tests {
             email,
         };
 
-        auth.verify_credentials(CREDENTIALS.clone()).await.unwrap();
+        auth.login(CREDENTIALS.clone()).await.unwrap();
     }
 
     #[actix_web::main]
@@ -184,7 +187,7 @@ mod tests {
         };
 
         // Verify the creds and grab the token from the response
-        let res = auth.verify_credentials(CREDENTIALS.clone()).await.unwrap();
+        let res = auth.login(CREDENTIALS.clone()).await.unwrap();
         let body = to_bytes(res.into_body()).await.unwrap();
         let token =
             serde_json::from_str::<TwoFactorAuthResponse>(std::str::from_utf8(&body).unwrap())
@@ -245,5 +248,71 @@ mod tests {
         };
 
         auth.verify_otp(data).await.unwrap();
+    }
+
+    #[actix_web::main]
+    #[test]
+    async fn invalid_credentails() {
+        let mut repository = MockRepositoryContract::new();
+        let cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
+
+        // Try to find a user without an email
+        repository
+            .expect_get_user_by_email()
+            .return_once(move |_| Err(AuthenticationError::InvalidCredentials.into()));
+
+        let invalid_email = Credentials {
+            email: "doesnt@exist.ever".to_string(),
+            password: "not good".to_string(),
+            remember: false,
+        };
+
+        let service = Authentication {
+            repository,
+            cache,
+            email,
+        };
+
+        let res = service.login(invalid_email).await;
+        match res {
+            Ok(_) => panic!("Not good"),
+            Err(e) => assert!(matches!(
+                e,
+                Error::Authentication(AuthenticationError::InvalidCredentials)
+            )),
+        }
+
+        let mut repository = MockRepositoryContract::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
+
+        // Try to find a valid user with an invalid password
+        repository
+            .expect_get_user_by_email()
+            .return_once(move |_| Ok(USER_NO_OTP.clone()));
+
+        cache.expect_cache_login_attempt().returning(|_| Ok(1));
+
+        let invalid_email = Credentials {
+            email: USER_NO_OTP.email.clone(),
+            password: "not good".to_string(),
+            remember: false,
+        };
+
+        let service = Authentication {
+            repository,
+            cache,
+            email,
+        };
+
+        let res = service.login(invalid_email).await;
+        match res {
+            Ok(_) => panic!("Not good"),
+            Err(e) => assert!(matches!(
+                e,
+                Error::Authentication(AuthenticationError::InvalidCredentials)
+            )),
+        }
     }
 }

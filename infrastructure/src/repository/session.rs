@@ -66,6 +66,10 @@ pub trait SessionRepository {
     /// Update session's `expires_at` field to now
     async fn expire(&self, id: &str) -> Result<Session, Self::Error>;
 
-    /// Expire all user sessions
-    async fn purge(&self, user_id: &str) -> Result<Vec<Session>, Self::Error>;
+    /// Expire all user sessions. A session ID can be provided to skip purging a specific session.
+    async fn purge<'a>(
+        &self,
+        user_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<Vec<Session>, Self::Error>;
 }

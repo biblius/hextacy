@@ -6,5 +6,4 @@ pub mod clients;
 pub mod config;
 pub mod crypto;
 pub mod repository;
-pub mod utility;
-pub mod websocket;
+pub mod web;

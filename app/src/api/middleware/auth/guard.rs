@@ -13,7 +13,7 @@ use infrastructure::{
         role::Role,
         session::{Session, SessionRepository},
     },
-    utility::http::cookie::S_ID,
+    web::http::cookie::S_ID,
 };
 use std::sync::Arc;
 use tracing::debug;

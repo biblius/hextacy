@@ -1,6 +1,6 @@
 use ::actors::actix::{prelude::*, Actor, Context, Handler, Recipient, System, WrapFuture};
 use ::actors::Signal;
-use infrastructure::websocket::message::WsMessage;
+use infrastructure::web::websocket::message::WsMessage;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::fmt::Debug;
 use std::io::Error;

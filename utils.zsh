@@ -1,5 +1,3 @@
-### Exports utility functions when working with the project. Can also be put in shell config without the exports.
-
 ### FOR ZSH ONLY
 
 ### Copy the absolute path of this file to your .zshrc to get access to these sweet helpers. Basically they let you

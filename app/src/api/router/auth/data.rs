@@ -1,7 +1,7 @@
 use derive_new::new;
 use infrastructure::{
     repository::{session::Session, user::User},
-    utility::{http::response::Response, validation::EMAIL_REGEX},
+    web::{http::response::Response, validation::EMAIL_REGEX},
 };
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -46,6 +46,12 @@ pub(super) struct ChangePassword {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+/// Received when a user asks to reset their password via email
+pub(super) struct ResetPassword {
+    pub token: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
 /// Received when verifying registration token
 pub(super) struct EmailToken {
     #[validate(length(min = 1))]
@@ -85,20 +91,20 @@ impl<'a> Response for FreezeAccountResponse<'a> {}
 
 /// Sent when a user registers for the very first time
 #[derive(Debug, Serialize, new)]
-pub(super) struct RegistrationSuccessResponse<'a> {
+pub(super) struct RegistrationStartResponse<'a> {
     message: &'a str,
     username: &'a str,
     email: &'a str,
 }
-impl<'a> Response for RegistrationSuccessResponse<'a> {}
+impl<'a> Response for RegistrationStartResponse<'a> {}
 
 /// Sent when a user successfully verifies their registration token
 #[derive(Debug, Serialize, new)]
-pub(super) struct TokenVerifiedResponse<'a> {
+pub(super) struct RegistrationSuccessResponse<'a> {
     user_id: &'a str,
     message: &'a str,
 }
-impl<'a> Response for TokenVerifiedResponse<'a> {}
+impl<'a> Response for RegistrationSuccessResponse<'a> {}
 
 /// Sent when a user successfully logs out
 #[derive(Debug, Serialize, new)]
@@ -113,3 +119,10 @@ pub(super) struct ChangePasswordResponse<'a> {
     message: &'a str,
 }
 impl<'a> Response for ChangePasswordResponse<'a> {}
+
+/// Sent when a user requests a password reset
+#[derive(Debug, Serialize, new)]
+pub(super) struct ResetPasswordResponse<'a> {
+    message: &'a str,
+}
+impl<'a> Response for ResetPasswordResponse<'a> {}

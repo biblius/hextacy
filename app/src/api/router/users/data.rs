@@ -1,5 +1,5 @@
 use infrastructure::repository::user::{SortOptions, User};
-use infrastructure::utility::http::response::Response;
+use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 

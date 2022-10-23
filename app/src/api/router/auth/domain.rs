@@ -3,7 +3,8 @@ use super::{
     data::{
         AuthenticationSuccessResponse, ChangePassword, ChangePasswordResponse, Credentials,
         EmailToken, FreezeAccountResponse, Logout, LogoutResponse, Otp, RegistrationData,
-        RegistrationSuccessResponse, TokenVerifiedResponse, TwoFactorAuthResponse,
+        RegistrationStartResponse, RegistrationSuccessResponse, ResetPassword,
+        ResetPasswordResponse, TwoFactorAuthResponse,
     },
 };
 use crate::{
@@ -23,8 +24,8 @@ use infrastructure::{
         token::{generate_hmac, verify_hmac},
         utility::{bcrypt_hash, bcrypt_verify, token},
     },
-    repository::user::User,
-    utility::http::{cookie, response::Response},
+    repository::{session::Session, user::User},
+    web::http::{cookie, response::Response},
 };
 use reqwest::{
     header::{self, HeaderName, HeaderValue},
@@ -51,7 +52,7 @@ where
     E: EmailContract + Send + Sync,
 {
     /// Verifies the user's credentials and returns a response based on their 2fa status
-    async fn verify_credentials(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
+    async fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
         let (email, password, remember) = (
             credentials.email.as_str(),
             credentials.password.as_str(),
@@ -191,7 +192,7 @@ where
             .send_registration_token(&token, &user.username, email)
             .await?;
 
-        Ok(RegistrationSuccessResponse::new(
+        Ok(RegistrationStartResponse::new(
             "Successfully sent registration token",
             &user.username,
             &user.email,
@@ -221,7 +222,36 @@ where
         self.cache.delete_token(CacheId::RegToken, token).await?;
 
         Ok(
-            TokenVerifiedResponse::new(&user_id, "Successfully verified registration token")
+            RegistrationSuccessResponse::new(&user_id, "Successfully verified registration token")
+                .to_response(StatusCode::OK, None, None),
+        )
+    }
+
+    /// Resends a registration token to the user if they are not already verified
+    async fn resend_registration_token(&self, user_id: &str) -> Result<HttpResponse, Error> {
+        let user = self.repository.get_user_by_id(user_id).await?;
+
+        if user.email_verified_at.is_some() {
+            return Err(Error::new(AuthenticationError::AlreadyVerified));
+        }
+
+        let token = token(BASE64URL, 160)?;
+
+        self.cache
+            .set_token(
+                CacheId::RegToken,
+                &token,
+                &user.id,
+                Some(REGISTRATION_TOKEN_DURATION_SECONDS),
+            )
+            .await?;
+
+        self.email
+            .send_registration_token(&token, &user.username, &user.email)
+            .await?;
+
+        Ok(
+            RegistrationSuccessResponse::new(&user_id, "Successfully verified registration token")
                 .to_response(StatusCode::OK, None, None),
         )
     }
@@ -246,20 +276,28 @@ where
             .body(BoxBody::new(qr)))
     }
 
-    /// Update user password. Purge all sessions and notify by email.
+    /// Updates the user's password. Purges all sessions and sends an email.
     async fn change_password(
         &self,
-        user_id: &str,
+        session: Session,
         data: ChangePassword,
     ) -> Result<HttpResponse, Error> {
         let password = data.password.as_str();
+
+        let user = self.repository.get_user_by_id(&session.user_id).await?;
         let hashed = crypto::utility::bcrypt_hash(password)?;
+
+        if user.password == hashed {
+            return Err(Error::new(AuthenticationError::InvalidPasswordChange));
+        }
+
         let user = self
             .repository
-            .update_user_password(user_id, &hashed)
+            .update_user_password(&session.user_id, &hashed)
             .await?;
 
-        self.purge_and_clear_sessions(&user.id).await?;
+        self.purge_and_clear_sessions(&user.id, None).await?;
+
         let token = token(BASE64URL, 128)?;
         self.cache
             .set_token(
@@ -269,31 +307,74 @@ where
                 Some(RESET_PW_TOKEN_DURATION_SECONDS),
             )
             .await?;
+
         self.email
             .alert_password_change(&token, &user.username, &user.email)
             .await?;
 
-        info!("Successfully changed password for {user_id}");
+        info!("Successfully changed password for {}", session.user_id);
 
         Ok(ChangePasswordResponse::new("Successfully changed password. All sessions have been purged, please log in again to continue.").to_response(StatusCode::OK, None, None))
     }
 
+    /// Updates a user's password to a random string and sends it to them in the email
+    async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error> {
+        let pw_token = data.token.as_str();
+
+        // Check if there's a reset PW token in the cache
+        let user_id = match self
+            .cache
+            .get_token::<String>(CacheId::PWToken, pw_token)
+            .await
+        {
+            Ok(id) => id,
+            Err(_) => {
+                return Err(Error::new(AuthenticationError::InvalidToken(
+                    CacheId::PWToken,
+                )))
+            }
+        };
+
+        self.cache.delete_token(CacheId::PWToken, pw_token).await?;
+
+        // Create a temporary password
+        let temp_pw = token(BASE64URL, 64)?;
+        let hashed = bcrypt_hash(&temp_pw)?;
+
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hashed)
+            .await?;
+
+        self.email
+            .send_reset_password(&user.username, &user.email, &temp_pw)
+            .await?;
+
+        self.purge_and_clear_sessions(&user.id, None).await?;
+
+        Ok(
+            ResetPasswordResponse::new("Successfully reset password. Incoming email.").to_response(
+                StatusCode::OK,
+                None,
+                None,
+            ),
+        )
+    }
+
     /// Deletes the user's current session and if purge is true expires all their sessions
-    async fn logout(
-        &self,
-        session_id: &str,
-        user_id: &str,
-        data: Logout,
-    ) -> Result<HttpResponse, Error> {
+    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
         if data.purge {
-            self.purge_and_clear_sessions(user_id).await?;
+            self.purge_and_clear_sessions(&session.user_id, None)
+                .await?;
         } else {
-            let session = self.repository.expire_session(session_id).await?;
+            let session = self.repository.expire_session(&session.id).await?;
             self.cache
                 .delete_token(CacheId::Session, &session.csrf_token)
                 .await?;
         }
-        let cookie = cookie::create_session(session_id, true, false);
+
+        // Expire the cookie
+        let cookie = cookie::create_session(&session.id, true, false);
 
         Ok(
             LogoutResponse::new("Successfully logged out, bye!").to_response(
@@ -305,8 +386,12 @@ where
     }
 
     /// Expires all sessions in the database and deletes all corresponding cached sessions
-    async fn purge_and_clear_sessions(&self, user_id: &str) -> Result<(), Error> {
-        let sessions = self.repository.purge_sessions(user_id).await?;
+    async fn purge_and_clear_sessions<'a>(
+        &self,
+        user_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<(), Error> {
+        let sessions = self.repository.purge_sessions(user_id, skip).await?;
         for s in sessions {
             self.cache
                 .delete_token(CacheId::Session, &s.csrf_token)
@@ -318,7 +403,8 @@ where
 
     /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
     async fn session_response(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
-        let csrf_token = token(BASE64URL, 160)?;
+        let csrf_token = token(BASE64URL, 80)?;
+
         let session = self
             .repository
             .create_session(&user, &csrf_token, remember)

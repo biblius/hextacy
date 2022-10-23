@@ -5,7 +5,7 @@ use super::{
 use crate::error::Error;
 use actix_web::HttpResponse;
 use async_trait::async_trait;
-use infrastructure::utility::http::response::Response;
+use infrastructure::web::http::response::Response;
 use reqwest::StatusCode;
 
 pub(super) struct UserService<R: RepositoryContract> {

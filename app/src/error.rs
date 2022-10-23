@@ -24,11 +24,13 @@ pub enum Error {
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Reqwest Header Error: {0}")]
-    Reqwest(#[from] reqwest::header::InvalidHeaderValue),
+    HeaderValue(#[from] reqwest::header::InvalidHeaderValue),
     #[error("Reqwest Header Error: {0}")]
     ToStr(#[from] reqwest::header::ToStrError),
-    #[error("Validation error detected")]
+    #[error("Validation Error")]
     Validation(Vec<ValidationError>),
+    #[error("Http Error")]
+    Http(#[from] infrastructure::web::http::HttpError),
 }
 
 impl From<ValidationErrors> for Error {
@@ -48,12 +50,19 @@ impl Error {
     pub fn message_and_description(&self) -> (&'static str, &'static str) {
         match self {
             Self::Authentication(e) => match e {
-                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "Invalid session"),
+                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session"),
                 AuthenticationError::InvalidCsrfHeader => ("UNAUTHORIZED", "Invalid CSRF header"),
                 AuthenticationError::InvalidCredentials => ("UNAUTHORIZED", "Invalid credentials"),
-                AuthenticationError::InvalidOTP => ("INVALID_OTP", "Invalid OTP provided"),
+                AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided"),
                 AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
                 AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
+                AuthenticationError::AlreadyVerified => {
+                    ("ALREADY_VERIFIED", "Account already verified")
+                }
+                AuthenticationError::InvalidPasswordChange => (
+                    "INVALID_PASSWORD",
+                    "Password cannot be the same as existing",
+                ),
                 AuthenticationError::InsufficientRights => (
                     "FORBIDDEN",
                     "You do not have the necessary rights to view this page",
@@ -61,8 +70,8 @@ impl Error {
                 AuthenticationError::InvalidToken(id) => match id {
                     CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
                     CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
-                    CacheId::PWToken => ("INVALID_TOKEN", "Temporary password expired"),
-                    _ => ("INVALID_TOKEN", "Invalid token"),
+                    CacheId::PWToken => ("INVALID_TOKEN", "Password reset token expired"),
+                    _ => ("INVALID_TOKEN", "Token not found"),
                 },
             },
             Self::Validation(_) => ("VALIDATION", "Invalid input"),
@@ -166,12 +175,16 @@ pub enum AuthenticationError {
     InvalidOTP,
     #[error("Invalid CSRF header")]
     InvalidCsrfHeader,
-    #[error("Insufficient right")]
+    #[error("Insufficient rights")]
     InsufficientRights,
     #[error("Account frozen")]
     AccountFrozen,
     #[error("Email taken")]
     EmailTaken,
+    #[error("Already verified")]
+    AlreadyVerified,
+    #[error("Invalid password")]
+    InvalidPasswordChange,
 }
 
 impl AuthenticationError {
@@ -185,6 +198,8 @@ impl AuthenticationError {
             Self::InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
             Self::AccountFrozen => StatusCode::UNAUTHORIZED,
             Self::EmailTaken => StatusCode::CONFLICT,
+            Self::AlreadyVerified => StatusCode::CONFLICT,
+            Self::InvalidPasswordChange => StatusCode::CONFLICT,
         }
     }
 }
