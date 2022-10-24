@@ -8,11 +8,12 @@ use actix_web::{
 use cookie::Cookie;
 use serde::Serialize;
 
+/// Utility containing default methods for quickly converting a struct to an HTTP response
 pub trait Response
 where
     Self: Sized + Serialize,
 {
-    /// Enables quickly converting a struct to an http response with a JSON body and the provided cookies.
+    /// Enables quickly converting a struct to an http response with a JSON body and the provided cookies and headers.
     fn to_response(
         self,
         code: StatusCode,
@@ -33,3 +34,17 @@ where
         response.json(self)
     }
 }
+
+/// Holds a single message. Implements the Response trait.
+#[derive(Debug, Serialize)]
+pub struct MessageResponse<'a> {
+    message: &'a str,
+}
+
+impl<'a> MessageResponse<'a> {
+    pub fn new(message: &'a str) -> Self {
+        Self { message }
+    }
+}
+
+impl<'a> Response for MessageResponse<'a> {}

@@ -19,12 +19,21 @@ pub struct User {
     pub google_id: Option<String>,
     pub github_id: Option<String>,
     pub frozen: bool,
+    #[serde(skip_serializing)]
     pub email_verified_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
 }
 
 impl User {
+    /// Checks if the user is suspended and if their email is verified.
+    pub fn check_valid(&self) -> bool {
+        if self.frozen || self.email_verified_at.is_none() {
+            return false;
+        }
+        true
+    }
+
     pub fn __mock(
         id: String,
         email: &str,

@@ -20,7 +20,6 @@ name = "generate_secret"
 path = "src/crypto/bin/generate_secret.rs"
 
 [dependencies]
-actors = { path = "./actors", optional = true }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 chrono = { version = "0.4", features = ["serde"] }
@@ -31,6 +30,7 @@ dotenv = "0.15.0"
 env_logger = "0.9.1"
 log4rs = "1.2.0"
 tracing = "0.1.35"
+tracing-test = "0.2.3"
 
 # HTTP
 
@@ -81,7 +81,3 @@ async-trait = "0.1.42"
 lazy_static = "1.4.0"
 thiserror = "1.0.37"
 colored = "2.0.0"
-
-[features]
-default = ["actors"]
-actors = ["dep:actors"]

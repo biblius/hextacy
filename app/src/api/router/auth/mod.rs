@@ -22,7 +22,7 @@ mod tests {
     use data_encoding::BASE32;
     use derive_new::new;
     use infrastructure::{
-        adapters::postgres::PgAdapterError,
+        adapters::AdapterError,
         config::env,
         crypto::utility::{bcrypt_hash, uuid},
         repository::{session::Session, user::User},
@@ -84,7 +84,7 @@ mod tests {
         repository
             .expect_get_user_by_email()
             .return_once_st(move |_| {
-                Err(Error::new(PgAdapterError::DoesNotExist(format!(
+                Err(Error::new(AdapterError::DoesNotExist(format!(
                     "User ID: {}",
                     USER_NO_OTP.clone().id
                 ))))
@@ -147,8 +147,11 @@ mod tests {
             .expect_session_response()
             .return_once_st(move |_, _| {
                 Ok(
-                    AuthenticationSuccessResponse::new(USER_NO_OTP.clone(), SESSION_NO_OTP.clone())
-                        .to_response(StatusCode::OK, None, None),
+                    AuthenticationSuccessResponse::new(USER_NO_OTP.clone()).to_response(
+                        StatusCode::OK,
+                        None,
+                        None,
+                    ),
                 )
             });
 
@@ -202,6 +205,11 @@ mod tests {
         cache
             .expect_get_token()
             .returning(move |_, _| Ok(USER_OTP.id.clone()));
+
+        // Try to get the OTP throttle
+        cache
+            .expect_get_token::<i64>()
+            .return_once(move |_, _| Err(Error::None));
 
         // Get the user's ID stored behind the token
         repository

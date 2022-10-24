@@ -21,3 +21,6 @@ pub const OTP_THROTTLE_DURATION_SECONDS: usize = 300;
 
 /// OTP wrong attempt throttle increment.
 pub const OTP_THROTTLE_INCREMENT: i64 = 3;
+
+/// Throttle emails for a minute to stop craziness
+pub const EMAIL_THROTTLE_DURATION_SECONDS: usize = 60;

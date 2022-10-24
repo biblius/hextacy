@@ -1,6 +1,6 @@
 use derive_new::new;
 use infrastructure::{
-    repository::{session::Session, user::User},
+    repository::user::User,
     web::{http::response::Response, validation::EMAIL_REGEX},
 };
 use serde::{Deserialize, Serialize};
@@ -74,7 +74,6 @@ RESPONSES
 #[derive(Debug, Serialize, new)]
 pub(super) struct AuthenticationSuccessResponse {
     user: User,
-    session: Session,
 }
 impl Response for AuthenticationSuccessResponse {}
 
@@ -103,32 +102,3 @@ pub(super) struct RegistrationStartResponse<'a> {
     email: &'a str,
 }
 impl<'a> Response for RegistrationStartResponse<'a> {}
-
-/// Sent when a user successfully verifies their registration token
-#[derive(Debug, Serialize, new)]
-pub(super) struct RegistrationSuccessResponse<'a> {
-    user_id: &'a str,
-    message: &'a str,
-}
-impl<'a> Response for RegistrationSuccessResponse<'a> {}
-
-/// Sent when a user successfully logs out
-#[derive(Debug, Serialize, new)]
-pub(super) struct LogoutResponse<'a> {
-    message: &'a str,
-}
-impl<'a> Response for LogoutResponse<'a> {}
-
-/// Sent when a user successfully changes their password
-#[derive(Debug, Serialize, new)]
-pub(super) struct ChangePasswordResponse<'a> {
-    message: &'a str,
-}
-impl<'a> Response for ChangePasswordResponse<'a> {}
-
-/// Sent when a user requests a password reset
-#[derive(Debug, Serialize, new)]
-pub(super) struct ResetPasswordResponse<'a> {
-    message: &'a str,
-}
-impl<'a> Response for ResetPasswordResponse<'a> {}

@@ -16,7 +16,7 @@ pub enum Error {
     #[error("Diesel Error: {0}")]
     Cache(#[from] crate::services::cache::CacheError),
     #[error("Pg adapter Error: {0}")]
-    PgAdapter(#[from] infrastructure::adapters::postgres::PgAdapterError),
+    Adapter(#[from] infrastructure::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
@@ -31,6 +31,10 @@ pub enum Error {
     Validation(Vec<ValidationError>),
     #[error("Http Error")]
     Http(#[from] infrastructure::web::http::HttpError),
+    /// Useful for testing when you need an error response
+    #[error("None")]
+    #[allow(dead_code)]
+    None,
 }
 
 impl From<ValidationErrors> for Error {
@@ -56,16 +60,13 @@ impl Error {
                 AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided"),
                 AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
                 AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
+                AuthenticationError::EmailUnverified => ("UNVERIFIED", "Email not verified"),
                 AuthenticationError::AuthBlocked => {
                     ("AUTH_BLOCK", "Authentication currently blocked")
                 }
                 AuthenticationError::AlreadyVerified => {
                     ("ALREADY_VERIFIED", "Account already verified")
                 }
-                AuthenticationError::InvalidPasswordChange => (
-                    "INVALID_PASSWORD",
-                    "Password cannot be the same as existing",
-                ),
                 AuthenticationError::InsufficientRights => (
                     "FORBIDDEN",
                     "You do not have the necessary rights to view this page",
@@ -76,6 +77,12 @@ impl Error {
                     CacheId::PWToken => ("INVALID_TOKEN", "Password reset token expired"),
                     _ => ("INVALID_TOKEN", "Token not found"),
                 },
+            },
+            Self::Adapter(e) => match e {
+                infrastructure::adapters::AdapterError::Postgres(_) => todo!(),
+                infrastructure::adapters::AdapterError::DoesNotExist(_) => {
+                    ("NOT_FOUND", "Resource does not exist")
+                }
             },
             Self::Validation(_) => ("VALIDATION", "Invalid input"),
             _ => ("INTERNAL", "Internal server error"),
@@ -186,8 +193,8 @@ pub enum AuthenticationError {
     EmailTaken,
     #[error("Already verified")]
     AlreadyVerified,
-    #[error("Invalid password")]
-    InvalidPasswordChange,
+    #[error("Unverified email")]
+    EmailUnverified,
     #[error("Authentication blocked")]
     AuthBlocked,
 }
@@ -203,8 +210,8 @@ impl AuthenticationError {
             Self::InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
             Self::AccountFrozen => StatusCode::UNAUTHORIZED,
             Self::EmailTaken => StatusCode::CONFLICT,
+            Self::EmailUnverified => StatusCode::UNAUTHORIZED,
             Self::AlreadyVerified => StatusCode::CONFLICT,
-            Self::InvalidPasswordChange => StatusCode::CONFLICT,
             Self::AuthBlocked => StatusCode::UNAUTHORIZED,
         }
     }

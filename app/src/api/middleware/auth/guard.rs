@@ -4,6 +4,7 @@ use crate::services::cache::{Cache as CacheService, CacheId};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use async_trait::async_trait;
 use infrastructure::adapters::postgres::session::PgSessionAdapter;
+use infrastructure::adapters::AdapterError;
 use infrastructure::clients::postgres::Postgres;
 use infrastructure::{
     adapters::postgres::PgAdapterError,
@@ -16,7 +17,7 @@ use infrastructure::{
     web::http::cookie::S_ID,
 };
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, warn};
 
 #[derive(Debug, Clone)]
 pub(super) struct AuthenticationGuard<R: RepositoryContract, C: CacheContract> {
@@ -59,19 +60,18 @@ where
             // Check DB
             if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
                 debug!("Found valid session with id {}", session.id);
-
                 // Cache if permanent
                 if session.is_permanent() {
                     debug!("Session permanent, caching {}", session.id);
                     self.cache.cache_session(csrf, &session).await?;
                     return Ok(session);
                 }
-
                 // Otherwise refresh
                 debug!("Refreshing session {}", session.id);
                 self.repository.refresh_session(&session.id, csrf).await?;
                 Ok(session)
             } else {
+                warn!("No valid session found");
                 Err(Error::new(AuthenticationError::Unauthenticated))
             }
         }
@@ -113,7 +113,7 @@ where
         self.session_repo
             .get_valid_by_id(id, csrf)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Extends session `expires_at` for 30 minutes
@@ -121,7 +121,7 @@ where
         self.session_repo
             .refresh(id, csrf)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 }
 

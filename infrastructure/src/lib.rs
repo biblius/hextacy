@@ -1,6 +1,4 @@
-#[cfg(feature = "actors")]
-pub use actors;
-
+pub mod actors;
 pub mod adapters;
 pub mod clients;
 pub mod config;

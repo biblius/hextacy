@@ -3,6 +3,7 @@ use crate::services::cache::Cache as Cacher;
 use crate::{error::Error, services::cache::CacheId};
 use async_trait::async_trait;
 use chrono::Utc;
+use infrastructure::adapters::AdapterError;
 use infrastructure::clients::email;
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
@@ -45,25 +46,34 @@ where
         self.user_repo
             .create(email, username, password)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Gets a user by their id
     async fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
         debug!("Getting user with ID {}", id);
-        self.user_repo.get_by_id(id).await.map_err(Error::new)
+        self.user_repo
+            .get_by_id(id)
+            .await
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Gets a user by their email
     async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
         debug!("Getting user with email {}", email);
-        self.user_repo.get_by_email(email).await.map_err(Error::new)
+        self.user_repo
+            .get_by_email(email)
+            .await
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Marks the user's account as frozen
     async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
         debug!("Freezing user with id: {user_id}");
-        self.user_repo.freeze(user_id).await.map_err(Error::new)
+        self.user_repo
+            .freeze(user_id)
+            .await
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Updates the user's password field
@@ -72,7 +82,7 @@ where
         self.user_repo
             .update_password(user_id, pw_hash)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Updates the user's email_verified_at field upon successfully verifying their registration token
@@ -81,7 +91,7 @@ where
         self.user_repo
             .update_email_verified_at(user_id)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Generates a random OTP secret and stores it to the user
@@ -90,7 +100,7 @@ where
         self.user_repo
             .update_otp_secret(user_id, secret)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Creates session for given user
@@ -104,7 +114,7 @@ where
         self.session_repo
             .create(user, csrf_token, permanent)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Expires user session
@@ -113,7 +123,7 @@ where
         self.session_repo
             .expire(session_id)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 
     /// Expires all user sessions
@@ -126,7 +136,7 @@ where
         self.session_repo
             .purge(user_id, skip)
             .await
-            .map_err(|_| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")).into())
+            .map_err(|_| AdapterError::DoesNotExist(format!("User ID: {user_id}")).into())
     }
 }
 

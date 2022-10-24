@@ -1,7 +1,7 @@
 //! Actor that manages client JSON messages
 use super::message::WsMessage;
 use super::WsError;
-use ::actors::signal::Signal;
+use crate::actors::signal::Signal;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;

@@ -19,7 +19,7 @@ pub fn generate_hmac(
     debug!("Generating HMAC with key {}", env_key);
 
     let hmac_secret =
-        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{}'", env_key));
+        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{env_key}'"));
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
 
@@ -37,7 +37,7 @@ pub fn verify_hmac(
 ) -> Result<bool, CryptoError> {
     debug!("Verifying HMAC with key {}", env_key);
     let hmac_secret =
-        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{}'", env_key));
+        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{env_key}'"));
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
     hmac::Mac::update(&mut mac, nonce.as_bytes());

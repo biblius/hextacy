@@ -6,6 +6,7 @@ use lettre::{
     SmtpTransport, Transport,
 };
 use std::{fmt::Write, fs, path::Path};
+use tracing::debug;
 
 /// Build an email client from the environment.
 pub fn build_client() -> SmtpTransport {
@@ -64,6 +65,8 @@ pub fn send(
         |s| format!("{} <{}>", s, sender),
     );
     let to = format!("{} <{}>", to_uname, to_email);
+
+    debug!("Sending to: {to}");
 
     let email = Message::builder()
         .from(from.parse().unwrap())

@@ -1,7 +1,7 @@
 use crate::error::Error;
 use async_trait::async_trait;
 use infrastructure::{
-    adapters::postgres::PgAdapterError,
+    adapters::{postgres::PgAdapterError, AdapterError},
     repository::user::{SortOptions, User, UserRepository},
 };
 
@@ -28,6 +28,6 @@ where
         self.user_repo
             .get_paginated(page, per_page, sort_by)
             .await
-            .map_err(Error::new)
+            .map_err(|e| AdapterError::Postgres(e).into())
     }
 }

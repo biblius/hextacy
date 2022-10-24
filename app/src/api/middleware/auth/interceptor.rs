@@ -85,34 +85,26 @@ where
             // Prepare an error response for brevity
             let error_response =
                 |e, r: ServiceRequest| ServiceResponse::from_err(e, r.request().to_owned());
-
             // Get the csrf header
             let csrf = match guard.get_csrf_header(&req) {
                 Ok(token) => token,
                 Err(e) => return Ok(error_response(e, req)),
             };
-
             debug!("Found csrf header: {csrf}");
-
             // Get the session ID
             let session_id = match guard.get_session_cookie(&req) {
                 Ok(id) => id,
                 Err(e) => return Ok(error_response(e, req)),
             };
-
-            debug!("Found session ID cookie with value {session_id}");
-
+            debug!("Found session ID cookie {session_id}");
             let session = guard.get_valid_session(session_id.value(), csrf).await?;
-
             if !guard.check_valid_role(&session.user_role) {
                 return Ok(error_response(
                     Error::new(AuthenticationError::InsufficientRights),
                     req,
                 ));
             }
-
             req.extensions_mut().insert(session);
-
             let res = service.call(req).await?;
 
             Ok(res)

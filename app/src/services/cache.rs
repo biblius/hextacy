@@ -59,7 +59,7 @@ pub enum CacheId {
     LoginAttempts,
     /// For caching permanent sessions
     Session,
-    /// For keeping teack of registration tokens
+    /// For keeping track of registration tokens
     RegToken,
     /// For keeping track of password reset tokens
     PWToken,
@@ -68,6 +68,8 @@ pub enum CacheId {
     /// For 2FA login failure
     OTPThrottle,
     OTPAttempts,
+    /// For stopping email craziness
+    EmailThrottle,
 }
 
 impl Display for CacheId {
@@ -80,6 +82,7 @@ impl Display for CacheId {
             CacheId::Session => write!(f, "auth:session"),
             CacheId::RegToken => write!(f, "auth:registration_token"),
             CacheId::PWToken => write!(f, "auth:set_pw"),
+            CacheId::EmailThrottle => write!(f, "auth:email_throttle"),
         }
     }
 }
