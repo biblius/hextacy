@@ -1,6 +1,9 @@
 use super::{
     contract::ServiceContract,
-    data::{ChangePassword, Credentials, EmailToken, Logout, Otp, RegistrationData, ResetPassword},
+    data::{
+        ChangePassword, Credentials, EmailToken, ForgotPassword, Logout, Otp, RegistrationData,
+        ResetPassword,
+    },
 };
 use crate::error::Error;
 use actix_web::{web, HttpRequest, Responder};
@@ -71,6 +74,7 @@ pub(super) async fn change_password<T: ServiceContract>(
     info!("Updating password for {}", session.user_id);
     service.change_password(session, data.0).await
 }
+
 /// Changes the user's password and purges all their sessions
 pub(super) async fn reset_password<T: ServiceContract>(
     data: web::Query<ResetPassword>,
@@ -79,6 +83,16 @@ pub(super) async fn reset_password<T: ServiceContract>(
     data.0.validate().map_err(Error::new)?;
     info!("Resetting password token: {:?}", data.0);
     service.reset_password(data.0).await
+}
+
+/// Changes the user's password and purges all their sessions
+pub(super) async fn forgot_password<T: ServiceContract>(
+    data: web::Json<ForgotPassword>,
+    service: web::Data<T>,
+) -> Result<impl Responder, Error> {
+    data.0.validate().map_err(Error::new)?;
+    info!("Forgot password, setting new");
+    service.forgot_password(data.0).await
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand

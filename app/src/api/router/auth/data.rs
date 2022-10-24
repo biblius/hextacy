@@ -46,6 +46,13 @@ pub(super) struct ChangePassword {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+/// Received when a user forgot their password
+pub(super) struct ForgotPassword {
+    #[validate(length(min = 1))]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
 /// Received when a user asks to reset their password via email
 pub(super) struct ResetPassword {
     pub token: String,

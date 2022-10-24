@@ -1,7 +1,7 @@
 use super::{
     contract::{CacheContract, EmailContract, RepositoryContract, ServiceContract},
     data::{
-        AuthenticationSuccessResponse, ChangePassword, Credentials, EmailToken,
+        AuthenticationSuccessResponse, ChangePassword, Credentials, EmailToken, ForgotPassword,
         FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
         ResetPassword, TwoFactorAuthResponse,
     },
@@ -355,7 +355,8 @@ where
     }
 
     /// Resets the user's password and sends an email with a temporary one. Guarded by a 1 minute throttle.
-    async fn forgot_password(&self, email: &str) -> Result<HttpResponse, Error> {
+    async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
+        let email = data.email.as_str();
         let user = self.repository.get_user_by_email(email).await?;
         if self
             .cache

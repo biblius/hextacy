@@ -1,5 +1,6 @@
 use super::data::{
-    ChangePassword, Credentials, EmailToken, Logout, Otp, RegistrationData, ResetPassword,
+    ChangePassword, Credentials, EmailToken, ForgotPassword, Logout, Otp, RegistrationData,
+    ResetPassword,
 };
 use crate::{error::Error, services::cache::CacheId};
 use actix_web::HttpResponse;
@@ -36,7 +37,7 @@ pub(super) trait ServiceContract {
     /// token is in the cache.
     async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error>;
     /// Reset the user's password
-    async fn forgot_password(&self, email: &str) -> Result<HttpResponse, Error>;
+    async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error>;
     async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error>;
     async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error>;
     async fn session_response(&self, user: User, remember: bool) -> Result<HttpResponse, Error>;

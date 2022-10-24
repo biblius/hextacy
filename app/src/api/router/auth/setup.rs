@@ -83,7 +83,14 @@ pub(in super::super) fn routes(
             .wrap(guard.clone()),
     );
 
-    // Change password
+    // Forgot password
+    cfg.service(web::resource("/auth/forgot-password").route(web::post().to(
+        handler::forgot_password::<
+            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+        >,
+    )));
+
+    // Reset password
     cfg.service(web::resource("/auth/reset-password").route(web::get().to(
         handler::reset_password::<
             Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
