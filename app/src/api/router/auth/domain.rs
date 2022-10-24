@@ -162,8 +162,6 @@ where
                 .await
                 .ok();
 
-            debug!("ATTEMPTS {:?}", attempts);
-
             // Check whether it's ok to attempt to verify it
             if let Some(attempts) = attempts {
                 let throttle = self

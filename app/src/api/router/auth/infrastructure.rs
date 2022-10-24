@@ -222,8 +222,7 @@ impl CacheContract for Cache {
                     .map_err(Error::new)?;
                 Ok(attempts)
             }
-            Err(e) => {
-                debug!("ERROR {}", e);
+            Err(_) => {
                 connection
                     .set_ex::<&str, i64, _>(
                         &throttle_key,
