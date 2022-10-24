@@ -15,3 +15,9 @@ pub const REGISTRATION_TOKEN_DURATION_SECONDS: usize = 86400;
 
 /// Maximum invalid logins until account freeze.
 pub const MAXIMUM_LOGIN_ATTEMPTS: usize = 5;
+
+/// OTP wrong attempt throttle duration.
+pub const OTP_THROTTLE_DURATION_SECONDS: usize = 300;
+
+/// OTP wrong attempt throttle increment.
+pub const OTP_THROTTLE_INCREMENT: i64 = 3;

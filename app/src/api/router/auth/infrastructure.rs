@@ -2,9 +2,11 @@ use super::contract::{CacheContract, EmailContract, RepositoryContract};
 use crate::services::cache::Cache as Cacher;
 use crate::{error::Error, services::cache::CacheId};
 use async_trait::async_trait;
+use chrono::Utc;
 use infrastructure::clients::email;
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
+use infrastructure::config::constants::OTP_THROTTLE_DURATION_SECONDS;
 use infrastructure::repository::session::{Session, SessionRepository};
 use infrastructure::repository::user::UserRepository;
 use infrastructure::{adapters::postgres::PgAdapterError, repository::user::User};
@@ -136,13 +138,13 @@ pub(super) struct Cache {
 impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
     async fn set_session(&self, csrf_token: &str, session: &Session) -> Result<(), Error> {
-        let mut connection = self.client.connect()?;
+        debug!("Caching session with ID {}", session.id);
         Cacher::set(
             CacheId::Session,
             csrf_token,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
-            &mut connection,
+            &mut self.client.connect()?,
         )
         .map_err(Error::new)
     }
@@ -155,8 +157,7 @@ impl CacheContract for Cache {
         value: &T,
         ex: Option<usize>,
     ) -> Result<(), Error> {
-        let mut connection = self.client.connect()?;
-        Cacher::set(cache_id, token, value, ex, &mut connection).map_err(Error::new)
+        Cacher::set(cache_id, token, value, ex, &mut self.client.connect()?).map_err(Error::new)
     }
 
     /// Gets a value from the cache stored under the token
@@ -165,19 +166,18 @@ impl CacheContract for Cache {
         cache_id: CacheId,
         token: &str,
     ) -> Result<T, Error> {
-        let mut connection = self.client.connect()?;
-        Cacher::get(cache_id, token, &mut connection).map_err(Error::new)
+        Cacher::get(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
     }
 
     /// Deletes the value in the cache stored under the token
     async fn delete_token(&self, cache_id: CacheId, token: &str) -> Result<(), Error> {
-        let mut connection = self.client.connect()?;
-        Cacher::delete(cache_id, token, &mut connection).map_err(Error::new)
+        Cacher::delete(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
     }
 
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
     /// will be created, otherwise they will be incremented.
     async fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
+        debug!("Caching login attempt for: {user_id}");
         let mut connection = self.client.connect()?;
         let key = Cacher::prefix_id(CacheId::LoginAttempts, &user_id);
         match connection.incr::<&str, u8, u8>(&key, 1) {
@@ -191,8 +191,58 @@ impl CacheContract for Cache {
     /// Removes the user's login attempts from the cache
     async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
         debug!("Deleting login attempts for: {}", &user_id);
+        Cacher::delete(CacheId::LoginAttempts, user_id, &mut self.client.connect()?)
+            .map_err(Error::new)
+    }
+
+    /// The first attempt sets the throttle to now. Each subsequent one increments it by 3 seconds.
+    async fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
+        debug!("Throttling OTP attempts for: {user_id}");
+
         let mut connection = self.client.connect()?;
-        Cacher::delete(CacheId::LoginAttempts, user_id, &mut connection).map_err(Error::new)
+        let throttle_key = Cacher::prefix_id(CacheId::OTPThrottle, &user_id);
+        let attempt_key = Cacher::prefix_id(CacheId::OTPAttempts, &user_id);
+
+        match connection.get::<&str, Option<i64>>(&attempt_key) {
+            Ok(attempts) => {
+                let attempts = attempts.map_or_else(|| 1, |a| a + 1);
+                connection
+                    .set_ex::<&str, i64, _>(
+                        &throttle_key,
+                        Utc::now().timestamp(),
+                        OTP_THROTTLE_DURATION_SECONDS,
+                    )
+                    .map_err(Error::new)?;
+                connection
+                    .set_ex::<&str, i64, String>(
+                        &attempt_key,
+                        attempts,
+                        OTP_THROTTLE_DURATION_SECONDS,
+                    )
+                    .map_err(Error::new)?;
+                Ok(attempts)
+            }
+            Err(e) => {
+                debug!("ERROR {}", e);
+                connection
+                    .set_ex::<&str, i64, _>(
+                        &throttle_key,
+                        Utc::now().timestamp(),
+                        OTP_THROTTLE_DURATION_SECONDS,
+                    )
+                    .map_err(Error::new)?;
+                connection
+                    .set_ex::<&str, i64, _>(&attempt_key, 1, OTP_THROTTLE_DURATION_SECONDS)
+                    .map_err(Error::new)
+            }
+        }
+    }
+
+    async fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
+        let mut conn = self.client.connect()?;
+        Cacher::delete(CacheId::OTPThrottle, user_id, &mut conn)?;
+        Cacher::delete(CacheId::OTPAttempts, user_id, &mut conn)?;
+        Ok(())
     }
 }
 
@@ -242,18 +292,42 @@ impl EmailContract for Email {
 
     async fn alert_password_change(
         &self,
-        token: &str,
         username: &str,
         email: &str,
+        token: &str,
     ) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
             "change_password",
-            &[("username", username), ("change_password_uri", &uri)],
+            &[("username", username), ("reset_password_uri", &uri)],
         );
         email::send(None, username, email, "Password change", mail, &self.client)
             .map_err(Error::new)
+    }
+
+    async fn send_freeze_account(
+        &self,
+        username: &str,
+        email: &str,
+        token: &str,
+    ) -> Result<(), Error> {
+        debug!("Sending change password email alert to {email}");
+        let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
+        let uri = format!("{domain}/auth/reset-password?token={token}");
+        let mail = email::from_template(
+            "account_frozen",
+            &[("username", username), ("reset_password_uri", &uri)],
+        );
+        email::send(
+            None,
+            username,
+            email,
+            "Account suspended",
+            mail,
+            &self.client,
+        )
+        .map_err(Error::new)
     }
 }

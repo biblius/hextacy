@@ -56,6 +56,9 @@ impl Error {
                 AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided"),
                 AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
                 AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
+                AuthenticationError::AuthBlocked => {
+                    ("AUTH_BLOCK", "Authentication currently blocked")
+                }
                 AuthenticationError::AlreadyVerified => {
                     ("ALREADY_VERIFIED", "Account already verified")
                 }
@@ -185,6 +188,8 @@ pub enum AuthenticationError {
     AlreadyVerified,
     #[error("Invalid password")]
     InvalidPasswordChange,
+    #[error("Authentication blocked")]
+    AuthBlocked,
 }
 
 impl AuthenticationError {
@@ -200,6 +205,7 @@ impl AuthenticationError {
             Self::EmailTaken => StatusCode::CONFLICT,
             Self::AlreadyVerified => StatusCode::CONFLICT,
             Self::InvalidPasswordChange => StatusCode::CONFLICT,
+            Self::AuthBlocked => StatusCode::UNAUTHORIZED,
         }
     }
 }

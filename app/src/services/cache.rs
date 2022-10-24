@@ -55,11 +55,19 @@ impl Cache {
 
 #[derive(Debug, PartialEq)]
 pub enum CacheId {
+    /// For keeping track of login attempts
     LoginAttempts,
+    /// For caching permanent sessions
     Session,
-    OTPToken,
+    /// For keeping teack of registration tokens
     RegToken,
+    /// For keeping track of password reset tokens
     PWToken,
+    /// For 2FA login, OTPs won't be accepted without this token in the cache
+    OTPToken,
+    /// For 2FA login failure
+    OTPThrottle,
+    OTPAttempts,
 }
 
 impl Display for CacheId {
@@ -67,6 +75,8 @@ impl Display for CacheId {
         match self {
             CacheId::LoginAttempts => write!(f, "auth:login_attempts"),
             CacheId::OTPToken => write!(f, "auth:otp"),
+            CacheId::OTPThrottle => write!(f, "auth:otp_throttle"),
+            CacheId::OTPAttempts => write!(f, "auth:otp_attempts"),
             CacheId::Session => write!(f, "auth:session"),
             CacheId::RegToken => write!(f, "auth:registration_token"),
             CacheId::PWToken => write!(f, "auth:set_pw"),

@@ -75,6 +75,8 @@ pub(super) trait CacheContract {
     async fn delete_token(&self, cache_id: CacheId, key: &str) -> Result<(), Error>;
     async fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error>;
     async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error>;
+    async fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error>;
+    async fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error>;
 }
 
 #[cfg_attr(test, mockall::automock)]
@@ -88,14 +90,20 @@ pub(super) trait EmailContract {
     ) -> Result<(), Error>;
     async fn alert_password_change(
         &self,
-        token: &str,
         username: &str,
         email: &str,
+        token: &str,
     ) -> Result<(), Error>;
     async fn send_reset_password(
         &self,
         username: &str,
         email: &str,
         temp_pw: &str,
+    ) -> Result<(), Error>;
+    async fn send_freeze_account(
+        &self,
+        username: &str,
+        email: &str,
+        token: &str,
     ) -> Result<(), Error>;
 }

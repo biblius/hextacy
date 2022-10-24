@@ -31,10 +31,10 @@ pub(super) struct RegistrationData {
 #[derive(Debug, Deserialize, Validate)]
 /// Received when verifying a one time password
 pub(super) struct Otp {
-    #[validate(length(equal = 6))]
-    pub password: String,
     #[validate(length(min = 1))]
     pub token: String,
+    #[validate(length(equal = 6))]
+    pub password: String,
     pub remember: bool,
 }
 
@@ -63,6 +63,12 @@ pub(super) struct EmailToken {
 pub(super) struct Logout {
     pub purge: bool,
 }
+
+/*
+
+RESPONSES
+
+*/
 
 /// Sent when the user completely authenticates
 #[derive(Debug, Serialize, new)]

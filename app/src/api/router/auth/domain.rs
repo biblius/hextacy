@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use data_encoding::BASE64URL;
 use infrastructure::{
     config::constants::{
-        MAXIMUM_LOGIN_ATTEMPTS, OTP_TOKEN_DURATION_SECONDS, REGISTRATION_TOKEN_DURATION_SECONDS,
-        RESET_PW_TOKEN_DURATION_SECONDS,
+        MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, OTP_TOKEN_DURATION_SECONDS,
+        REGISTRATION_TOKEN_DURATION_SECONDS, RESET_PW_TOKEN_DURATION_SECONDS,
     },
     crypto::{
         self,
@@ -80,11 +80,27 @@ where
         if !bcrypt_verify(password, user.password.as_str())? {
             let attempts = self.cache.cache_login_attempt(&user.id).await?;
 
-            // Freeze the account if attempts exceed the threshold
+            // Freeze the account if attempts exceed the threshold and send a password reset token
             if attempts > MAXIMUM_LOGIN_ATTEMPTS as u8 {
                 self.repository.freeze_user(&user.id).await?;
+
+                let token = token(BASE64URL, 160)?;
+
+                self.email
+                    .send_freeze_account(&user.username, &user.email, &token)
+                    .await?;
+
+                self.cache
+                    .set_token(
+                        CacheId::PWToken,
+                        &token,
+                        &user.id,
+                        Some(RESET_PW_TOKEN_DURATION_SECONDS),
+                    )
+                    .await?;
+
                 return Ok(FreezeAccountResponse::new(
-                    &user.id,
+                    &user.email,
                     "Your account has been frozen due to too many invalid login attempts",
                 )
                 .to_response(StatusCode::LOCKED, None, None));
@@ -94,7 +110,7 @@ where
 
         // If the user has 2FA turned on, stop here and cache the user so we can quickly verify their otp
         if user.otp_secret.is_some() {
-            let token = generate_hmac("OTP_TOKEN_SECRET", &user.password, BASE64URL)?;
+            let token = token(BASE64URL, 80)?;
 
             debug!("User {} requires 2FA, caching token {}", user.id, token);
 
@@ -138,22 +154,40 @@ where
 
         let user = self.repository.get_user_by_id(&user_id).await?;
 
-        // Verify the user's token that was created from their password
-        if !verify_hmac("OTP_TOKEN_SECRET", user.password.as_str(), token, BASE64URL)? {
-            return Err(AuthenticationError::InvalidToken(CacheId::OTPToken).into());
-        }
-
         if let Some(ref secret) = user.otp_secret {
-            debug!("Found secret {secret} and {password}");
-            let (result, d) = crypto::otp::verify_otp(password, secret)?;
+            // Check if there's an active throttle
+            let attempts = self
+                .cache
+                .get_token::<i64>(CacheId::OTPAttempts, &user.id)
+                .await
+                .ok();
 
-            debug!("OTP success: {result}{d}");
+            debug!("ATTEMPTS {:?}", attempts);
+
+            // Check whether it's ok to attempt to verify it
+            if let Some(attempts) = attempts {
+                let throttle = self
+                    .cache
+                    .get_token::<i64>(CacheId::OTPThrottle, &user.id)
+                    .await?;
+                let now = chrono::Utc::now().timestamp();
+                if now - throttle <= OTP_THROTTLE_INCREMENT * attempts {
+                    return Err(AuthenticationError::AuthBlocked.into());
+                }
+            }
+
+            let (result, _) = crypto::otp::verify_otp(password, secret)?;
 
             if !result {
+                self.cache.cache_otp_throttle(&user.id).await?;
                 return Err(AuthenticationError::InvalidOTP.into());
             }
 
             self.cache.delete_token(CacheId::OTPToken, token).await?;
+
+            if attempts.is_some() {
+                self.cache.delete_otp_throttle(&user.id).await?;
+            }
 
             self.session_response(user, remember).await
         } else {
@@ -309,7 +343,7 @@ where
             .await?;
 
         self.email
-            .alert_password_change(&token, &user.username, &user.email)
+            .alert_password_change(&user.email, &user.username, &token)
             .await?;
 
         info!("Successfully changed password for {}", session.user_id);
