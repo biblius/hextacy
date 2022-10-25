@@ -48,7 +48,7 @@ pub(super) struct ChangePassword {
 #[derive(Debug, Deserialize, Validate)]
 /// Received when a user forgot their password
 pub(super) struct ForgotPassword {
-    #[validate(length(min = 1))]
+    #[validate(regex = "EMAIL_REGEX")]
     pub email: String,
 }
 
