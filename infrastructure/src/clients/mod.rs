@@ -1,7 +1,5 @@
 pub mod email;
-pub mod mongo;
-pub mod postgres;
-pub mod redis;
+pub mod store;
 
 use thiserror::Error;
 

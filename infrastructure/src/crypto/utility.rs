@@ -1,6 +1,6 @@
 use super::CryptoError;
 use bcrypt;
-use data_encoding::{Encoding, BASE64URL};
+use data_encoding::{Encoding, BASE64URL_NOPAD};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use tracing::debug;
 
@@ -20,7 +20,7 @@ pub fn bcrypt_verify(password: &str, hash: &str) -> Result<bool, CryptoError> {
 
 #[inline]
 pub fn pw_and_hash() -> Result<(String, String), CryptoError> {
-    let pw = token(BASE64URL, 64)?;
+    let pw = token(BASE64URL_NOPAD, 64)?;
     let hashed = bcrypt_hash(&pw)?;
     Ok((pw, hashed))
 }

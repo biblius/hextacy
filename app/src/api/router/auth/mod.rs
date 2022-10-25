@@ -22,10 +22,10 @@ mod tests {
     use data_encoding::BASE32;
     use derive_new::new;
     use infrastructure::{
-        adapters::AdapterError,
         config::env,
         crypto::utility::{bcrypt_hash, uuid},
-        repository::{session::Session, user::User},
+        store::adapters::AdapterError,
+        store::repository::{session::Session, user::User},
         web::http::response::Response,
     };
     use lazy_static::lazy_static;

@@ -1,4 +1,4 @@
-use infrastructure::repository::user::{SortOptions, User};
+use infrastructure::store::repository::user::{SortOptions, User};
 use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use validator::Validate;

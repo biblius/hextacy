@@ -2,7 +2,7 @@ use super::data::GetUsersPaginated;
 use crate::error::Error;
 use actix_web::HttpResponse;
 use async_trait::async_trait;
-use infrastructure::repository::user::{SortOptions, User};
+use infrastructure::store::repository::user::{SortOptions, User};
 
 #[async_trait]
 pub(super) trait ServiceContract {

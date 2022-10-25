@@ -1,5 +1,5 @@
 /// Every session gets cached for a minute.
-pub const SESSION_CACHE_DURATION_SECONDS: usize = 60;
+pub const SESSION_CACHE_DURATION_SECONDS: usize = 600;
 
 /// Store the token for 2 days after a password change.
 pub const RESET_PW_TOKEN_DURATION_SECONDS: usize = 172800;

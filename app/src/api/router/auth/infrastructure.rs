@@ -3,16 +3,18 @@ use crate::services::cache::Cache as Cacher;
 use crate::{error::Error, services::cache::CacheId};
 use async_trait::async_trait;
 use chrono::Utc;
-use infrastructure::adapters::AdapterError;
+
 use infrastructure::clients::email;
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
 use infrastructure::config::constants::OTP_THROTTLE_DURATION_SECONDS;
-use infrastructure::repository::session::{Session, SessionRepository};
-use infrastructure::repository::user::UserRepository;
-use infrastructure::{adapters::postgres::PgAdapterError, repository::user::User};
+use infrastructure::store::adapters::postgres::PgAdapterError;
+use infrastructure::store::adapters::AdapterError;
+use infrastructure::store::models::user_session::UserSession;
+use infrastructure::store::repository::session::{Session, SessionRepository};
+use infrastructure::store::repository::user::{User, UserRepository};
 use infrastructure::{
-    clients::redis::{Commands, Redis},
+    clients::store::redis::{Commands, Redis},
     config::constants::{SESSION_CACHE_DURATION_SECONDS, WRONG_PASSWORD_CACHE_DURATION},
 };
 use serde::{de::DeserializeOwned, Serialize};
@@ -147,11 +149,11 @@ pub(super) struct Cache {
 #[async_trait]
 impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
-    async fn set_session(&self, csrf_token: &str, session: &Session) -> Result<(), Error> {
+    async fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error> {
         debug!("Caching session with ID {}", session.id);
         Cacher::set(
             CacheId::Session,
-            csrf_token,
+            session_id,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
             &mut self.client.connect()?,

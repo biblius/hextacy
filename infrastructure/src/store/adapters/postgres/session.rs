@@ -2,8 +2,8 @@ use std::sync::Arc;
 
 use super::{schema::sessions, PgAdapterError};
 use crate::{
-    clients::postgres::Postgres,
-    repository::{
+    clients::store::postgres::Postgres,
+    store::repository::{
         role::Role,
         session::{Session, SessionRepository},
         user::User,

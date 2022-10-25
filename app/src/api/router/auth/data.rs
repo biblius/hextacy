@@ -1,6 +1,6 @@
 use derive_new::new;
 use infrastructure::{
-    repository::user::User,
+    store::repository::user::User,
     web::{http::response::Response, validation::EMAIL_REGEX},
 };
 use serde::{Deserialize, Serialize};

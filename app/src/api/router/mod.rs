@@ -3,7 +3,10 @@ mod health_check;
 mod users;
 
 use actix_web::web::{self, ServiceConfig};
-use infrastructure::clients::{email::lettre::SmtpTransport, postgres::Postgres, redis::Redis};
+use infrastructure::clients::{
+    email::lettre::SmtpTransport,
+    store::{postgres::Postgres, redis::Redis},
+};
 use std::sync::Arc;
 
 pub fn init(

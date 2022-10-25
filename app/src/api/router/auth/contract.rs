@@ -2,10 +2,14 @@ use super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, Logout, Otp, RegistrationData,
     ResetPassword,
 };
+
 use crate::{error::Error, services::cache::CacheId};
 use actix_web::HttpResponse;
 use async_trait::async_trait;
-use infrastructure::repository::{session::Session, user::User};
+use infrastructure::store::{
+    models::user_session::UserSession,
+    repository::{session::Session, user::User},
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg_attr(test, mockall::automock)]
@@ -30,7 +34,7 @@ pub(super) trait ServiceContract {
     /// temporary PW token in the cache. Works only with an established session.
     async fn change_password(
         &self,
-        session: Session,
+        session: UserSession,
         data: ChangePassword,
     ) -> Result<HttpResponse, Error>;
     /// Reset the user's password and send it to their email. Works only if a temporary PW
@@ -38,7 +42,7 @@ pub(super) trait ServiceContract {
     async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error>;
     /// Reset the user's password
     async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error>;
-    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error>;
+    async fn logout(&self, session: UserSession, data: Logout) -> Result<HttpResponse, Error>;
     async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error>;
     async fn session_response(&self, user: User, remember: bool) -> Result<HttpResponse, Error>;
 }
@@ -71,7 +75,7 @@ pub(super) trait RepositoryContract {
 #[cfg_attr(test, mockall::automock)]
 #[async_trait]
 pub(super) trait CacheContract {
-    async fn set_session(&self, csrf_token: &str, session: &Session) -> Result<(), Error>;
+    async fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error>;
     async fn set_token<T: Serialize + Sync + Send + 'static>(
         &self,
         cache_id: CacheId,

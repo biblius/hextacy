@@ -6,10 +6,11 @@ use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Tr
 use actix_web::HttpMessage;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
-use infrastructure::adapters::postgres::session::PgSessionAdapter;
-use infrastructure::clients::postgres::Postgres;
-use infrastructure::clients::redis::Redis;
-use infrastructure::repository::role::Role;
+use infrastructure::clients::store::postgres::Postgres;
+use infrastructure::clients::store::redis::Redis;
+use infrastructure::store::adapters::postgres::session::PgSessionAdapter;
+use infrastructure::store::adapters::postgres::user::PgUserAdapter;
+use infrastructure::store::repository::role::Role;
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -24,7 +25,7 @@ where
     guard: Rc<AuthenticationGuard<R, C>>,
 }
 
-impl AuthGuard<Repository<PgSessionAdapter>, Cache> {
+impl AuthGuard<Repository<PgSessionAdapter, PgUserAdapter>, Cache> {
     pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
         Self {
             guard: Rc::new(AuthenticationGuard::new(pg_client, rd_client, role)),
@@ -97,14 +98,14 @@ where
                 Err(e) => return Ok(error_response(e, req)),
             };
             debug!("Found session ID cookie {session_id}");
-            let session = guard.get_valid_session(session_id.value(), csrf).await?;
-            if !guard.check_valid_role(&session.user_role) {
+            let user_sess = guard.get_valid_session(session_id.value(), csrf).await?;
+            if !guard.check_valid_role(&user_sess.user_role) {
                 return Ok(error_response(
                     Error::new(AuthenticationError::InsufficientRights),
                     req,
                 ));
             }
-            req.extensions_mut().insert(session);
+            req.extensions_mut().insert(user_sess);
             let res = service.call(req).await?;
 
             Ok(res)

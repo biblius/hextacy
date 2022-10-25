@@ -2,9 +2,9 @@ use super::{domain::UserService, handler, infrastructure::Repository};
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
 use infrastructure::{
-    adapters::postgres::user::PgUserAdapter,
-    clients::{postgres::Postgres, redis::Redis},
-    repository::role::Role,
+    clients::store::{postgres::Postgres, redis::Redis},
+    store::adapters::postgres::user::PgUserAdapter,
+    store::repository::role::Role,
 };
 use std::sync::Arc;
 

@@ -27,8 +27,8 @@ pub fn init(level: &str) {
                 Level::Error => style.set_color(Color::Red),
                 Level::Warn => style.set_color(Color::Yellow),
                 Level::Info => style.set_color(Color::Green),
-                Level::Debug => style.set_color(Color::Rgb(200, 200, 200)),
-                Level::Trace => style.set_color(Color::Rgb(170, 170, 170)),
+                Level::Debug => style.set_color(Color::Rgb(100, 200, 255)),
+                Level::Trace => style.set_color(Color::Rgb(255, 100, 255)),
             };
 
             // Pings in this module are at debug level for some reason so we don't want to

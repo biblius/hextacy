@@ -1,4 +1,4 @@
-use super::ClientError;
+use super::super::ClientError;
 use crate::config::env;
 use diesel::r2d2::State;
 use r2d2_redis::{

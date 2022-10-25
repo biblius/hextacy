@@ -6,6 +6,7 @@ use diesel::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 
+/// The repository session model
 #[derive(Debug, Clone, Deserialize, Serialize, Queryable)]
 pub struct Session {
     pub id: String,

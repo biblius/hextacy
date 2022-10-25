@@ -24,7 +24,7 @@ use infrastructure::{
         token::{generate_hmac, verify_hmac},
         utility::{bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
-    repository::{session::Session, user::User},
+    store::{models::user_session::UserSession, repository::user::User},
     web::http::{
         cookie,
         response::{MessageResponse, Response},
@@ -291,7 +291,7 @@ where
     /// Updates the user's password. Purges all sessions and sends an email with a reset token.
     async fn change_password(
         &self,
-        session: Session,
+        session: UserSession,
         data: ChangePassword,
     ) -> Result<HttpResponse, Error> {
         let password = data.password.as_str();
@@ -392,13 +392,13 @@ where
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions
-    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
+    async fn logout(&self, session: UserSession, data: Logout) -> Result<HttpResponse, Error> {
         if data.purge {
             self.purge_sessions(&session.user_id, None).await?;
         } else {
             let session = self.repository.expire_session(&session.id).await?;
             self.cache
-                .delete_token(CacheId::Session, &session.csrf_token)
+                .delete_token(CacheId::Session, &session.id)
                 .await?;
         }
         // Expire the cookie
@@ -416,10 +416,7 @@ where
     async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
         let sessions = self.repository.purge_sessions(user_id, skip).await?;
         for s in sessions {
-            self.cache
-                .delete_token(CacheId::Session, &s.csrf_token)
-                .await
-                .ok();
+            self.cache.delete_token(CacheId::Session, &s.id).await.ok();
         }
         Ok(())
     }
@@ -437,11 +434,14 @@ where
             Ok(_) => info!("Deleted cached login attempts for {}", user.id),
             Err(_) => info!("No login attempts found for user {}, proceeding", user.id),
         };
-        // If the session is permanent, cache it initially
-        if remember {
-            self.cache.set_session(&csrf_token, &session).await?;
-        }
-        info!("Successfully created session for {}", user.id);
+        // Cache the session
+        self.cache
+            .set_session(
+                &session.id,
+                &UserSession::new(user.clone(), session.clone()),
+            )
+            .await?;
+        info!("Successfully created session for {}", user.username);
         // Respond with the x-csrf header and the session ID
         Ok(AuthenticationSuccessResponse::new(user).to_response(
             StatusCode::OK,

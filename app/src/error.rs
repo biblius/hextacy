@@ -1,6 +1,6 @@
 use crate::services::cache::CacheId;
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::clients::redis::{self};
+use infrastructure::clients::store::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -13,10 +13,10 @@ pub enum Error {
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
     ClientError(#[from] infrastructure::clients::ClientError),
-    #[error("Diesel Error: {0}")]
+    #[error("Cache Error: {0}")]
     Cache(#[from] crate::services::cache::CacheError),
     #[error("Pg adapter Error: {0}")]
-    Adapter(#[from] infrastructure::adapters::AdapterError),
+    Adapter(#[from] infrastructure::store::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
@@ -79,8 +79,8 @@ impl Error {
                 },
             },
             Self::Adapter(e) => match e {
-                infrastructure::adapters::AdapterError::Postgres(_) => todo!(),
-                infrastructure::adapters::AdapterError::DoesNotExist(_) => {
+                infrastructure::store::adapters::AdapterError::Postgres(_) => todo!(),
+                infrastructure::store::adapters::AdapterError::DoesNotExist(_) => {
                     ("NOT_FOUND", "Resource does not exist")
                 }
             },

@@ -1,5 +1,5 @@
 use actix_web::{web, HttpResponseBuilder};
-use infrastructure::clients::{postgres::Postgres, redis::Redis};
+use infrastructure::clients::store::{postgres::Postgres, redis::Redis};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::sync::Arc;

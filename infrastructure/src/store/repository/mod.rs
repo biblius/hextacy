@@ -2,7 +2,7 @@ pub mod role;
 pub mod session;
 pub mod user;
 
-use crate::adapters::postgres::PgAdapterError;
+use crate::store::adapters::postgres::PgAdapterError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

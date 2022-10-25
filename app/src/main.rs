@@ -5,7 +5,10 @@ mod services;
 use actix_web::{middleware::Logger, App, HttpServer};
 use api::router;
 use infrastructure::{
-    clients::{email, postgres::Postgres, redis::Redis},
+    clients::{
+        email,
+        store::{postgres::Postgres, redis::Redis},
+    },
     config::{env, logger},
     web::http,
 };

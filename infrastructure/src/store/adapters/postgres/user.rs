@@ -1,7 +1,7 @@
 use super::{schema::users, PgAdapterError};
 use crate::{
-    clients::postgres::Postgres,
-    repository::user::{SortOptions, User, UserRepository},
+    clients::store::postgres::Postgres,
+    store::repository::user::{SortOptions, User, UserRepository},
 };
 use async_trait::async_trait;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};

@@ -1,6 +1,6 @@
 use crate::error::Error;
 use async_trait::async_trait;
-use infrastructure::{
+use infrastructure::store::{
     adapters::{postgres::PgAdapterError, AdapterError},
     repository::user::{SortOptions, User, UserRepository},
 };

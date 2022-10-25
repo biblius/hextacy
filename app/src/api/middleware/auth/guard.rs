@@ -3,21 +3,26 @@ use crate::error::{AuthenticationError, Error};
 use crate::services::cache::{Cache as CacheService, CacheId};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use async_trait::async_trait;
-use infrastructure::adapters::postgres::session::PgSessionAdapter;
-use infrastructure::adapters::AdapterError;
-use infrastructure::clients::postgres::Postgres;
+use chrono::Utc;
+use infrastructure::clients::store::postgres::Postgres;
+use infrastructure::clients::store::redis::Commands;
+use infrastructure::store::adapters::postgres::session::PgSessionAdapter;
+use infrastructure::store::adapters::postgres::user::PgUserAdapter;
+use infrastructure::store::adapters::AdapterError;
+use infrastructure::store::models::user_session::UserSession;
+use infrastructure::store::repository::user::UserRepository;
 use infrastructure::{
-    adapters::postgres::PgAdapterError,
-    clients::redis::Redis,
+    clients::store::redis::Redis,
     config::constants::SESSION_CACHE_DURATION_SECONDS,
-    repository::{
+    store::adapters::postgres::PgAdapterError,
+    store::repository::{
         role::Role,
         session::{Session, SessionRepository},
     },
     web::http::cookie::S_ID,
 };
 use std::sync::Arc;
-use tracing::{debug, warn};
+use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]
 pub(super) struct AuthenticationGuard<R: RepositoryContract, C: CacheContract> {
@@ -26,11 +31,14 @@ pub(super) struct AuthenticationGuard<R: RepositoryContract, C: CacheContract> {
     pub auth_level: Role,
 }
 
-impl AuthenticationGuard<Repository<PgSessionAdapter>, Cache> {
+impl AuthenticationGuard<Repository<PgSessionAdapter, PgUserAdapter>, Cache> {
     pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
         Self {
             repository: Repository {
                 session_repo: PgSessionAdapter {
+                    client: pg_client.clone(),
+                },
+                user_repo: PgUserAdapter {
                     client: pg_client.clone(),
                 },
             },
@@ -51,28 +59,43 @@ where
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
     /// If it can't find a session returns an `Unauthenticated` error.
-    async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error> {
+    async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<UserSession, Error> {
         // Check cache
-        if let Ok(session) = self.cache.get_session_by_csrf(csrf).await {
-            debug!("Found cached session with {session_id}");
-            Ok(session)
-        } else {
-            // Check DB
-            if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
-                debug!("Found valid session with id {}", session.id);
-                // Cache if permanent
-                if session.is_permanent() {
-                    debug!("Session permanent, caching {}", session.id);
-                    self.cache.cache_session(csrf, &session).await?;
-                    return Ok(session);
+        match self.cache.get_session_by_id(session_id).await {
+            Ok(session) => {
+                if session.csrf != csrf {
+                    return Err(Error::new(AuthenticationError::InvalidCsrfHeader));
                 }
-                // Otherwise refresh
-                debug!("Refreshing session {}", session.id);
-                self.repository.refresh_session(&session.id, csrf).await?;
+                trace!(
+                    "Found cached session: {:?}, is permanent: {}",
+                    session,
+                    session.is_permanent()
+                );
+                if !session.is_permanent() {
+                    self.cache.refresh_session(session_id).await?;
+                }
                 Ok(session)
-            } else {
-                warn!("No valid session found");
-                Err(Error::new(AuthenticationError::Unauthenticated))
+            }
+            Err(e) => {
+                trace!("{e}");
+                // Check DB
+                if let Ok(session) = self
+                    .repository
+                    .get_valid_user_session(session_id, csrf)
+                    .await
+                {
+                    debug!("Found valid session with id {}", session.id);
+                    // Cache
+                    self.cache.cache_session(session_id, &session).await?;
+                    debug!("Refreshing session {}", session.id);
+                    if !session.is_permanent() {
+                        self.repository.refresh_session(&session.id, csrf).await?;
+                    }
+                    Ok(session)
+                } else {
+                    warn!("No valid session found");
+                    Err(Error::new(AuthenticationError::Unauthenticated))
+                }
             }
         }
     }
@@ -99,21 +122,30 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct Repository<SR: SessionRepository> {
+pub struct Repository<SR: SessionRepository, UR: UserRepository> {
     pub session_repo: SR,
+    pub user_repo: UR,
 }
 
 #[async_trait]
-impl<SR> RepositoryContract for Repository<SR>
+impl<SR, UR> RepositoryContract for Repository<SR, UR>
 where
     SR: SessionRepository<Error = PgAdapterError> + Send + Sync,
+    UR: UserRepository<Error = PgAdapterError> + Send + Sync,
 {
     /// Attempts to find an unexpired session with its corresponding CSRF
-    async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
-        self.session_repo
+    async fn get_valid_user_session(&self, id: &str, csrf: &str) -> Result<UserSession, Error> {
+        let session = self
+            .session_repo
             .get_valid_by_id(id, csrf)
             .await
-            .map_err(|e| AdapterError::Postgres(e).into())
+            .map_err(|e| AdapterError::Postgres(e))?;
+        let user = self
+            .user_repo
+            .get_by_id(&session.user_id)
+            .await
+            .map_err(|e| AdapterError::Postgres(e))?;
+        Ok(UserSession::new(user, session))
     }
 
     /// Extends session `expires_at` for 30 minutes
@@ -132,18 +164,27 @@ pub struct Cache {
 
 #[async_trait]
 impl CacheContract for Cache {
-    async fn get_session_by_csrf(&self, token: &str) -> Result<Session, Error> {
-        CacheService::get(CacheId::Session, token, &mut self.client.connect()?).map_err(Error::new)
+    async fn get_session_by_id(&self, id: &str) -> Result<UserSession, Error> {
+        CacheService::get(CacheId::Session, id, &mut self.client.connect()?).map_err(Error::new)
     }
 
-    async fn cache_session(&self, token: &str, session: &Session) -> Result<(), Error> {
+    async fn cache_session(&self, id: &str, session: &UserSession) -> Result<(), Error> {
         CacheService::set(
             CacheId::Session,
-            token,
+            id,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
             &mut self.client.connect()?,
         )
         .map_err(Error::new)
+    }
+
+    async fn refresh_session(&self, session_id: &str) -> Result<(), Error> {
+        let mut conn = self.client.connect()?;
+        conn.expire_at(
+            session_id,
+            ((Utc::now().timestamp() + SESSION_CACHE_DURATION_SECONDS as i64) % i64::MAX) as usize,
+        )?;
+        Ok(())
     }
 }
