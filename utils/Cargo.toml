@@ -1,10 +1,15 @@
 [package]
-name = "misc"
+name = "utils"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "gen_env_example"
-path = "src/bin/gen_env_example.rs"
+name = "envex"
+path = "src/bin/envex.rs"
+
+[[bin]]
+name = "alx"
+path = "src/cli/main.rs"
 
 [dependencies]
+clap = { version = "4.0.18", features = ["derive"] }

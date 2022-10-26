@@ -142,6 +142,9 @@ mod tests {
         // Delete login attempts
         cache.expect_delete_login_attempts().return_once(|_| Ok(()));
 
+        // Set the session
+        cache.expect_set_session().return_once(|_, _| Ok(()));
+
         // Respond with session
         service
             .expect_session_response()

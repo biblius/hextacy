@@ -1,6 +1,7 @@
+//! Generate an env example file from the .env file in the root
 use std::fmt::Write;
 
-/// cargo run -p misc --bin gen_env_example
+/// envex
 fn main() {
     let env_file = std::fs::read_to_string(std::path::Path::new("./.env")).unwrap();
 
