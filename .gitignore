@@ -8,3 +8,5 @@ server.log
 /openssl/cert.pem
 /openssl/ca-key.pem
 /openssl/key.pem
+
+.DS_Store
