@@ -71,7 +71,7 @@ pub fn create<'a, T: Serialize>(
 }
 
 /// Creates any kind of cookie in a jar
-pub fn create_in_jar<'a, T: Serialize>(
+pub fn create_in_jar<T: Serialize>(
     key: &str,
     value: &T,
     expire: bool,

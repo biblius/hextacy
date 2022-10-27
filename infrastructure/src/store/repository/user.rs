@@ -44,7 +44,7 @@ impl User {
         frozen: bool,
     ) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             email: email.to_string(),
             username: username.to_string(),
             role: Role::User,

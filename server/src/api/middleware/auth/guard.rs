@@ -1,6 +1,6 @@
 use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
 use crate::error::{AuthenticationError, Error};
-use crate::services::cache::{Cache as CacheService, CacheId};
+use crate::helpers::cache::{Cache as CacheService, CacheId};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use async_trait::async_trait;
 use chrono::Utc;
@@ -38,13 +38,9 @@ impl AuthenticationGuard<Repository<PgSessionAdapter, PgUserAdapter>, Cache> {
                 session_repo: PgSessionAdapter {
                     client: pg_client.clone(),
                 },
-                user_repo: PgUserAdapter {
-                    client: pg_client.clone(),
-                },
+                user_repo: PgUserAdapter { client: pg_client },
             },
-            cache: Cache {
-                client: rd_client.clone(),
-            },
+            cache: Cache { client: rd_client },
             auth_level: role,
         }
     }
@@ -139,12 +135,12 @@ where
             .session_repo
             .get_valid_by_id(id, csrf)
             .await
-            .map_err(|e| AdapterError::Postgres(e))?;
+            .map_err(AdapterError::Postgres)?;
         let user = self
             .user_repo
             .get_by_id(&session.user_id)
             .await
-            .map_err(|e| AdapterError::Postgres(e))?;
+            .map_err(AdapterError::Postgres)?;
         Ok(UserSession::new(user, session))
     }
 

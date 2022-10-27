@@ -7,7 +7,7 @@ pub(crate) struct AlxArgs {
     pub command: Command,
 }
 
-/// The subject of the command
+/// The top level command
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Generate a new route endpoint.

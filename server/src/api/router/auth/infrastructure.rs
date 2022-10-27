@@ -1,6 +1,6 @@
 use super::contract::{CacheContract, EmailContract, RepositoryContract};
-use crate::services::cache::Cache as Cacher;
-use crate::{error::Error, services::cache::CacheId};
+use crate::helpers::cache::Cache as Cacher;
+use crate::{error::Error, helpers::cache::CacheId};
 use async_trait::async_trait;
 use chrono::Utc;
 

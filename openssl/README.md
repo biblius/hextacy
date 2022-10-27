@@ -8,16 +8,16 @@ Make sure to `cd` in the script's directory and then execute it so your files ge
 
 Run the script to generate the CA private key (1), the CA (2), the certificate private key (3), a temporary certificate signing request (4), a temporary config file for the certificate (5) and finally the certificate (6).
 
-- 1. Generate the private key for the CA certificate. Encrypt this with a password (the command prompts you to) at least 4 characters long. This key is private and should NEVER be accessible. You can additionally encrypt it with a passphrase by adding `-aes256`.
+- 1. Generate the private key for the CA certificate. This key is private and should NEVER be accessible. You can additionally encrypt it with a passphrase by adding `-aes256`.
 
       ```bash
       openssl genrsa -out 'ca-key.pem' 4096
       ```
 
-- 2. Generate a CA certificate with the private key from the above step. You can change the duration and file names if you want to, just make sure these changes reflect on the rest of the script. The `subj` is used to identify the CA in the browser.
+- 2. Generate a CA certificate with the private key from the above step. You can change the duration and file names if you want to, just make sure these changes reflect on the rest of the script. The `subj` is used to identify the CA in the browser. You will be prompted for a password if you encrypted the private key from the previous step.
 
       ```bash
-      openssl req -new -x509 -sha256 -days 365 -key 'ca-key.pem' -out 'ca.pem' -subj "/C=HR/ST=OS/L=Osijek/O=Myco/OU=Myco/CN=localhost"
+      openssl req -new -x509 -sha256 -days 365 -key 'ca-key.pem' -out 'ca.pem' -subj "/C=HR/ST=OS/L=Osijek/O=Alchemy/OU=Clandestine/CN=localhost"
       ```
 
       To read the file in human readable format, use the following command:
@@ -35,7 +35,7 @@ Run the script to generate the CA private key (1), the CA (2), the certificate p
 - 4. Generate a temporary certificate signing request.
 
       ```bash
-      openssl req -new -sha256 -subj "/C=HR/ST=OS/L=Osijek/O=Myco/OU=Myco/CN=localhost" -key 'key.pem' -out 'cert.csr'
+      openssl req -new -sha256 -subj "/C=HR/ST=OS/L=Osijek/O=Alchemy/OU=Clandestine/CN=localhost" -key 'key.pem' -out 'cert.csr'
       ```
 
 - 5. Create a temporary config file for the certificate. Contains DNS names or IP addresses that the cert will be valid for. You can add more if you want.

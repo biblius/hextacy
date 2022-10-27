@@ -21,20 +21,15 @@ pub(in super::super) fn routes(
     email: Arc<SmtpTransport>,
     cfg: &mut web::ServiceConfig,
 ) {
-    let repository = Repository {
-        user_repo: PgUserAdapter { client: pg.clone() },
-        session_repo: PgSessionAdapter { client: pg.clone() },
-    };
-    let cache = Cache { client: rd.clone() };
-    let email = Email {
-        client: email.clone(),
-    };
     let service = Authentication {
-        repository,
-        cache,
-        email,
+        repository: Repository {
+            user_repo: PgUserAdapter { client: pg.clone() },
+            session_repo: PgSessionAdapter { client: pg.clone() },
+        },
+        cache: Cache { client: rd.clone() },
+        email: Email { client: email },
     };
-    let guard = interceptor::AuthGuard::new(pg.clone(), rd.clone(), Role::User);
+    let guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 
     cfg.app_data(Data::new(service));
 

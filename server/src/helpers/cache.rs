@@ -55,7 +55,7 @@ impl Cache {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum CacheId {
     /// For keeping track of login attempts
     LoginAttempts,

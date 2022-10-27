@@ -1,6 +1,6 @@
 mod api;
 mod error;
-mod services;
+mod helpers;
 
 use actix_web::{middleware::Logger, App, HttpServer};
 use api::router;

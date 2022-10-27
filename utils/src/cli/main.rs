@@ -1,10 +1,20 @@
 mod args;
+use crate::args::{Command, MiddlewareSubcommand, RouteSubcommand};
 use args::AlxArgs;
 use clap::Parser;
 use std::fmt::Write;
 use std::{fs, path::Path};
 
-use crate::args::{Command, MiddlewareSubcommand, RouteSubcommand};
+const FILES: [&str; 7] = [
+    "contract",
+    "data",
+    "domain",
+    "handler",
+    "infrastructure",
+    "mod",
+    "setup",
+];
+
 pub fn main() {
     let args = AlxArgs::parse();
     println!("{:?}", args);
@@ -29,21 +39,26 @@ pub fn main() {
                     .map_err(|e| panic!("Could not create directory at path: {}, {}", path, e))
                     .unwrap();
 
-                // Prepare the contracts
-                let mut contents = String::new();
-                for s in contracts {
-                    write!(
-                        contents,
-                        "pub(super) trait {}{}Contract {{\n\t\n}}\n",
-                        &s[..1].to_string().to_uppercase(),
-                        &s[1..]
-                    )
-                    .unwrap();
+                for file in FILES {
+                    let mut contents = String::new();
+                    if file == "contract" {
+                        // Prepare the contracts if any
+                        for s in &contracts {
+                            write!(
+                                contents,
+                                "pub(super) trait {}{}Contract {{\n\t\n}}\n",
+                                &s[..1].to_string().to_uppercase(),
+                                &s[1..]
+                            )
+                            .unwrap();
+                        }
+                    }
+                    fs::File::create(&format!("{}/{}.rs", path, file))
+                        .expect("Couldn't create file");
+                    fs::write(&format!("{}/{}.rs", path, file), contents.clone())
+                        .expect("Could't write to file");
+                    contents.clear();
                 }
-                println!("{:?}", contents);
-                fs::File::create(&format!("{}/contract.rs", path)).expect("Couldn't create file");
-                fs::write(&format!("{}/contract.rs", path), contents)
-                    .expect("Could't write contract");
 
                 println!("{:?}", router_dir);
                 println!("{:?}", route);

@@ -1,4 +1,4 @@
-use crate::services::cache::CacheId;
+use crate::helpers::cache::CacheId;
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
 use infrastructure::clients::store::redis;
 use reqwest::StatusCode;
@@ -14,7 +14,7 @@ pub enum Error {
     #[error("Client Error: {0}")]
     ClientError(#[from] infrastructure::clients::ClientError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] crate::services::cache::CacheError),
+    Cache(#[from] crate::helpers::cache::CacheError),
     #[error("Pg adapter Error: {0}")]
     Adapter(#[from] infrastructure::store::adapters::AdapterError),
     #[error("Redis Error: {0}")]

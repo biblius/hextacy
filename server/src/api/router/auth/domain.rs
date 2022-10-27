@@ -8,7 +8,7 @@ use super::{
 };
 use crate::{
     error::{AuthenticationError, Error},
-    services::cache::CacheId,
+    helpers::cache::CacheId,
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use async_trait::async_trait;

@@ -3,7 +3,7 @@ use super::data::{
     ResetPassword,
 };
 
-use crate::{error::Error, services::cache::CacheId};
+use crate::{error::Error, helpers::cache::CacheId};
 use actix_web::HttpResponse;
 use async_trait::async_trait;
 use infrastructure::store::{
@@ -42,8 +42,12 @@ pub(super) trait ServiceContract {
     async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error>;
     /// Reset the user's password
     async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error>;
+    /// Log the user out, i.e. expire their current session and purge the rest if the user
+    /// selected the purge option
     async fn logout(&self, session: UserSession, data: Logout) -> Result<HttpResponse, Error>;
+    /// Expire and remove from the cache all user sessions
     async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error>;
+    /// Generate a successful authentication response and set the necessary cookies and backend session data
     async fn session_response(&self, user: User, remember: bool) -> Result<HttpResponse, Error>;
 }
 
