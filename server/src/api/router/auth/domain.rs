@@ -2,8 +2,8 @@ use super::{
     contract::{CacheContract, EmailContract, RepositoryContract, ServiceContract},
     data::{
         AuthenticationSuccessResponse, ChangePassword, Credentials, EmailToken, ForgotPassword,
-        FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
-        ResetPassword, TwoFactorAuthResponse,
+        ForgotPasswordVerify, FreezeAccountResponse, Logout, Otp, RegistrationData,
+        RegistrationStartResponse, ResetPassword, TwoFactorAuthResponse,
     },
 };
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use async_trait::async_trait;
-use data_encoding::BASE64URL;
+use data_encoding::{BASE32, BASE64URL};
 use infrastructure::{
     config::constants::{
         EMAIL_THROTTLE_DURATION_SECONDS, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT,
@@ -21,7 +21,7 @@ use infrastructure::{
     },
     crypto::{
         self,
-        token::{generate_hmac, verify_hmac},
+        hmac::{generate_hmac, verify_hmac},
         utility::{bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
     store::{models::user_session::UserSession, repository::user::User},
@@ -78,7 +78,7 @@ where
             // Freeze the account if attempts exceed the threshold and send a password reset token
             if attempts > MAXIMUM_LOGIN_ATTEMPTS as u8 {
                 self.repository.freeze_user(&user.id).await?;
-                let token = token(BASE64URL, 160)?;
+                let token = token(BASE64URL, 160);
                 self.email
                     .send_freeze_account(&user.username, &user.email, &token)
                     .await?;
@@ -98,9 +98,9 @@ where
             }
             return Err(AuthenticationError::InvalidCredentials.into());
         }
-        // If the user has 2FA turned on, stop here and cache the user so we can quickly verify their otp
+        // If the user has 2FA turned on, stop here and cache the user ID so we can quickly verify their otp
         if user.otp_secret.is_some() {
-            let token = token(BASE64URL, 80)?;
+            let token = token(BASE64URL, 80);
             debug!("User {} requires 2FA, caching token {}", user.id, token);
             self.cache
                 .set_token(
@@ -121,7 +121,7 @@ where
         self.session_response(user, remember).await
     }
 
-    /// Verifies the given OTP using the token generated on the credentials login.
+    /// Verifies the given OTP using the token generated on the credentials login. Throttles by 2*attempts seconds on each failed attempt.
     async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
         let (password, token, remember) = (otp.password.as_str(), otp.token.as_str(), otp.remember);
         let user_id = match self
@@ -244,7 +244,7 @@ where
         {
             return Err(AuthenticationError::AuthBlocked.into());
         }
-        let token = token(BASE64URL, 160)?;
+        let token = token(BASE64URL, 160);
         self.cache
             .set_token(
                 CacheId::RegToken,
@@ -301,7 +301,7 @@ where
             .update_user_password(&session.user_id, &hashed)
             .await?;
         self.purge_sessions(&user.id, None).await?;
-        let token = token(BASE64URL, 128)?;
+        let token = token(BASE64URL, 128);
         self.cache
             .set_token(
                 CacheId::PWToken,
@@ -354,10 +354,11 @@ where
         )
     }
 
-    /// Resets the user's password and sends an email with a temporary one. Guarded by a 1 minute throttle.
+    /// Resets the user's password and sends an email with a temporary one. Guarded by a half min throttle.
     async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
         let email = data.email.as_str();
         let user = self.repository.get_user_by_email(email).await?;
+        // Check throttle
         if self
             .cache
             .get_token::<i64>(CacheId::EmailThrottle, &user.id)
@@ -367,28 +368,60 @@ where
         {
             return Err(AuthenticationError::AuthBlocked.into());
         }
-        let (temp_pw, hash) = pw_and_hash()?;
-        self.repository
-            .update_user_password(&user.id, &hash)
-            .await?;
+        // Send and cache the temp password, throttle
+        let token = token(BASE32, 20);
         self.email
-            .send_reset_password(&user.username, email, &temp_pw)
+            .send_forgot_password(&user.username, email, &token)
             .await?;
         self.cache
             .set_token(
-                CacheId::OTPThrottle,
+                CacheId::PWToken,
+                &token,
+                &user.id,
+                Some(RESET_PW_TOKEN_DURATION_SECONDS),
+            )
+            .await?;
+        self.cache
+            .set_token(
+                CacheId::EmailThrottle,
                 &user.id,
                 &1,
                 Some(EMAIL_THROTTLE_DURATION_SECONDS),
             )
             .await?;
         Ok(
-            MessageResponse::new("Successfully reset password. Incoming email.").to_response(
+            MessageResponse::new("Started forgot password routine. Incoming email.").to_response(
                 StatusCode::OK,
                 None,
                 None,
             ),
         )
+    }
+
+    /// Verify the forgot pw email token and update the user's password
+    async fn verify_forgot_password(
+        &self,
+        data: ForgotPasswordVerify,
+    ) -> Result<HttpResponse, Error> {
+        let (password, token) = (data.password.as_str(), data.token.as_str());
+        let user_id = match self
+            .cache
+            .get_token::<String>(CacheId::PWToken, token)
+            .await
+        {
+            Ok(id) => id,
+            Err(_) => return Err(AuthenticationError::InvalidToken(CacheId::PWToken).into()),
+        };
+        self.cache.delete_token(CacheId::PWToken, token).await?;
+        let hashed = bcrypt_hash(password)?;
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hashed)
+            .await?;
+
+        self.purge_sessions(&user.id, None).await?;
+
+        self.session_response(user, false).await
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions

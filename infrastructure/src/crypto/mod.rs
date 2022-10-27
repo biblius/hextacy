@@ -1,6 +1,6 @@
+pub mod hmac;
 pub mod jwt;
 pub mod otp;
-pub mod token;
 pub mod utility;
 
 pub use bcrypt::BcryptError;
@@ -18,9 +18,9 @@ pub enum CryptoError {
     #[error("{0}")]
     Bcrypt(#[from] bcrypt::BcryptError),
     #[error("{0}")]
-    HmacLength(#[from] hmac::digest::InvalidLength),
+    HmacLength(#[from] ::hmac::digest::InvalidLength),
     #[error("{0}")]
-    Hmac(#[from] hmac::digest::MacError),
+    Hmac(#[from] ::hmac::digest::MacError),
     #[error("{0}")]
     DataEncoding(#[from] data_encoding::DecodeError),
     #[error("{0}")]

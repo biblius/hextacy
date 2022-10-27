@@ -1,6 +1,6 @@
 use super::data::{
-    ChangePassword, Credentials, EmailToken, ForgotPassword, Logout, Otp, RegistrationData,
-    ResetPassword,
+    ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
+    RegistrationData, ResetPassword,
 };
 
 use crate::{error::Error, helpers::cache::CacheId};
@@ -37,6 +37,12 @@ pub(super) trait ServiceContract {
         session: UserSession,
         data: ChangePassword,
     ) -> Result<HttpResponse, Error>;
+    /// Verify a token sent to a user via email when they request a forgotten password and change their
+    /// password to the given one
+    async fn verify_forgot_password(
+        &self,
+        data: ForgotPasswordVerify,
+    ) -> Result<HttpResponse, Error>;
     /// Reset the user's password and send it to their email. Works only if a temporary PW
     /// token is in the cache.
     async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error>;
@@ -59,7 +65,7 @@ pub(super) trait RepositoryContract {
     async fn get_user_by_id(&self, id: &str) -> Result<User, Error>;
     async fn get_user_by_email(&self, email: &str) -> Result<User, Error>;
     async fn freeze_user(&self, id: &str) -> Result<User, Error>;
-    async fn update_user_password(&self, id: &str, password: &str) -> Result<User, Error>;
+    async fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<User, Error>;
     async fn update_email_verified_at(&self, id: &str) -> Result<User, Error>;
     async fn set_user_otp_secret(&self, id: &str, secret: &str) -> Result<User, Error>;
     async fn create_session(
@@ -119,6 +125,12 @@ pub(super) trait EmailContract {
         username: &str,
         email: &str,
         temp_pw: &str,
+    ) -> Result<(), Error>;
+    async fn send_forgot_password(
+        &self,
+        username: &str,
+        email: &str,
+        token: &str,
     ) -> Result<(), Error>;
     async fn send_freeze_account(
         &self,

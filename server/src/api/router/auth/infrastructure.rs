@@ -318,6 +318,28 @@ impl EmailContract for Email {
             .map_err(Error::new)
     }
 
+    async fn send_forgot_password(
+        &self,
+        username: &str,
+        email: &str,
+        token: &str,
+    ) -> Result<(), Error> {
+        debug!("Sending forgot password email to {email}");
+        let mail = email::from_template(
+            "forgot_password",
+            &[("username", username), ("forgot_pw_token", token)],
+        );
+        email::send(
+            None,
+            username,
+            email,
+            "Forgot your password?",
+            mail,
+            &self.client,
+        )
+        .map_err(Error::new)
+    }
+
     async fn send_freeze_account(
         &self,
         username: &str,

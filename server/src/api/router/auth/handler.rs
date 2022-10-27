@@ -1,8 +1,8 @@
 use super::{
     contract::ServiceContract,
     data::{
-        ChangePassword, Credentials, EmailToken, ForgotPassword, Logout, Otp, RegistrationData,
-        ResetPassword,
+        ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
+        RegistrationData, ResetPassword,
     },
 };
 use crate::error::Error;
@@ -20,16 +20,6 @@ pub(super) async fn login<T: ServiceContract>(
     auth_form.0.validate().map_err(Error::new)?;
     info!("Credentials login : {:?}", auth_form.0);
     service.login(auth_form.0).await
-}
-
-/// Verifies the user's OTP if they have 2FA enabled
-pub(super) async fn verify_otp<T: ServiceContract>(
-    otp: web::Json<Otp>,
-    service: web::Data<T>,
-) -> Result<impl Responder, Error> {
-    otp.0.validate().map_err(Error::new)?;
-    info!("OTP login : {:?}", otp.0);
-    service.verify_otp(otp.0).await
 }
 
 /// Starts the registration process for the user and sends an email containing a temporary
@@ -63,6 +53,16 @@ pub(super) async fn set_otp_secret<T: ServiceContract>(
     service.set_otp_secret(&session.user_id).await
 }
 
+/// Verifies the user's OTP if they have 2FA enabled
+pub(super) async fn verify_otp<T: ServiceContract>(
+    otp: web::Json<Otp>,
+    service: web::Data<T>,
+) -> Result<impl Responder, Error> {
+    otp.0.validate().map_err(Error::new)?;
+    info!("OTP login : {:?}", otp.0);
+    service.verify_otp(otp.0).await
+}
+
 /// Changes the user's password and purges all their sessions
 pub(super) async fn change_password<T: ServiceContract>(
     data: web::Json<ChangePassword>,
@@ -75,6 +75,26 @@ pub(super) async fn change_password<T: ServiceContract>(
     service.change_password(session, data.0).await
 }
 
+/// Sends a forgot password token via email
+pub(super) async fn forgot_password<T: ServiceContract>(
+    data: web::Json<ForgotPassword>,
+    service: web::Data<T>,
+) -> Result<impl Responder, Error> {
+    data.0.validate().map_err(Error::new)?;
+    info!("Forgot password, sending token");
+    service.forgot_password(data.0).await
+}
+
+/// Changes the user's password and purges all their sessions
+pub(super) async fn verify_forgot_password<T: ServiceContract>(
+    data: web::Json<ForgotPasswordVerify>,
+    service: web::Data<T>,
+) -> Result<impl Responder, Error> {
+    data.0.validate().map_err(Error::new)?;
+    info!("Forgot password, setting new");
+    service.verify_forgot_password(data.0).await
+}
+
 /// Changes the user's password and purges all their sessions
 pub(super) async fn reset_password<T: ServiceContract>(
     data: web::Query<ResetPassword>,
@@ -83,16 +103,6 @@ pub(super) async fn reset_password<T: ServiceContract>(
     data.0.validate().map_err(Error::new)?;
     info!("Resetting password token: {:?}", data.0);
     service.reset_password(data.0).await
-}
-
-/// Changes the user's password and purges all their sessions
-pub(super) async fn forgot_password<T: ServiceContract>(
-    data: web::Json<ForgotPassword>,
-    service: web::Data<T>,
-) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Forgot password, setting new");
-    service.forgot_password(data.0).await
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand

@@ -74,7 +74,7 @@ impl Error {
                 AuthenticationError::InvalidToken(id) => match id {
                     CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
                     CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
-                    CacheId::PWToken => ("INVALID_TOKEN", "Password reset token expired"),
+                    CacheId::PWToken => ("INVALID_TOKEN", "Invalid password change token"),
                     _ => ("INVALID_TOKEN", "Token not found"),
                 },
             },

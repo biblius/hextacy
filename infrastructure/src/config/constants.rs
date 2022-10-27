@@ -7,7 +7,7 @@ pub const RESET_PW_TOKEN_DURATION_SECONDS: usize = 172800;
 /// Cache invalid login attempts for 2 days (172800 seconds). If the threshold is reached freeze the user's account.
 pub const WRONG_PASSWORD_CACHE_DURATION: usize = 172800;
 
-/// OTP Token duration
+/// OTP EmailToken duration
 pub const OTP_TOKEN_DURATION_SECONDS: usize = 300;
 
 /// First time registration token duration
@@ -22,5 +22,5 @@ pub const OTP_THROTTLE_DURATION_SECONDS: usize = 300;
 /// OTP wrong attempt throttle increment.
 pub const OTP_THROTTLE_INCREMENT: i64 = 3;
 
-/// Throttle emails for a minute to stop craziness
-pub const EMAIL_THROTTLE_DURATION_SECONDS: usize = 60;
+/// Throttle emails for half a minute to stop craziness
+pub const EMAIL_THROTTLE_DURATION_SECONDS: usize = 30;

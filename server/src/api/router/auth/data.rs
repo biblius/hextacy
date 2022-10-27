@@ -65,6 +65,15 @@ pub(super) struct EmailToken {
     pub token: String,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+/// Received when verifying registration token
+pub(super) struct ForgotPasswordVerify {
+    #[validate(length(min = 8))]
+    pub password: String,
+    #[validate(length(min = 1))]
+    pub token: String,
+}
+
 #[derive(Debug, Deserialize)]
 /// Received when verifying registration token
 pub(super) struct Logout {

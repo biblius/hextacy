@@ -175,7 +175,7 @@ pub fn xss_filter(on: bool) -> (HeaderName, HeaderValue) {
     )
 }
 
-/// Builds the default security header middlware
+/// Builds the default security header middleware
 pub fn default() -> DefaultHeaders {
     DefaultHeaders::new()
         .add(default_content_security_policy())

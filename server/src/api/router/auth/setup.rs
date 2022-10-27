@@ -88,6 +88,15 @@ pub(in super::super) fn routes(
         >,
     )));
 
+    // Verify forgot password
+    cfg.service(
+        web::resource("/auth/verify-forgot-password").route(web::post().to(
+            handler::verify_forgot_password::<
+                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+            >,
+        )),
+    );
+
     // Reset password
     cfg.service(web::resource("/auth/reset-password").route(web::get().to(
         handler::reset_password::<
