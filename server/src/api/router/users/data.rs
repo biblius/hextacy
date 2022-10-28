@@ -1,3 +1,4 @@
+use derive_new::new;
 use infrastructure::store::repository::user::{SortOptions, User};
 use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
@@ -13,15 +14,9 @@ pub(super) struct GetUsersPaginated {
     pub sort_by: Option<SortOptions>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, new)]
 pub struct UserResponse {
     users: Vec<User>,
-}
-
-impl UserResponse {
-    pub fn new(users: Vec<User>) -> Self {
-        Self { users }
-    }
 }
 
 impl Response for UserResponse {}

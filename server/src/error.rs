@@ -53,6 +53,9 @@ impl Error {
     /// Returns error message and description
     pub fn message_and_description(&self) -> (&'static str, &'static str) {
         match self {
+            /*
+             * Authentication
+             */
             Self::Authentication(e) => match e {
                 AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session"),
                 AuthenticationError::InvalidCsrfHeader => ("UNAUTHORIZED", "Invalid CSRF header"),
@@ -61,16 +64,9 @@ impl Error {
                 AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
                 AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
                 AuthenticationError::EmailUnverified => ("UNVERIFIED", "Email not verified"),
-                AuthenticationError::AuthBlocked => {
-                    ("AUTH_BLOCK", "Authentication currently blocked")
-                }
-                AuthenticationError::AlreadyVerified => {
-                    ("ALREADY_VERIFIED", "Account already verified")
-                }
-                AuthenticationError::InsufficientRights => (
-                    "FORBIDDEN",
-                    "You do not have the necessary rights to view this page",
-                ),
+                AuthenticationError::AuthBlocked => ("BLOCKED", "Authentication currently blocked"),
+                AuthenticationError::AlreadyVerified => ("VERIFIED", "Account already verified"),
+                AuthenticationError::InsufficientRights => ("FORBIDDEN", "Insufficient rights"),
                 AuthenticationError::InvalidToken(id) => match id {
                     CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
                     CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
@@ -78,14 +74,20 @@ impl Error {
                     _ => ("INVALID_TOKEN", "Token not found"),
                 },
             },
+            /*
+             * Adapter
+             */
             Self::Adapter(e) => match e {
-                infrastructure::store::adapters::AdapterError::Postgres(_) => todo!(),
                 infrastructure::store::adapters::AdapterError::DoesNotExist(_) => {
                     ("NOT_FOUND", "Resource does not exist")
                 }
+                _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
             },
+            /*
+             * Validation
+             */
             Self::Validation(_) => ("VALIDATION", "Invalid input"),
-            _ => ("INTERNAL", "Internal server error"),
+            _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
         }
     }
 
