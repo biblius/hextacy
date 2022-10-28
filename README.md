@@ -16,7 +16,7 @@ The most interesting here is the store module, where the said data sources are l
 
 #### **Repository**
 
-Contains data structures and the interfaces with which we interact with them. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable in any server domain module.
+Contains data structures and the interfaces with which we interact with them. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the domain logic.
 
 #### **Adapters**
 
@@ -36,8 +36,8 @@ Contains structures implementing client specific behaviour such as connecting to
 
 Module containing an implementation of a basic broadcastable message and a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
-The rest is a bunch of helpers that don't require that much explanation.
+The rest is a bunch of helpers that don't require that much explanation. We have the **config** directory which just loads and sets environment variables, the **crypto** directory containing cryptographic utilities for encrypting, signing and generating tokens and the **web** directory containing various helpers and utilities for HTTP and websockets. The most notable modules from **web** are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response.
 
 ## **Server**
 
-The main application binary. Contains the domain logic and the request handlers.
+The main monolith binary. Contains the domain logic and the request handlers.
