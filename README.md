@@ -182,12 +182,13 @@ The router contains the endpoints of the server. The endpoints provide a compact
     data: web::Query<GetUsersPaginated>,
     service: web::Data<S>,
   ) -> Result<impl Responder, Error> {
+    data.0.validate().map_err(Error::new)?;
     info!("Getting users");
     service.get_paginated(data.0).await
   }
   ```
 
-  We place a `ServiceContract` trait bound on the handler so we can later inject the specific service configuration we want. We expect to receive the necessary data in the query parameters and we plug the service we intend to use in the `service` function parameter, then we call the service's `get_paginated` function which returns either an error or a successful HTTP response, as defined in the domain.
+  We place a `ServiceContract` trait bound on the handler so we can later inject the specific service configuration we want. We expect to receive the necessary data in the query parameters and validate it. We plug the service we intend to use in the `service` function parameter, then we call the service's `get_paginated` function which returns either an error or a successful HTTP response, as defined in the domain.
 
 - #### **setup.rs**
 
