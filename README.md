@@ -103,39 +103,6 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
   We also specify how the inputs get validated by the [validator](https://docs.rs/validator/latest/validator/) crate. The response trait is a utility trait for converting this struct to a response, as you'll see in the domain.
 
-- #### **domain.rs**
-
-  Here we define the domain logic, i.e. we implement the behaviour we want this service to have when we get a request for this route. This part is where all of the infrastructure pieces tie together and perform the business. This is where we implement the `ServiceContract` for this module's `UserService` struct.
-
-  ```rust
-  use super::{
-    contract::{RepositoryContract, ServiceContract},
-
-  pub(super) struct UserService<R: RepositoryContract> {
-    pub repository: R,
-  }
-
-  #[async_trait]
-  impl<R> ServiceContract for UserService<R>
-  where
-    R: RepositoryContract + Send + Sync,
-  {
-    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
-        let users = self
-            .repository
-            .get_paginated(
-                data.page.unwrap_or(1_u16),
-                data.per_page.unwrap_or(25),
-            )
-            .await?;
-
-        Ok(UserResponse::new(users).to_response(StatusCode::OK, None, None))
-    }
-  }
-  ```
-
-   Notice how we didn't tie any implementation to the repository, it can take in anything as long as it implements the `RepositoryContract` from the `contract` module. This allows for easy mocking of the function and seperation of the business logic of the service from the implementation details of our repository adapters. In this service's implementation of the `get_paginated` function we just call our repository to get a list of users and return them in the `UserResponse` from our `data` module. Here the `to_response()` call converts the struct to an HTTP response with a 200 OK status code, no cookies and no additional headers.
-
 - #### **infrastructure.rs**
 
   Here we define the specific implementation of the aformentioned `RepositoryContract` for this service's repository.
@@ -170,6 +137,39 @@ The router contains the endpoints of the server. The endpoints provide a compact
   ```
 
   Here, `UserRepository` is again seperated from the business logic as we can plug in any adapter that implements it. In our case we are using the `PgUserAdapter`, a struct containing a postgres specific implementation and we define the error type to be a `PgAdapterError` as `Repository` requires a specific error for each implementation.
+
+- #### **domain.rs**
+
+  Here we define the domain logic, i.e. we implement the behaviour we want this service to have when we get a request for this route. This part is where all of the infrastructure pieces tie together and perform the business. This is where we implement the `ServiceContract` for this module's `UserService` struct.
+
+  ```rust
+  use super::{
+    contract::{RepositoryContract, ServiceContract},
+
+  pub(super) struct UserService<R: RepositoryContract> {
+    pub repository: R,
+  }
+
+  #[async_trait]
+  impl<R> ServiceContract for UserService<R>
+  where
+    R: RepositoryContract + Send + Sync,
+  {
+    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
+        let users = self
+            .repository
+            .get_paginated(
+                data.page.unwrap_or(1_u16),
+                data.per_page.unwrap_or(25),
+            )
+            .await?;
+
+        Ok(UserResponse::new(users).to_response(StatusCode::OK, None, None))
+    }
+  }
+  ```
+
+   Notice how we didn't tie any implementation to the repository, it can take in anything as long as it implements the `RepositoryContract` from the `contract` module. This allows for easy mocking of the function and seperation of the business logic of the service from the implementation details of our repository adapters. In this service's implementation of the `get_paginated` function we just call our repository to get a list of users and return them in the `UserResponse` from our `data` module. Here the `to_response()` call converts the struct to an HTTP response with a 200 OK status code, no cookies and no additional headers.
 
 - #### **handler.rs**
 
@@ -206,7 +206,6 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
     cfg.app_data(Data::new(service));
 
-    // Show all
     cfg.service(
         web::resource("/users")
             .route(web::get().to(handler::get_paginated::<UserService<Repository<PgUserAdapter>>>))
@@ -215,7 +214,11 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
   ```
 
-  This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository.
+  This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository.
+
+The benefits of having this kind of architecture start to become clear once you have more complex logic. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
+
+Middleware has the same structure, it uses repositories and contains it's own domain logic we want to execute when we receive requests for certain endpoints.
 
 If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this, it's best to keep the visibility public only at the endpoint directory and this can be achieved with with `pub(in path)` where path is the module where you want it to be visible, e.g. for one level of nesting it would be `pub(in super::super)`
 
@@ -246,4 +249,22 @@ We would then pass this function to our server setup.
     .await
 ```
 
-Obviously a real project would have much more routes and passing everything to one function would be crazy, so we would seperate that into some kind of `configure` module where we'd set up all our clients and calling that function instead of declaring everything in `main.rs`.
+Obviously a real project would have much more routes and passing everything to one function would be crazy, so we would seperate that into some kind of `configure` module where we'd set up all our clients and call that function instead of initializing everything in `main.rs`.
+
+The helpers module contains various helper functions usable throughout the server.
+
+## **Authentication flow**
+
+The user is expected to enter their email and password after which an email with a registration token gets sent. Users can request another token if their token expires. Once the user verifies their registration they must log in, after which they will receive a session ID cookie and a CSRF token in the header.
+
+The cookie and token are then used by the middleware to authenticate the user when accessing protected resources. It does so by grabbing both from the request and trying to fetch a session first from the cache, then if that fails from postgres. The session is searched for by ID and must be unexpired and have a matching csrf token, otherwise the middleware will error.
+
+There is a predefined route for setting a user's OTP secret, a session must be established to do so. When a user sets their OTP secret they have to provide a valid OTP after successfully verifying credentials or they won't be able to establish a session.
+
+Users can change their password and logout only if they have an established session. If a user changes their password they receive an email notifying them of the change with a password reset token in case it wasn't them, the PW reset token lasts for 2 days. On logout a user can purge all of their sessions.
+
+Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it they must login again as their sessions will be purged.
+
+## **CLI Tool**
+
+TBD
