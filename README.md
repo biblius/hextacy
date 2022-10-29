@@ -263,8 +263,20 @@ There is a predefined route for setting a user's OTP secret, a session must be e
 
 Users can change their password and logout only if they have an established session. If a user changes their password they receive an email notifying them of the change with a password reset token in case it wasn't them, the PW reset token lasts for 2 days. On logout a user can purge all of their sessions.
 
-Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it they must login again as their sessions will be purged.
+Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it they .
 
 ## **CLI Tool**
 
 TBD
+
+TODO:
+
+- [ ] Add maxmind and activity logging middleware
+
+- [ ] Finish CLI tool
+
+- [ ] Project config file for ez endpoint setup
+
+- [ ] Openssl with let's encrypt
+
+- [ ] Something I'm probably forgetting right now

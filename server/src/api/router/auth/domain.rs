@@ -334,6 +334,7 @@ where
                 )))
             }
         };
+        info!("Resetting password for {user_id}");
         self.cache.delete_token(CacheId::PWToken, pw_token).await?;
         // Create a temporary password
         let (temp_pw, hash) = pw_and_hash()?;
@@ -356,6 +357,7 @@ where
 
     /// Resets the user's password and sends an email with a temporary one. Guarded by a half min throttle.
     async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
+        info!("{} forgot password, sending email", data.email);
         let email = data.email.as_str();
         let user = self.repository.get_user_by_email(email).await?;
         // Check throttle
@@ -403,6 +405,7 @@ where
         &self,
         data: ForgotPasswordVerify,
     ) -> Result<HttpResponse, Error> {
+        info!("Verifying forgot password");
         let (password, token) = (data.password.as_str(), data.token.as_str());
         let user_id = match self
             .cache
@@ -426,6 +429,7 @@ where
 
     /// Deletes the user's current session and if purge is true expires all their sessions
     async fn logout(&self, session: UserSession, data: Logout) -> Result<HttpResponse, Error> {
+        info!("Logging out {}", session.user_name);
         if data.purge {
             self.purge_sessions(&session.user_id, None).await?;
         } else {
@@ -464,8 +468,8 @@ where
         let session_cookie = cookie::create_session(&session.id, false, remember);
         // Delete login attempts on success
         match self.cache.delete_login_attempts(&user.id).await {
-            Ok(_) => info!("Deleted cached login attempts for {}", user.id),
-            Err(_) => info!("No login attempts found for user {}, proceeding", user.id),
+            Ok(_) => debug!("Deleted cached login attempts for {}", user.id),
+            Err(_) => debug!("No login attempts found for user {}, proceeding", user.id),
         };
         // Cache the session
         self.cache
