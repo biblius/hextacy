@@ -74,7 +74,7 @@ The router contains the endpoints of the server. The endpoints provide a compact
   }
   ```
 
-  No implementation details are written here, only the signatures we want our endpoint service to have.
+  No implementation details are written here, only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding to the user with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
 
 - #### **data.rs**
   
