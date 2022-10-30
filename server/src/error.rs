@@ -77,12 +77,10 @@ impl Error {
             /*
              * Adapter
              */
-            Self::Adapter(e) => match e {
-                infrastructure::store::adapters::AdapterError::DoesNotExist(_) => {
-                    ("NOT_FOUND", "Resource does not exist")
-                }
-                _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
-            },
+            Self::Adapter(infrastructure::store::adapters::AdapterError::DoesNotExist(_)) => {
+                ("NOT_FOUND", "Resource does not exist")
+            }
+
             /*
              * Validation
              */

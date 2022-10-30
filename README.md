@@ -6,6 +6,8 @@ This kind of project structure is heavily based on [hexagonal architecture](http
 
 The heart of this repository are the infrastructure and server directories.
 
+--
+
 ## **Infrastructure**
 
 Contains the foundations from which we build our servers. Here you'll find all the database clients, adapters and repositories as well as a bunch of crypto, web and actor helpers.
@@ -216,9 +218,18 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
   This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository.
 
-The benefits of having this kind of architecture start to become clear once you have more complex logic. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
+#### **Middleware**
 
-Middleware has the same structure, it uses repositories and contains it's own domain logic we want to execute when we receive requests for certain endpoints.
+Contains the middleware used by the server for intercepting HTTP requests. The structure is very similar to the router endpoints. If you're interested in a bit more detail about how Actix's middleware works, [here's a nice blog post you can read](https://imfeld.dev/writing/actix-web-middleware). By wrapping resources with middleware we get access to the request before it actually hits the handler. This enables us to append any data to the request for use by the designated handler. Essentially, we have to implement the `Transform` trait for the middleware and the `Service` trait for the actual business logic.
+
+If you take a look at the `auth` middleware you'll notice how our `Transform` implementation, specifically the `new_transform` function returns a future whose output value is a result containing either the `AuthMiddleware` or an `InitError` which is a unit type. If you take a look at the signature for Actix's `wrap` function you can see that we can pass to it anything that implements `Transform`. This means that whenever we want to wrap a resource with a middleware, we have to pass the instantiated `AuthGuard` struct, because that's the one implementing `Transform`.
+If you take an even closer look at what happens in `wrap` you'll see that it triggers `new_transform` internally, meaning the instantiated `AuthGuard` transforms into an `AuthGuardMiddleware` which executes all the business.
+
+The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
+
+--
+
+The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
 
 If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this, it's best to keep the visibility public only at the endpoint directory and this can be achieved with with `pub(in path)` where path is the module where you want it to be visible, e.g. for one level of nesting it would be `pub(in super::super)`
 
@@ -249,7 +260,7 @@ We would then pass this function to our server setup.
     .await
 ```
 
-Obviously a real project would have much more routes and passing everything to one function would be crazy, so we would seperate that into some kind of `configure` module where we'd set up all our clients and call that function instead of initializing everything in `main.rs`.
+Obviously a real project would have much more routes and passing all the arcs to one function would be crazy, so we would seperate that into a `configure.rs` module where we'd set up all our clients and call that function instead of initializing everything in `main.rs`.
 
 The helpers module contains various helper functions usable throughout the server.
 

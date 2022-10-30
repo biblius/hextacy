@@ -9,7 +9,11 @@ fn main() {
 
     for l in env_file.lines() {
         if let Some(i) = l.find('=') {
-            writeln!(example, "{}", l.split_at(i + 1).0).unwrap();
+            if l.contains("_URL") {
+                writeln!(example, "{}", l).unwrap();
+            } else {
+                writeln!(example, "{}", l.split_at(i + 1).0).unwrap();
+            }
         } else {
             writeln!(example, "{}", l).unwrap();
         }

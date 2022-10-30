@@ -1,19 +1,14 @@
 mod api;
+mod configure;
 mod error;
 mod helpers;
 
 use actix_web::{middleware::Logger, App, HttpServer};
-use api::router;
 use infrastructure::{
-    clients::{
-        email,
-        store::{postgres::Postgres, redis::Redis},
-    },
     config::{env, logger},
     web::http,
 };
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
-use std::sync::Arc;
 use tracing::info;
 
 #[actix_web::main]
@@ -22,15 +17,6 @@ async fn main() -> std::io::Result<()> {
 
     logger::init("debug");
     // logger::init_file("debug", "server.log");
-
-    let pg = Arc::new(Postgres::new());
-    info!("Postgres pool initialized");
-
-    let rd = Arc::new(Redis::new());
-    info!("Redis pool initialized");
-
-    let email_client = Arc::new(email::build_client());
-    info!("Email client initialized");
 
     let (host, port) = (
         env::get_or_default("HOST", "0.0.0.0"),
@@ -50,7 +36,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .configure(|cfg| router::init(pg.clone(), rd.clone(), email_client.clone(), cfg))
+            .configure(configure::configure)
             .wrap(http::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
             .wrap(http::security_headers::default())
             .wrap(Logger::default())
