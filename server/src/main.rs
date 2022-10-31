@@ -18,6 +18,9 @@ async fn main() -> std::io::Result<()> {
     logger::init("debug");
     // logger::init_file("debug", "server.log");
 
+    // Init all the lazy loaded static stuff
+    helpers::lazy::initialize();
+
     let (host, port) = (
         env::get_or_default("HOST", "0.0.0.0"),
         env::get_or_default("PORT", "8080"),

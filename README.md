@@ -36,7 +36,11 @@ Contains structures implementing client specific behaviour such as connecting to
 
 Module containing an implementation of a basic broadcastable message and a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
-The rest is a bunch of helpers that don't require that much explanation. We have the **config** directory which just loads and sets environment variables, the **crypto** directory containing cryptographic utilities for encrypting, signing and generating tokens and the **web** directory containing various helpers and utilities for HTTP and websockets. The most notable modules from **web** are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)), the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response and a websocket actor useful for maintaing a websocket session.
+### **Services**
+
+Contains services usable throughout the whole project.
+
+The rest is a bunch of helpers that don't require that much explanation. We have the **config** directory (which contains the `env` and `logger` modules used for manipulating the env and logging, respectively), the **crypto** directory containing cryptographic utilities for encrypting, signing and generating tokens and the **web** directory containing various helpers and utilities for HTTP and websockets. The most notable modules from **web** are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)), the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response and a websocket actor useful for maintaing a websocket session.
 
 ## **Server**
 
@@ -225,14 +229,12 @@ If you take an even closer look at what happens in `wrap` you'll see that it tri
 
 The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
 
-#### **Configure**
+### **Configure**
 
 We tie all our handlers together in the `configure.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
 
 ```rust
-pub(super) fn configure(
-    cfg: &mut ServiceConfig,
-) {
+pub(super) fn configure(cfg: &mut ServiceConfig) {
     let pg = Arc::new(Postgres::new());
 
     users::setup::routes(pg, cfg);
@@ -243,8 +245,6 @@ pub(super) fn configure(
 We would then pass this function to our server setup.
 
 ```rust
-  let pg = Arc::new(Postgres::new());
-
     HttpServer::new(move || {
         App::new()
             .configure(configure::configure)
@@ -260,6 +260,65 @@ The helpers module contains various helper functions usable throughout the serve
 The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
 
 If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this. It's best to keep everything scoped at the endpoint level except for `setup.rs`, which should be scoped at `api` level since we need it in `configure.rs`.
+
+## **Mocking**
+
+Mocking allows us to test the business logic of our domains. With this type of architecture mocking is easy and efficient as it contains almost no implementation details. In mock tests we utilize the [mockall](https://docs.rs/mockall/latest/mockall/) crate. This crate allows us to instantiate our services with mock versions of our `Contract` implementations. To understand what's going on when we use mockall it's best to see an example:
+
+  To mock our service and repository contracts we have to annotate them with the `automock` attribute
+
+  ```rust
+  #[cfg_attr(test, mockall::automock)]
+  #[async_trait]
+  pub(super) trait ServiceContract {
+    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
+  }
+  ```
+
+  The same applies for the `RepositoryContract`. The `cfg_attr` with the test flag means these mock implementations will only be available in a `#[cfg(test)]` module.
+
+  Our mocks are located in the `mod.rs` file of an endpoint. Here we define what we *expect* to happen once an endpoint function triggers. For our simple paginated users function this would look like:
+
+  ```rust
+  let mut repository = MockRepositoryContract::new();
+
+  repository.expect_get_paginated().return_once(|_,_| Ok(vec![MOCK_USER.clone()]));
+
+  let data = GetUsersPaginated {
+    page: 1,
+    per_page: 25
+  };
+
+  let service = UserService { repository };
+  service.get_paginated(data).await.unwrap();
+  ```
+
+  We instantiate a mock repository and set an expectation. In our simple handler we only expect the repository to get a paginated list of users so that's the only thing we have to expect. When a service's function contains multiple calls to its infrastructure contracts we would expect them all in the test.
+  Notice also that we instantiated the real deal service at the end and not a mock one.
+  
+  If the service also has calls to itself (i.e. `self.do_something()` as opposed to `self.repository.do_something()`), we would have to mock the service contract as well and expect everything that would get triggered in the function call.
+
+  The `MOCK_USER` is a static lazy loaded `User` struct which we can reuse in our tests to prevent us from having to instantiate a user in every test.
+
+  The beauty here is that we can return anything in our expectations so long as it matches the contract's signature. For example, since `get_paginated` returns a result, instead of returning an OK vec with MOCK_USER, we could have just as easily returned an error
+
+  ```rust
+  repository.expect_get_paginated().return_once(|_,_| Err(Error::/* Some error */));
+  ```
+
+  which would then trigger flows which would happen if the function actually errored in runtime.
+
+  For the first example we can just unwrap the result since our test would fail if it was an error and we'd know something's wrong. For the second example we can even inspect and assert that we got the right error:
+
+  ```rust
+  let result = service.get_paginated(data).await;
+  match result {
+    Ok(_) => panic!("Should not have happened"),
+    Err(e) => assert!(matches!(e, Error::/* Some error */)),
+  }
+  ```
+
+  Just keep in mind that the errors returned by the service will be the ones you specify in the domain.
 
 ## **Authentication flow**
 
