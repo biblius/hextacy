@@ -17,7 +17,7 @@ pub(super) fn configure(cfg: &mut ServiceConfig) {
     let email_client = Arc::new(email::build_client());
     info!("Email client initialized");
 
-    router::auth::setup::routes(pg.clone(), rd.clone(), email_client.clone(), cfg);
+    router::auth::setup::routes(pg.clone(), rd.clone(), email_client, cfg);
     router::users::setup::routes(pg.clone(), rd.clone(), cfg);
     router::health::route(pg, rd, cfg);
     router::resources::setup::routes(cfg);

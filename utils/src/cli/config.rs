@@ -7,31 +7,22 @@ use crate::error::AlxError;
 
 const INDENT: &str = "    ";
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct ProjectConfig {
     pub endpoints: Vec<Endpoint>,
     pub middleware: Option<Vec<Middleware>>,
 }
 
 impl ProjectConfig {
-    pub fn parse(yaml: String) -> Result<Self, AlxError> {
+    pub fn _parse(yaml: String) -> Result<Self, AlxError> {
         let config = serde_yaml::from_str::<Self>(&yaml)?;
         Ok(config)
     }
 
-    pub fn write_config_lock(&self) -> Result<(), AlxError> {
+    pub fn _write_config_lock(&self) -> Result<(), AlxError> {
         let config = serde_yaml::to_string(self)?;
         fs::write(Path::new("./alx_lock.yaml"), config)?;
         Ok(())
-    }
-}
-
-impl Default for ProjectConfig {
-    fn default() -> Self {
-        Self {
-            endpoints: Default::default(),
-            middleware: Default::default(),
-        }
     }
 }
 
@@ -71,20 +62,11 @@ pub enum Endpoint {
 }
 /// Defines a group of enpoints under a shared namespace defined by `name`, with at least one resource.
 /// Wrapping a scope with a `Middleware` or `Guard` will wrap all the scope's resources with the defined mw/guard.
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Scope {
     pub name: String,
     pub resources: Vec<Resource>,
     pub middleware: Option<Vec<String>>,
-}
-impl Default for Scope {
-    fn default() -> Self {
-        Self {
-            name: Default::default(),
-            resources: Default::default(),
-            middleware: Default::default(),
-        }
-    }
 }
 
 /// Defines a single endpoint with at least one route.

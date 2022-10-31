@@ -83,7 +83,7 @@ pub fn main() {
         Command::Analyze | Command::Anal => {
             let mut pc = ProjectConfig::default();
             let path = Path::new(DEFAULT_PATH);
-            router_read_recursive(&mut pc, &path, &populate_config).unwrap();
+            router_read_recursive(&mut pc, path, &populate_config).unwrap();
             println!("CONFIG: \n{}", pc);
         }
     }

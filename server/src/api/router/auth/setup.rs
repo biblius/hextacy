@@ -98,7 +98,7 @@ pub(crate) fn routes(
                     .route(web::post().to(handler::logout::<
                         Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
                     >))
-                    .wrap(guard.clone()),
+                    .wrap(guard),
             ),
     );
 }
