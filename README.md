@@ -4,9 +4,7 @@ This repo is deisgned to quick start web server development with [actix_web](htt
 
 This kind of project structure is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
-The heart of this repository are the infrastructure and server directories.
-
---
+The heart of this starter are the infrastructure and server directories.
 
 ## **Infrastructure**
 
@@ -26,7 +24,7 @@ The most interesting here is the store module, where the said data sources are l
 
 - #### **Models**
 
-  This is where application models are located. These aren't necessarily meant to be stored in databases and serve as utility structures for responses, the cache and intermediary data that can be used across the project.
+  Where application models are located. These aren't necessarily meant to be stored in databases and serve as utility structures for responses, the cache and intermediary data that can be used across the project.
 
 The store adapters utilize connections established from the clients module:
 
@@ -227,19 +225,16 @@ If you take an even closer look at what happens in `wrap` you'll see that it tri
 
 The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
 
---
+#### **Configure**
 
-The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
-
-If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this, it's best to keep the visibility public only at the endpoint directory and this can be achieved with with `pub(in path)` where path is the module where you want it to be visible, e.g. for one level of nesting it would be `pub(in super::super)`
-
-We tie all our handlers together in the `mod.rs` file of the router. With only this one endpoint it would look something like:
+We tie all our handlers together in the `configure.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
 
 ```rust
-pub fn init(
-    pg: Arc<Postgres>,
+pub(super) fn configure(
     cfg: &mut ServiceConfig,
 ) {
+    let pg = Arc::new(Postgres::new());
+
     users::setup::routes(pg, cfg);
 }
 
@@ -252,7 +247,7 @@ We would then pass this function to our server setup.
 
     HttpServer::new(move || {
         App::new()
-            .configure(|cfg| router::init(pg.clone(), cfg))
+            .configure(configure::configure)
             .wrap(Logger::default())
     })
     .bind_openssl(addr, builder)?
@@ -260,9 +255,11 @@ We would then pass this function to our server setup.
     .await
 ```
 
-Obviously a real project would have much more routes and passing all the arcs to one function would be crazy, so we would seperate that into a `configure.rs` module where we'd set up all our clients and call that function instead of initializing everything in `main.rs`.
-
 The helpers module contains various helper functions usable throughout the server.
+
+The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
+
+If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this. It's best to keep everything scoped at the endpoint level except for `setup.rs`, which should be scoped at `api` level since we need it in `configure.rs`.
 
 ## **Authentication flow**
 
@@ -274,7 +271,7 @@ There is a predefined route for setting a user's OTP secret, a session must be e
 
 Users can change their password and logout only if they have an established session. If a user changes their password they receive an email notifying them of the change with a password reset token in case it wasn't them, the PW reset token lasts for 2 days. On logout a user can purge all of their sessions.
 
-Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it they .
+Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established.
 
 ## **CLI Tool**
 

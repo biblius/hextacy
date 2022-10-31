@@ -14,7 +14,6 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
             user_repo: PgUserAdapter { client: pg.clone() },
         },
     };
-
     let guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 
     cfg.app_data(Data::new(service));

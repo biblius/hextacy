@@ -71,10 +71,6 @@ sha2 = "0.10.6"
 jsonwebtoken = "8.1.1"
 thotp = "0.1.11"
 
-# Validation
-
-regex = "1.6.0"
-
 # Utility and pretty
 
 async-trait = "0.1.42"

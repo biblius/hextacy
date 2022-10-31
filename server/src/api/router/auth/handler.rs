@@ -25,7 +25,7 @@ pub(super) async fn login<T: ServiceContract>(
 /// Starts the registration process for the user and sends an email containing a temporary
 /// token used to complete the registration
 pub(super) async fn start_registration<T: ServiceContract>(
-    data: web::Form<RegistrationData>,
+    data: web::Json<RegistrationData>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     data.0.validate().map_err(Error::new)?;

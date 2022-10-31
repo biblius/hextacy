@@ -1,8 +1,6 @@
+use crate::helpers::lazy::validation::EMAIL_REGEX;
 use derive_new::new;
-use infrastructure::{
-    store::repository::user::User,
-    web::{http::response::Response, validation::EMAIL_REGEX},
-};
+use infrastructure::{store::repository::user::User, web::http::response::Response};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use validator::Validate;

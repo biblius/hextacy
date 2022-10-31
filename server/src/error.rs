@@ -8,7 +8,7 @@ use thiserror::{self, Error};
 use validator::{ValidationError, ValidationErrors};
 
 #[derive(Debug, Error)]
-pub enum Error {
+pub(crate) enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
@@ -196,7 +196,7 @@ impl Display for ErrorResponse<'_> {
 }
 
 #[derive(Debug, Error)]
-pub enum AuthenticationError {
+pub(crate) enum AuthenticationError {
     #[error("Session not found")]
     Unauthenticated,
     #[error("Invalid credentials")]

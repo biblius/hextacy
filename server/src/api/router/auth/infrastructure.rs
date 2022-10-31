@@ -4,10 +4,10 @@ use crate::{error::Error, helpers::cache::CacheId};
 use async_trait::async_trait;
 use chrono::Utc;
 
-use infrastructure::clients::email;
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
 use infrastructure::config::constants::OTP_THROTTLE_DURATION_SECONDS;
+use infrastructure::services::email;
 use infrastructure::store::adapters::postgres::PgAdapterError;
 use infrastructure::store::adapters::AdapterError;
 use infrastructure::store::models::user_session::UserSession;
