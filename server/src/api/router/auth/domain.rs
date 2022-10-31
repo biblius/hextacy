@@ -3,7 +3,7 @@ use super::{
     data::{
         AuthenticationSuccessResponse, ChangePassword, Credentials, EmailToken, ForgotPassword,
         ForgotPasswordVerify, FreezeAccountResponse, Logout, Otp, RegistrationData,
-        RegistrationStartResponse, ResetPassword, TwoFactorAuthResponse,
+        RegistrationStartResponse, ResendRegToken, ResetPassword, TwoFactorAuthResponse,
     },
 };
 use crate::{
@@ -229,7 +229,8 @@ where
     }
 
     /// Resends a registration token to the user if they are not already verified
-    async fn resend_registration_token(&self, email: &str) -> Result<HttpResponse, Error> {
+    async fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
+        let email = data.email.as_str();
         info!("Resending registration token to {email}");
         let user = self.repository.get_user_by_email(email).await?;
         if user.email_verified_at.is_some() {
@@ -237,7 +238,7 @@ where
         }
         if self
             .cache
-            .get_token::<i64>(CacheId::EmailThrottle, &user.id)
+            .get_token::<i32>(CacheId::EmailThrottle, &user.id)
             .await
             .ok()
             .is_some()
@@ -258,7 +259,7 @@ where
             .await?;
         self.cache
             .set_token(
-                CacheId::OTPThrottle,
+                CacheId::EmailThrottle,
                 &user.id,
                 &1,
                 Some(EMAIL_THROTTLE_DURATION_SECONDS),
@@ -363,7 +364,7 @@ where
         // Check throttle
         if self
             .cache
-            .get_token::<i64>(CacheId::EmailThrottle, &user.id)
+            .get_token::<i32>(CacheId::EmailThrottle, &user.id)
             .await
             .ok()
             .is_some()
@@ -421,9 +422,7 @@ where
             .repository
             .update_user_password(&user_id, &hashed)
             .await?;
-
         self.purge_sessions(&user.id, None).await?;
-
         self.session_response(user, false).await
     }
 

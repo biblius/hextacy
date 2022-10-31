@@ -68,7 +68,7 @@ impl UserRepository for PgUserAdapter {
             .load::<User>(&mut self.client.connect()?)
             .map_err(Self::Error::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
     }
 
     /// Sets the user's frozen flag to true
@@ -79,7 +79,7 @@ impl UserRepository for PgUserAdapter {
             .load::<User>(&mut self.client.connect()?)
             .map_err(Self::Error::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
     }
 
     /// Updates the user's OTP secret to the given key
@@ -90,7 +90,7 @@ impl UserRepository for PgUserAdapter {
             .load::<User>(&mut self.client.connect()?)
             .map_err(Self::Error::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
     }
 
     /// Sets the user's frozen flag to true
@@ -101,7 +101,7 @@ impl UserRepository for PgUserAdapter {
             .load::<User>(&mut self.client.connect()?)
             .map_err(Self::Error::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("User ID: {user_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
     }
 
     /// Returns the total count of users and a vec of users constrained by the options as

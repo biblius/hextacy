@@ -2,7 +2,7 @@ use super::{
     contract::ServiceContract,
     data::{
         ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
-        RegistrationData, ResetPassword,
+        RegistrationData, ResendRegToken, ResetPassword,
     },
 };
 use crate::error::Error;
@@ -41,6 +41,16 @@ pub(super) async fn verify_registration_token<T: ServiceContract>(
     token.0.validate().map_err(Error::new)?;
     info!("Verify registration token: {:?}", token);
     service.verify_registration_token(token.0).await
+}
+
+/// Resend the user's registration token in case it expired
+pub(super) async fn resend_registration_token<T: ServiceContract>(
+    data: web::Json<ResendRegToken>,
+    service: web::Data<T>,
+) -> Result<impl Responder, Error> {
+    data.0.validate().map_err(Error::new)?;
+    info!("Resend registration token: {:?}", data.0.email);
+    service.resend_registration_token(data.0).await
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand

@@ -85,7 +85,7 @@ impl SessionRepository for PgSessionAdapter {
             .load::<Session>(&mut self.client.connect()?)
             .map_err(PgAdapterError::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("Session ID: {session_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()))
     }
 
     /// Updates the sessions `expires_at` field to now
@@ -98,7 +98,7 @@ impl SessionRepository for PgSessionAdapter {
             .load::<Session>(&mut self.client.connect()?)
             .map_err(PgAdapterError::new)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist(format!("Session ID: {session_id}")))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()))
     }
 
     /// Updates all user related sessions' `expires_at` field to now

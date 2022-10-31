@@ -29,6 +29,13 @@ pub(super) struct RegistrationData {
 }
 
 #[derive(Debug, Deserialize, Validate)]
+/// Received when resending reg token
+pub(super) struct ResendRegToken {
+    #[validate(regex = "EMAIL_REGEX")]
+    pub email: String,
+}
+
+#[derive(Debug, Deserialize, Validate)]
 /// Received when verifying a one time password
 pub(super) struct Otp {
     #[validate(length(min = 1))]

@@ -1,5 +1,5 @@
 mod api;
-mod configure;
+pub mod configure;
 mod error;
 mod helpers;
 

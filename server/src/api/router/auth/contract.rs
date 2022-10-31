@@ -1,6 +1,6 @@
 use super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
-    RegistrationData, ResetPassword,
+    RegistrationData, ResendRegToken, ResetPassword,
 };
 
 use crate::{error::Error, helpers::cache::CacheId};
@@ -25,7 +25,7 @@ pub(super) trait ServiceContract {
     /// Verify the registration token.
     async fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error>;
     /// Resend a registration token in case the user's initial one expired.
-    async fn resend_registration_token(&self, user_id: &str) -> Result<HttpResponse, Error>;
+    async fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error>;
     /// Set the user's OTP secret and enable 2FA for the user. Send a QR code of the secret in the
     /// response. Requires an established session beforehand as it is not idempotent, meaning
     /// it will generate a new OTP secret every time this URL is called.

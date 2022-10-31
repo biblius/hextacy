@@ -1,6 +1,6 @@
-mod auth;
+pub(crate) mod auth;
 mod health_check;
-mod users;
+pub(crate) mod users;
 
 use actix_web::web::{self, ServiceConfig};
 use infrastructure::clients::{

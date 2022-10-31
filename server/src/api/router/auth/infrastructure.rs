@@ -138,7 +138,7 @@ where
         self.session_repo
             .purge(user_id, skip)
             .await
-            .map_err(|_| AdapterError::DoesNotExist(format!("User ID: {user_id}")).into())
+            .map_err(|_| AdapterError::DoesNotExist("User".to_string()).into())
     }
 }
 

@@ -15,7 +15,7 @@ use infrastructure::{
 };
 use std::sync::Arc;
 
-pub(in super::super) fn routes(
+pub(crate) fn routes(
     pg: Arc<Postgres>,
     rd: Arc<Redis>,
     email: Arc<SmtpTransport>,
@@ -67,6 +67,15 @@ pub(in super::super) fn routes(
     cfg.service(
         web::resource("/auth/verify-registration-token").route(web::get().to(
             handler::verify_registration_token::<
+                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+            >,
+        )),
+    );
+
+    // Verify registration token
+    cfg.service(
+        web::resource("/auth/resend-registration-token").route(web::post().to(
+            handler::resend_registration_token::<
                 Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
             >,
         )),

@@ -15,7 +15,7 @@ pub enum Error {
     ClientError(#[from] infrastructure::clients::ClientError),
     #[error("Cache Error: {0}")]
     Cache(#[from] crate::helpers::cache::CacheError),
-    #[error("Pg adapter Error: {0}")]
+    #[error("Adapter Error: {0}")]
     Adapter(#[from] infrastructure::store::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
@@ -51,41 +51,63 @@ impl Error {
     }
 
     /// Returns error message and description
-    pub fn message_and_description(&self) -> (&'static str, &'static str) {
+    pub fn message_and_description(&self) -> (&'static str, String) {
         match self {
             /*
              * Authentication
              */
             Self::Authentication(e) => match e {
-                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session"),
-                AuthenticationError::InvalidCsrfHeader => ("UNAUTHORIZED", "Invalid CSRF header"),
-                AuthenticationError::InvalidCredentials => ("UNAUTHORIZED", "Invalid credentials"),
-                AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided"),
-                AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
-                AuthenticationError::EmailTaken => ("EMAIL_TAKEN", "Cannot use provided email"),
-                AuthenticationError::EmailUnverified => ("UNVERIFIED", "Email not verified"),
-                AuthenticationError::AuthBlocked => ("BLOCKED", "Authentication currently blocked"),
-                AuthenticationError::AlreadyVerified => ("VERIFIED", "Account already verified"),
-                AuthenticationError::InsufficientRights => ("FORBIDDEN", "Insufficient rights"),
+                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session".to_string()),
+                AuthenticationError::InvalidCsrfHeader => {
+                    ("UNAUTHORIZED", "Invalid CSRF header".to_string())
+                }
+                AuthenticationError::InvalidCredentials => {
+                    ("UNAUTHORIZED", "Invalid credentials".to_string())
+                }
+                AuthenticationError::InvalidOTP => {
+                    ("UNAUTHORIZED", "Invalid OTP provided".to_string())
+                }
+                AuthenticationError::AccountFrozen => {
+                    ("SUSPENDED", "Account suspended".to_string())
+                }
+                AuthenticationError::EmailTaken => {
+                    ("EMAIL_TAKEN", "Cannot use provided email".to_string())
+                }
+                AuthenticationError::EmailUnverified => {
+                    ("UNVERIFIED", "Email not verified".to_string())
+                }
+                AuthenticationError::AuthBlocked => {
+                    ("BLOCKED", "Authentication currently blocked".to_string())
+                }
+                AuthenticationError::AlreadyVerified => {
+                    ("VERIFIED", "Account already verified".to_string())
+                }
+                AuthenticationError::InsufficientRights => {
+                    ("FORBIDDEN", "Insufficient rights".to_string())
+                }
                 AuthenticationError::InvalidToken(id) => match id {
-                    CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
-                    CacheId::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
-                    CacheId::PWToken => ("INVALID_TOKEN", "Invalid password change token"),
-                    _ => ("INVALID_TOKEN", "Token not found"),
+                    CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
+                    CacheId::RegToken => {
+                        ("INVALID_TOKEN", "Invalid registration token".to_string())
+                    }
+                    CacheId::PWToken => {
+                        ("INVALID_TOKEN", "Invalid password change token".to_string())
+                    }
+                    _ => ("INVALID_TOKEN", "Token not found".to_string()),
                 },
             },
             /*
              * Adapter
              */
-            Self::Adapter(infrastructure::store::adapters::AdapterError::DoesNotExist(_)) => {
-                ("NOT_FOUND", "Resource does not exist")
+            Self::Adapter(infrastructure::store::adapters::AdapterError::DoesNotExist(r)) => {
+                ("NOT_FOUND", format!("Resource does not exist: {}", r))
             }
 
             /*
              * Validation
              */
-            Self::Validation(_) => ("VALIDATION", "Invalid input"),
-            _ => ("INTERNAL_SERVER_ERROR", "Internal server error"),
+            Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),
+            _ => ("INTERNAL_SERVER_ERROR", "Internal server error".to_string()),
         }
     }
 
@@ -134,7 +156,7 @@ impl ResponseError for Error {
         let (message, description) = self.message_and_description();
         let validation_errors = self.check_validation_errors();
         let error_response =
-            ErrorResponse::new(status.as_u16(), description, message, validation_errors);
+            ErrorResponse::new(status.as_u16(), message, &description, validation_errors);
         Response::new(status).json(error_response)
     }
 }
@@ -150,8 +172,8 @@ pub struct ErrorResponse<'a> {
 impl<'a> ErrorResponse<'a> {
     pub fn new(
         code: u16,
-        description: &'a str,
         message: &'a str,
+        description: &'a str,
         validation_errors: Option<Vec<ValidationError>>,
     ) -> Self {
         Self {
