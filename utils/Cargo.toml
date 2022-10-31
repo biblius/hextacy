@@ -13,3 +13,6 @@ path = "src/cli/main.rs"
 
 [dependencies]
 clap = { version = "4.0.18", features = ["derive"] }
+serde_yaml = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0.37"

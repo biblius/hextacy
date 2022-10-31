@@ -20,5 +20,5 @@ pub(super) fn configure(cfg: &mut ServiceConfig) {
     router::auth::setup::routes(pg.clone(), rd.clone(), email_client.clone(), cfg);
     router::users::setup::routes(pg.clone(), rd.clone(), cfg);
     router::health::route(pg, rd, cfg);
-    router::resources::favicon::route(cfg);
+    router::resources::setup::routes(cfg);
 }

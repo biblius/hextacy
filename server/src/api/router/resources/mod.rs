@@ -1,1 +1,2 @@
-pub(crate) mod favicon;
+pub mod favicon;
+pub mod setup;

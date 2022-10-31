@@ -1,9 +1,18 @@
-mod args;
-use crate::args::{Command, MiddlewareSubcommand, RouteSubcommand};
-use args::AlxArgs;
+mod commands;
+mod config;
+mod error;
+
+use crate::commands::analyze::{populate_config, router_read_recursive};
+use crate::commands::mw::MiddlewareSubcommand;
+use crate::commands::route::RouteSubcommand;
+use crate::commands::Command;
+use crate::config::ProjectConfig;
 use clap::Parser;
+use commands::AlxArgs;
 use std::fmt::Write;
 use std::{fs, path::Path};
+
+const DEFAULT_PATH: &str = "server/src/api/router";
 
 const FILES: [&str; 7] = [
     "contract",
@@ -22,7 +31,7 @@ pub fn main() {
     match args.command {
         Command::Route(cmd) | Command::R(cmd) => match cmd.command {
             RouteSubcommand::Gen(route) | RouteSubcommand::G(route) => {
-                let mut path = format!("server/src/api/router/{}", route.name);
+                let mut path = format!("{}/{}", DEFAULT_PATH, route.name);
                 if let Some(ref p) = route.path {
                     path = format!("{}/{}", p, route.name)
                 }
@@ -71,5 +80,11 @@ pub fn main() {
             MiddlewareSubcommand::Gen(_) | MiddlewareSubcommand::G(_) => todo!(),
             MiddlewareSubcommand::AddContract(_) | MiddlewareSubcommand::AC(_) => todo!(),
         },
+        Command::Analyze | Command::Anal => {
+            let mut pc = ProjectConfig::default();
+            let path = Path::new(DEFAULT_PATH);
+            router_read_recursive(&mut pc, &path, &populate_config).unwrap();
+            println!("CONFIG: \n{}", pc);
+        }
     }
 }

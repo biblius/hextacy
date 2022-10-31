@@ -30,95 +30,75 @@ pub(crate) fn routes(
         email: Email { client: email },
     };
     let guard = interceptor::AuthGuard::new(pg, rd, Role::User);
-
     cfg.app_data(Data::new(service));
-
-    // Initial registration
-    cfg.service(web::resource("/auth/register").route(web::post().to(
-        handler::start_registration::<
-            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-        >,
-    )));
-
-    // Credentials login
     cfg.service(
-        web::resource("/auth/login").route(web::post().to(handler::login::<
-            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-        >)),
-    );
-
-    // Logout
-    cfg.service(
-        web::resource("/auth/logout")
-            .route(web::post().to(handler::logout::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >))
-            .wrap(guard.clone()),
-    );
-
-    // OTP login
-    cfg.service(
-        web::resource("/auth/verify-otp").route(web::post().to(handler::verify_otp::<
-            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-        >)),
-    );
-
-    // Verify registration token
-    cfg.service(
-        web::resource("/auth/verify-registration-token").route(web::get().to(
-            handler::verify_registration_token::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >,
-        )),
-    );
-
-    // Verify registration token
-    cfg.service(
-        web::resource("/auth/resend-registration-token").route(web::post().to(
-            handler::resend_registration_token::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >,
-        )),
-    );
-
-    // Change password
-    cfg.service(
-        web::resource("/auth/change-password")
-            .route(web::post().to(handler::change_password::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >))
-            .wrap(guard.clone()),
-    );
-
-    // Forgot password
-    cfg.service(web::resource("/auth/forgot-password").route(web::post().to(
-        handler::forgot_password::<
-            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-        >,
-    )));
-
-    // Verify forgot password
-    cfg.service(
-        web::resource("/auth/verify-forgot-password").route(web::post().to(
-            handler::verify_forgot_password::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >,
-        )),
-    );
-
-    // Reset password
-    cfg.service(web::resource("/auth/reset-password").route(web::get().to(
-        handler::reset_password::<
-            Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-        >,
-    )));
-
-    // Set otp
-    cfg.service(
-        web::resource("/auth/set-otp")
-            .route(web::get().to(handler::set_otp_secret::<
-                Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
-            >))
-            .wrap(guard),
+        web::scope("/auth")
+            .service(
+                web::resource("/login").route(web::post().to(handler::login::<
+                    Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                >)),
+            )
+            .service(web::resource("/register").route(web::post().to(
+                handler::start_registration::<
+                    Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                >,
+            )))
+            .service(
+                web::resource("/verify-registration-token").route(web::get().to(
+                    handler::verify_registration_token::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >,
+                )),
+            )
+            .service(
+                web::resource("/resend-registration-token").route(web::post().to(
+                    handler::resend_registration_token::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >,
+                )),
+            )
+            .service(
+                web::resource("/set-otp")
+                    .route(web::get().to(handler::set_otp_secret::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >))
+                    .wrap(guard.clone()),
+            )
+            .service(
+                web::resource("/verify-otp").route(web::post().to(handler::verify_otp::<
+                    Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                >)),
+            )
+            .service(
+                web::resource("/change-password")
+                    .route(web::post().to(handler::change_password::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >))
+                    .wrap(guard.clone()),
+            )
+            .service(web::resource("/forgot-password").route(web::post().to(
+                handler::forgot_password::<
+                    Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                >,
+            )))
+            .service(
+                web::resource("/verify-forgot-password").route(web::post().to(
+                    handler::verify_forgot_password::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >,
+                )),
+            )
+            .service(web::resource("/reset-password").route(web::get().to(
+                handler::reset_password::<
+                    Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                >,
+            )))
+            .service(
+                web::resource("/logout")
+                    .route(web::post().to(handler::logout::<
+                        Authentication<Repository<PgUserAdapter, PgSessionAdapter>, Cache, Email>,
+                    >))
+                    .wrap(guard.clone()),
+            ),
     );
 }
