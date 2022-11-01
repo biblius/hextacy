@@ -2,7 +2,7 @@ mod commands;
 mod config;
 mod error;
 
-use crate::commands::analyze::{populate_config, router_read_recursive};
+use crate::commands::analyze::{parse, router_read_recursive};
 use crate::commands::mw::MiddlewareSubcommand;
 use crate::commands::route::RouteSubcommand;
 use crate::commands::Command;
@@ -81,10 +81,11 @@ pub fn main() {
             MiddlewareSubcommand::AddContract(_) | MiddlewareSubcommand::AC(_) => todo!(),
         },
         Command::Analyze | Command::Anal => {
-            let mut pc = ProjectConfig::default();
             let path = Path::new(DEFAULT_PATH);
-            router_read_recursive(&mut pc, path, &populate_config).unwrap();
-            println!("CONFIG: \n{}", pc);
+            let mut pc = ProjectConfig::default();
+            router_read_recursive(path, &mut pc, &parse).unwrap();
+            println!("{pc}");
+            pc._write_config_lock().unwrap();
         }
     }
 }

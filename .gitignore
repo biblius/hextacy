@@ -10,3 +10,4 @@ server.log
 /openssl/key.pem
 
 .DS_Store
+alx_lock.yaml

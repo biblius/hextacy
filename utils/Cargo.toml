@@ -16,3 +16,7 @@ clap = { version = "4.0.18", features = ["derive"] }
 serde_yaml = "0.9"
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
+syn = { version = "1.0.103", features = ["full", "extra-traits"] }
+colored = "2.0.0"
+derive-new = "0.5.9"
+env_logger = "0.9.1"
