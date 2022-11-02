@@ -1,8 +1,8 @@
-pub(crate) mod analyze;
 pub(crate) mod mw;
 pub(crate) mod route;
 
 use self::{mw::MiddlewareCommand, route::RouteCommand};
+use crate::analyze::AnalyzeOptions;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -24,6 +24,6 @@ pub(crate) enum Command {
     MW(MiddlewareCommand),
 
     /// Analyze the router directory and generate an alx.yaml file
-    Analyze,
-    Anal,
+    Analyze(AnalyzeOptions),
+    Anal(AnalyzeOptions),
 }

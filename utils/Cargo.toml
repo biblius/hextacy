@@ -9,7 +9,7 @@ path = "src/bin/envex.rs"
 
 [[bin]]
 name = "alx"
-path = "src/cli/main.rs"
+path = "src/alx/main.rs"
 
 [dependencies]
 clap = { version = "4.0.18", features = ["derive"] }
@@ -18,5 +18,5 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.37"
 syn = { version = "1.0.103", features = ["full", "extra-traits"] }
 colored = "2.0.0"
-derive-new = "0.5.9"
 env_logger = "0.9.1"
+serde_json = "1.0.87"

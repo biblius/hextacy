@@ -42,6 +42,8 @@ Contains services usable throughout the whole project.
 
 The rest is a bunch of helpers that don't require that much explanation. We have the **config** directory (which contains the `env` and `logger` modules used for manipulating the env and logging, respectively), the **crypto** directory containing cryptographic utilities for encrypting, signing and generating tokens and the **web** directory containing various helpers and utilities for HTTP and websockets. The most notable modules from **web** are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)), the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response and a websocket actor useful for maintaing a websocket session.
 
+The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits our needs better.
+
 ## **Server**
 
 The main binary. Contains the domain logic and the request handlers.
@@ -322,15 +324,23 @@ Mocking allows us to test the business logic of our domains. With this type of a
 
 ## **Authentication flow**
 
-The user is expected to enter their email and password after which an email with a registration token gets sent. Users can request another token if their token expires. Once the user verifies their registration they must log in, after which they will receive a session ID cookie and a CSRF token in the header.
+The user is expected to enter their email and password after which an email with a registration token gets sent (`start_registration`).
+
+Users can request another token if their token expires (`resend_registration_token`).
+
+Once the user verifies their registration token they must log in, after which they will receive a session ID cookie and a CSRF token in the header (`verify_registration_token`, `login`).
 
 The cookie and token are then used by the middleware to authenticate the user when accessing protected resources. It does so by grabbing both from the request and trying to fetch a session first from the cache, then if that fails from postgres. The session is searched for by ID and must be unexpired and have a matching csrf token, otherwise the middleware will error.
 
-There is a predefined route for setting a user's OTP secret, a session must be established to do so. When a user sets their OTP secret they have to provide a valid OTP after successfully verifying credentials or they won't be able to establish a session.
+A route exists for setting a user's OTP secret and a session must be established to access it (`set_otp_secret`).
 
-Users can change their password and logout only if they have an established session. If a user changes their password they receive an email notifying them of the change with a password reset token in case it wasn't them, the PW reset token lasts for 2 days. On logout a user can purge all of their sessions.
+When a user sets their OTP secret they have to provide a valid OTP after successfully verifying credentials or they won't be able to establish a session (`verify_otp`).
 
-Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established.
+Users can change their password and logout only if they have an established session. On logout a user can also choose to purge all of their sessions (`change_password`, `logout`).
+
+ If a user changes their password their sessions will be purged and they will receive an email notifying them of the change with a password reset token in case it wasn't them. The PW reset token lasts for 2 days (`reset_password`).
+
+Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established (`forgot_password`, `verify_forgot_password`).
 
 ## **CLI Tool**
 
