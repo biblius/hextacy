@@ -107,24 +107,24 @@ pub fn parse(entry: &DirEntry, file_type: AlxFileType) -> Result<FileScanResult,
                 .collect::<Vec<syn::ItemFn>>();
 
             // Get all the config calls
-            let mut function_inner = match routes_fn.first() {
+            let mut routes_fn_inner = match routes_fn.first() {
                 Some(calls) => calls.block.stmts.clone(),
                 None => vec![],
             };
 
-            let config_calls = function_inner
+            let inner_calls = routes_fn_inner
                 .drain(..)
                 .filter(|stmt| matches!(stmt, syn::Stmt::Semi(_, _)))
                 .collect::<Vec<syn::Stmt>>();
-            println!("Found {} cfg calls", config_calls.len());
+            println!("Found {} inner calls", inner_calls.len());
 
             let mut setup = Vec::<Route>::new();
             let mut route = Route::default();
 
             // We want only the method calls i.e. cfg.service()
-            for call in config_calls {
-                if let syn::Stmt::Semi(syn::Expr::MethodCall(service_call), _) = call {
-                    if let syn::Expr::Path(ref service_path) = *service_call.receiver {
+            for call in inner_calls {
+                if let syn::Stmt::Semi(syn::Expr::MethodCall(cfg_service_call), _) = call {
+                    if let syn::Expr::Path(ref service_path) = *cfg_service_call.receiver {
                         let target = &service_path
                             .path
                             .segments
@@ -133,12 +133,19 @@ pub fn parse(entry: &DirEntry, file_type: AlxFileType) -> Result<FileScanResult,
                             .ident
                             .to_string();
 
-                        if target == "cfg" && service_call.method == "service" {
-                            for arg in service_call.args {
-                                // println!("ARG: {:?}", arg);
-                                if let syn::Expr::MethodCall(ref resource_call) = arg {
-                                    scan_setup(resource_call.clone(), &mut route);
-                                }
+                        if target == "cfg" && cfg_service_call.method == "service" {
+                            let arg = cfg_service_call.args.first().unwrap();
+                            // println!("ARG: {:#?}", arg);
+                            if let syn::Expr::MethodCall(ref service_call) = arg {
+                                let mut level = 0;
+                                let mut route_config = HashMap::<usize, Vec<String>>::new();
+                                scan_setup(
+                                    service_call.clone(),
+                                    &mut route,
+                                    &mut level,
+                                    &mut route_config,
+                                );
+                                println!("M: {:?}", route_config);
                             }
                         }
                     }
@@ -168,67 +175,96 @@ pub fn parse(entry: &DirEntry, file_type: AlxFileType) -> Result<FileScanResult,
     }
 }
 
-fn scan_setup(p: ExprMethodCall, route: &mut Route) {
-    if let syn::Expr::MethodCall(ref mc) = *p.receiver {
-        scan_setup(mc.clone(), route);
+/// Scan a cfg.service() call for route info. All arguments
+fn scan_setup(
+    expr_meth_call: ExprMethodCall,
+    route: &mut Route,
+    level: &mut usize,
+    stuff: &mut HashMap<usize, Vec<String>>,
+) {
+    // If the receiver is another method call, scan it recursively.
+    if let syn::Expr::MethodCall(ref meth_call) = *expr_meth_call.receiver {
+        scan_setup(meth_call.clone(), route, level, stuff);
     }
-    if let syn::Expr::Call(ref c) = *p.receiver {
-        if let Some(syn::Expr::Lit(ref p)) = c.args.first() {
+
+    // This checks for the resource("/path") string literal.
+    if let syn::Expr::Call(ref call) = *expr_meth_call.receiver {
+        if let Some(syn::Expr::Lit(ref p)) = call.args.first() {
             if let syn::Lit::Str(ref path) = p.lit {
                 route.path = path.value();
+                stuff
+                    .entry(*level)
+                    .and_modify(|e| e.push(path.value()))
+                    .or_insert(vec![path.value()]);
             }
         }
     }
-    for arg in p.args {
-        if let syn::Expr::Path(ref p) = arg {
-            if let Some(wrapper) = p.path.get_ident() {
+
+    // Iterate through all the method call arguments
+    for mut arg in expr_meth_call.args {
+        // Middleware wrappers, i.e. some_guard in `.wrap(some_guard)` will be a path argument
+        if let syn::Expr::Path(ref path) = arg {
+            if let Some(wrapper) = path.path.get_ident() {
                 if let Some(ref mut mw) = route.middleware {
                     mw.push(wrapper.to_string())
                 } else {
                     route.middleware = Some(vec![wrapper.to_string()])
                 }
+                stuff
+                    .entry(*level)
+                    .and_modify(|e| e.push(wrapper.to_string()))
+                    .or_insert(vec![wrapper.to_string()]);
             }
         }
+
         // Check if the arg is a method call
-        if let syn::Expr::MethodCall(ref mc) = arg {
-            // Recursively check nested calls
-            if let syn::Expr::MethodCall(ref m_call) = *mc.receiver {
-                scan_setup(m_call.clone(), route);
+        if let syn::Expr::MethodCall(ref mut meth_call) = arg {
+            // And if the receiver is another one scan recursively
+            if let syn::Expr::MethodCall(ref call) = *meth_call.receiver {
+                scan_setup(call.clone(), route, level, stuff);
             }
-            // Get the route
-            if let syn::Expr::Call(ref m_call) = *mc.receiver {
-                if let syn::Expr::Path(ref call) = *m_call.func {
-                    let mut methods = call
-                        .path
-                        .segments
-                        .iter()
-                        .filter_map(|p| {
-                            if p.ident != "web" {
-                                return Some(p.ident.to_string());
-                            }
-                            None
-                        })
-                        .collect::<Vec<String>>();
-                    route.method = methods.pop().unwrap();
+
+            // Otherwise check if the receiver is a function call
+            if let syn::Expr::Call(ref mut call) = *meth_call.receiver {
+                // Look for a web::method() call
+                if let syn::Expr::Path(ref mut call) = *call.func {
+                    let methods = &mut call.path.segments;
+                    route.method = methods.pop().unwrap().value().ident.to_string();
+
+                    stuff
+                        .entry(*level)
+                        .and_modify(|e| e.push(route.method.clone()))
+                        .or_insert(vec![route.method.clone()]);
                 }
-                if let Some(syn::Expr::Lit(ref p)) = m_call.args.first() {
+                // Look for a path literal i.e. web::resource("/something")
+                if let Some(syn::Expr::Lit(ref p)) = call.args.first() {
                     if let syn::Lit::Str(ref path) = p.lit {
                         route.path = path.value();
+                        stuff
+                            .entry(*level)
+                            .and_modify(|e| e.push(path.value()))
+                            .or_insert(vec![path.value()]);
                     }
                 }
             }
-            // Check if we have a receiving wrapper
-            if let syn::Expr::Path(ref m_call) = *mc.receiver {
-                if let Some(wrapper) = m_call.path.get_ident() {
+
+            // We also have to check for wrappers in method calls
+            if let syn::Expr::Path(ref path) = *meth_call.receiver {
+                if let Some(wrapper) = path.path.get_ident() {
                     if let Some(ref mut mw) = route.middleware {
                         mw.push(wrapper.to_string())
                     } else {
                         route.middleware = Some(vec![wrapper.to_string()])
                     }
+                    stuff
+                        .entry(*level)
+                        .and_modify(|e| e.push(wrapper.to_string()))
+                        .or_insert(vec![wrapper.to_string()]);
                 }
             }
+
             // Get the name of the handler
-            if let Some(syn::Expr::Path(route_path)) = mc.args.first() {
+            if let Some(syn::Expr::Path(route_path)) = meth_call.args.first() {
                 let mut service = None;
                 let mut handlers = route_path
                     .path
@@ -251,11 +287,22 @@ fn scan_setup(p: ExprMethodCall, route: &mut Route) {
                         None
                     })
                     .collect::<Vec<String>>();
-                route.handler_name = handlers.pop().expect("Route must have handler");
+                let h = handlers.pop().unwrap();
+                let s = service.clone().unwrap_or_else(String::new);
+                stuff
+                    .entry(*level)
+                    .and_modify(|e| e.push(s.clone()))
+                    .or_insert(vec![s.clone()]);
+                stuff
+                    .entry(*level)
+                    .and_modify(|e| e.push(h.to_string()))
+                    .or_insert(vec![h.to_string()]);
+                route.handler_name = h;
                 route.service = service;
             }
         }
     }
+    *level += 1;
 }
 
 fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {

@@ -1,4 +1,4 @@
-use crate::helpers::lazy::validation::EMAIL_REGEX;
+use crate::helpers::validation::EMAIL_REGEX;
 use derive_new::new;
 use infrastructure::{store::repository::user::User, web::http::response::Response};
 use serde::{Deserialize, Serialize};

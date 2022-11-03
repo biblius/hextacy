@@ -16,9 +16,8 @@ use std::fmt::Write;
 use std::{fs, path::Path};
 
 pub const INDENT: &str = "    ";
-const DEFAULT_PATH: &str = "server/src/api/router";
-
-const FILES: [&str; 7] = [
+pub const DEFAULT_PATH: &str = "server/src/api/router";
+pub const FILES: [&str; 7] = [
     "contract",
     "data",
     "domain",
@@ -224,7 +223,7 @@ pub fn main() {
                 }
                 pc.endpoints.push(ep);
             }
-            println!("{pc}");
+            // println!("{pc}");
             pc.write_config_lock(format).unwrap();
         }
     }
