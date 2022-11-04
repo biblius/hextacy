@@ -350,10 +350,16 @@ TODO:
 
 - [ ] Add maxmind and activity logging middleware
 
-- [ ] Finish CLI tool
+- [ ] Make MW addable through CLI tool
+
+- [ ] Parse scopes with cli tool
+
+- [ ] Make CLI tool interactive
+
+- [ ] Directories in analyzing endpoints and CLI tool
 
 - [ ] Project config file for ez endpoint setup with the CLI tool
 
 - [ ] Openssl with let's encrypt
 
-- [ ] Something I'm probably forgetting right now
+- [ ] Something probably

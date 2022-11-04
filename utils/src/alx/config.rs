@@ -1,6 +1,5 @@
 use crate::error::AlxError;
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::{fmt::Display, fs, path::Path};
 
 const INDENT: &str = "    ";
@@ -89,11 +88,7 @@ impl From<(&Route, Option<&Handler>)> for RouteHandler {
         Self {
             method: r.method.to_string(),
             path: r.path.to_string(),
-            handler: if let Some(h) = h {
-                Some(h.clone())
-            } else {
-                None
-            },
+            handler: h.cloned(),
             middleware: r.middleware.clone(),
             service: r.service.clone(),
         }

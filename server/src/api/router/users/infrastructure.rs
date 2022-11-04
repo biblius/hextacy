@@ -1,11 +1,10 @@
+use super::contract::RepositoryContract;
 use crate::error::Error;
 use async_trait::async_trait;
 use infrastructure::store::{
     adapters::{postgres::PgAdapterError, AdapterError},
     repository::user::{SortOptions, User, UserRepository},
 };
-
-use super::contract::RepositoryContract;
 
 pub(super) struct Repository<UR>
 where

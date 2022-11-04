@@ -14,7 +14,7 @@ lazy_static! {
 
   pub static ref PHONE_REGEX: Regex = {
     trace!("Loading PHONE regex");
-    Regex::new("^(00|+)([1-9]{1})(d{6,14})$").unwrap()
+    Regex::new(r"^(00|\+)([1-9]{1})(d{6,14})$").unwrap()
   };
 
   /// Alphanumeric regex, allows spaces.

@@ -1,6 +1,6 @@
 # Run this script to generate the CA private key (1), the CA (2),
 # the certificate private key (3), the certificate signing request (4), the config file for the certificate (5),
-# the actual certificate (6)..
+# the actual certificate (6).
 
 ### MAKE SURE TO CD IN TO THIS SCRIPT'S DIRECTORY BEFORE YOU RUN IT
 
