@@ -2,7 +2,7 @@ pub(crate) mod mw;
 pub(crate) mod route;
 
 use self::{mw::MiddlewareCommand, route::RouteCommand};
-use crate::analyze::AnalyzeOptions;
+use crate::analyzer::AnalyzeOptions;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]

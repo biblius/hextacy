@@ -66,7 +66,6 @@ pub(super) struct ResetPassword {
 #[derive(Debug, Deserialize, Validate)]
 /// Received when verifying registration token
 pub(super) struct EmailToken {
-    #[validate(length(min = 1))]
     pub token: String,
 }
 

@@ -18,7 +18,7 @@ impl ProjectConfig {
     pub fn write_config_lock(&self, format: ConfigFormat) -> Result<(), AlxError> {
         match format {
             ConfigFormat::Json => {
-                let config = serde_json::to_string(self)?;
+                let config = serde_json::to_string_pretty(self)?;
                 fs::write(Path::new("./alx_lock.json"), config)?;
             }
             ConfigFormat::Yaml => {
@@ -26,7 +26,7 @@ impl ProjectConfig {
                 fs::write(Path::new("./alx_lock.yaml"), config)?;
             }
             ConfigFormat::Both => {
-                let config = serde_json::to_string(self)?;
+                let config = serde_json::to_string_pretty(self)?;
                 fs::write(Path::new("./alx_lock.json"), config)?;
                 let config = serde_yaml::to_string(self)?;
                 fs::write(Path::new("./alx_lock.yaml"), config)?;
@@ -117,12 +117,28 @@ pub struct Handler {
     pub bound: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct HandlerInput {
     #[serde(rename = "extractor")]
     pub ext_type: String,
     #[serde(rename = "data")]
     pub data_type: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+pub struct Data {
+    pub wrapper_id: String,
+    /// Contains the struct's fields where the first
+    /// element is the field name and the second the field type
+    pub fields: Vec<Field>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
+pub struct Field {
+    pub name: String,
+    pub ty: String,
+    pub required: bool,
+    pub validation: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]

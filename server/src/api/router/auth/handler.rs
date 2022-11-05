@@ -91,7 +91,7 @@ pub(super) async fn forgot_password<T: ServiceContract>(
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
     data.0.validate().map_err(Error::new)?;
-    info!("Forgot password, sending token");
+    info!("Forgot password, sending token to {}", data.0.email);
     service.forgot_password(data.0).await
 }
 
@@ -115,7 +115,7 @@ pub(super) async fn reset_password<T: ServiceContract>(
     service.reset_password(data.0).await
 }
 
-/// Sets the user's OTP secret. Requires a valid session to be established beforehand
+/// Logs the user out. Optionally purges their sessions, Requires a valid session to be established beforehand
 pub(super) async fn logout<T: ServiceContract>(
     data: web::Json<Logout>,
     req: HttpRequest,

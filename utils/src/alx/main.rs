@@ -1,10 +1,10 @@
-mod analyze;
+mod analyzer;
 mod boiler;
 mod commands;
 mod config;
 mod error;
 
-use crate::analyze::handle_analyze;
+use crate::analyzer::handle_analyze;
 use crate::commands::mw::MiddlewareSubcommand;
 use crate::commands::route::{handle_gen_route, RouteSubcommand};
 use crate::commands::Command;
