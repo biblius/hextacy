@@ -4,13 +4,13 @@ This repo is deisgned to quick start web server development with [actix_web](htt
 
 This kind of project structure is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
-The heart of this starter are the infrastructure and server directories.
+The foundations of this starter are the infrastructure and server directories.
 
 ## **Infrastructure**
 
-Contains the foundations from which we build our servers. Here you'll find all the database clients, adapters and repositories as well as a bunch of crypto, web and actor helpers.
+Here you'll find all the database clients, adapters and repositories as well as a bunch of crypto, web and actor helpers.
 
-The most interesting here is the store module, where the said data sources are located. It is divided in to three parts:
+The most notable here is the *store* module, where data sources are located. It is divided in to three parts:
 
 ### **Store**
 
@@ -36,19 +36,27 @@ Contains structures implementing client specific behaviour such as connecting to
 
 Module containing an implementation of a basic broadcastable message and a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
+### **Config**
+
+Contains the `env` and `logger` modules used for manipulating the env and logging, respectively). The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits our needs better.
+
+### **Crypto**
+
+Contains cryptographic utilities for encrypting, signing and generating tokens.
+
+### **Web**
+
+Contains various helpers and utilities for HTTP and websockets. The most notable modules here are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)), the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response and a websocket actor useful for maintaing a websocket session.
+
 ### **Services**
 
-Contains services usable throughout the whole project.
-
-The rest is a bunch of helpers that don't require that much explanation. We have the **config** directory (which contains the `env` and `logger` modules used for manipulating the env and logging, respectively), the **crypto** directory containing cryptographic utilities for encrypting, signing and generating tokens and the **web** directory containing various helpers and utilities for HTTP and websockets. The most notable modules from **web** are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)), the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response and a websocket actor useful for maintaing a websocket session.
-
-The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits our needs better.
+Starts out with a simple email service and is where system wide services should be located.
 
 ## **Server**
 
-The main binary. Contains the domain logic and the request handlers.
+The main binary.
 
-The `main.rs` is where the server gets instantiated. The `Error` enum from `error.rs` is a wrapper around external errors that implements actix's `ErrorResponse` trait, meaning we can send any error we encounter as a custom HTTP response.
+The `main.rs` is where the server gets instantiated. The `configure` file is used to set up all the infrastructure connections and endpoints. The `Error` enum from `error.rs` is a wrapper around external errors that implements actix's `ErrorResponse` trait, meaning we can send any error we encounter as a custom HTTP response.
 
 ### **API**
 
@@ -60,7 +68,7 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
 - #### **contract.rs**
 
-  Like the repositories from the infrastructure, this is where the behaviour for this endpoint is described. A contract specifies certain conditions the endpoint's domain/infrastructure must fulfil.
+  A contract specifies certain conditions the endpoint's domain/infrastructure must fulfil.
 
   A simple example for a very basic user service would look like:
 
@@ -80,7 +88,7 @@ The router contains the endpoints of the server. The endpoints provide a compact
   }
   ```
 
-  No implementation details are written here, only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding to the user with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
+  No implementation details are written here, only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
 
 - #### **data.rs**
   
@@ -353,8 +361,6 @@ TODO:
 - [ ] Make MW addable through CLI tool
 
 - [ ] Parse scopes with cli tool
-
-- [ ] Make CLI tool interactive
 
 - [ ] Directories in analyzing endpoints and CLI tool
 

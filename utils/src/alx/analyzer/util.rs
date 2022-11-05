@@ -56,7 +56,13 @@ pub(super) fn analyze_call_recursive(
                 // Look for a web::method() call
                 if let syn::Expr::Path(ref mut call) = *call.func {
                     let methods = &mut call.path.segments;
-                    route.method = methods.pop().unwrap().value().ident.to_string();
+                    route.method = methods
+                        .pop()
+                        .unwrap()
+                        .value()
+                        .ident
+                        .to_string()
+                        .to_uppercase();
 
                     stuff
                         .entry(*level)
@@ -67,6 +73,7 @@ pub(super) fn analyze_call_recursive(
                 if let Some(syn::Expr::Lit(ref p)) = call.args.first() {
                     if let syn::Lit::Str(ref path) = p.lit {
                         route.path = path.value();
+
                         stuff
                             .entry(*level)
                             .and_modify(|e| e.push(path.value()))
@@ -83,6 +90,7 @@ pub(super) fn analyze_call_recursive(
                     } else {
                         route.middleware = Some(vec![wrapper.to_string()])
                     }
+
                     stuff
                         .entry(*level)
                         .and_modify(|e| e.push(wrapper.to_string()))
@@ -117,6 +125,7 @@ pub(super) fn analyze_call_recursive(
 
                 let h = handlers.pop().unwrap();
                 let s = service.clone().unwrap_or_default();
+
                 // Insert stuff into the map
                 stuff
                     .entry(*level)
@@ -126,6 +135,7 @@ pub(super) fn analyze_call_recursive(
                     .entry(*level)
                     .and_modify(|e| e.push(h.to_string()))
                     .or_insert_with(|| vec![h.to_string()]);
+
                 route.handler_name = h;
                 route.service = service;
             }

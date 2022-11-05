@@ -1,7 +1,6 @@
-use super::contract::{CacheContract, RepositoryContract};
+use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
 use super::domain::AuthenticationGuard;
 use super::infratructure::{Cache, Repository};
-use crate::api::middleware::auth::contract::AuthGuardContract;
 use crate::error::{AuthenticationError, Error};
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;

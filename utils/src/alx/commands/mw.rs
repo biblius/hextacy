@@ -2,14 +2,14 @@ use clap::{Args, Subcommand};
 
 /// Middleware commands
 #[derive(Debug, Args)]
-pub(crate) struct MiddlewareCommand {
+pub struct MiddlewareCommand {
     #[clap(subcommand)]
     pub command: MiddlewareSubcommand,
 }
 
 /// Commands for generating and modifying route endpoints.
 #[derive(Debug, Subcommand)]
-pub(crate) enum MiddlewareSubcommand {
+pub enum MiddlewareSubcommand {
     /// Generate a route.
     Gen(Middleware),
     /// Shorthand for generate.
@@ -22,7 +22,7 @@ pub(crate) enum MiddlewareSubcommand {
 
 /// Contains middleware information
 #[derive(Debug, Args)]
-pub(crate) struct Middleware {
+pub struct Middleware {
     /// The name of the middleware
     pub name: String,
     /// The various services or repositories the middleware will use
@@ -30,7 +30,7 @@ pub(crate) struct Middleware {
 }
 
 #[derive(Debug, Args)]
-pub(crate) struct MWName {
+pub struct MWName {
     /// The name of a middleware
     pub name: String,
 }

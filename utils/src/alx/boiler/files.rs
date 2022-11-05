@@ -4,6 +4,8 @@ use std::{
     io::{stdin, Write},
 };
 
+use crate::print;
+
 /// Returns false if the user aborted the process
 pub fn handle_create_dir(path: &str) -> bool {
     match fs::create_dir(path) {
@@ -44,6 +46,12 @@ pub fn handle_create_dir(path: &str) -> bool {
 }
 
 pub fn write_to_mod_file(file_path: &str, mod_name: &str) {
+    print(&format!(
+        "{} Adding {} to {}",
+        "\u{270E}".green(),
+        mod_name,
+        file_path
+    ));
     let f = fs::read_to_string(file_path).unwrap();
     let mut new_file_contents = format!("pub(crate) mod {};\n", mod_name);
     if !f.contains(&new_file_contents) {

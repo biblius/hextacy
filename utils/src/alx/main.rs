@@ -4,15 +4,17 @@ mod commands;
 mod config;
 mod error;
 
-use crate::analyzer::handle_analyze;
-use crate::commands::mw::MiddlewareSubcommand;
-use crate::commands::route::{handle_gen_route, RouteSubcommand};
-use crate::commands::Command;
+use crate::analyzer::analyze::handle;
+use crate::commands::alx::{Alx, Command};
+use crate::commands::generate::handle_gen_route;
 use clap::Parser;
-use commands::AlxArgs;
+use commands::generate::GenSubject;
+use std::sync::atomic::AtomicBool;
 
 pub const INDENT: &str = "    ";
-pub const DEFAULT_PATH: &str = "server/src/api/router";
+pub const DEFAULT_API_PATH: &str = "server/src/api";
+pub const DEFAULT_MIDDLEWARE_PATH: &str = "server/src/api/middleware";
+pub const DEFAULT_ROUTER_PATH: &str = "server/src/api/router";
 pub const FILES: [&str; 7] = [
     "contract",
     "data",
@@ -23,25 +25,47 @@ pub const FILES: [&str; 7] = [
     "setup",
 ];
 
-pub fn main() {
-    let args = AlxArgs::parse();
-    println!("Running with args: {:?}", args);
+static VERBOSE: AtomicBool = AtomicBool::new(false);
 
-    match args.command {
-        Command::Route(cmd) | Command::R(cmd) => match cmd.command {
-            RouteSubcommand::Gen(args) | RouteSubcommand::G(args) => handle_gen_route(args),
-            RouteSubcommand::AddContract(route_name) | RouteSubcommand::AC(route_name) => {
-                println!("{:?}", route_name)
+pub fn main() {
+    let alx = Alx::parse();
+    println!("Running {} ", alx.command);
+    match alx.command {
+        Command::Generate(cmd) | Command::G(cmd) => match cmd.subject {
+            GenSubject::Route(args) | GenSubject::R(args) => {
+                verbose(args.verbose);
+                let path = match args.path {
+                    Some(ref p) => p.to_string(),
+                    None => DEFAULT_ROUTER_PATH.to_string(),
+                };
+                handle_gen_route(args, &path);
             }
+            GenSubject::Middleware(_) | GenSubject::MW(_) => {}
         },
-        Command::Middleware(cmd) | Command::MW(cmd) => match cmd.command {
-            MiddlewareSubcommand::Gen(_) | MiddlewareSubcommand::G(_) => todo!(),
-            MiddlewareSubcommand::AddContract(_) | MiddlewareSubcommand::AC(_) => todo!(),
-        },
-        Command::Analyze(options) | Command::Anal(options) => handle_analyze(options),
+        Command::Analyze(args) | Command::Anal(args) => {
+            verbose(args.verbose);
+            let path = match args.path {
+                Some(ref p) => p.to_string(),
+                None => DEFAULT_API_PATH.to_string(),
+            };
+            handle(args, &path);
+        }
     }
 }
 
 fn uppercase(s: &str) -> String {
     format!("{}{}", &s[..1].to_string().to_uppercase(), &s[1..])
+}
+
+#[inline]
+pub fn print(s: &str) {
+    if VERBOSE.fetch_and(true, std::sync::atomic::Ordering::SeqCst) {
+        println!("{s}");
+    }
+}
+
+fn verbose(v: Option<bool>) {
+    if let Some(v) = v {
+        VERBOSE.fetch_or(v, std::sync::atomic::Ordering::SeqCst);
+    }
 }

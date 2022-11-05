@@ -98,31 +98,11 @@ pub fn setup(buf: &mut String, service_name: &str, contracts: &[&str]) {
 }
 
 pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
-    // Utility closure
-    let write_bounds = |stmt: &mut String| {
-        write!(stmt, "<").unwrap();
-        for (i, c) in contracts.iter().enumerate() {
-            if i == contracts.len() - 1 {
-                write!(stmt, "{}", &uppercase(c)[..1]).unwrap();
-            } else {
-                write!(stmt, "{}, ", &uppercase(c)[..1]).unwrap();
-            }
-        }
-        write!(stmt, "> ").unwrap();
-    };
-
     // Use statement
     let mut use_stmt = String::from("use super::contract::");
     if !contracts.is_empty() {
         write!(use_stmt, "{{ServiceContract, ").unwrap();
-        for (i, c) in contracts.iter().enumerate() {
-            if i == contracts.len() - 1 {
-                write!(use_stmt, "{}Contract", uppercase(c)).unwrap();
-            } else {
-                write!(use_stmt, "{}Contract, ", uppercase(c)).unwrap();
-            }
-        }
-        writeln!(use_stmt, "}};").unwrap();
+        write_contracts_use(&mut use_stmt, contracts);
     } else {
         writeln!(use_stmt, "ServiceContract;").unwrap();
     }
@@ -131,7 +111,7 @@ pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
     // Struct statement
     let mut struct_statement = format!("pub(super) struct {}", service_name);
     if !contracts.is_empty() {
-        write_bounds(&mut struct_statement);
+        write_letter_bounds(&mut struct_statement, contracts, &[]);
         writeln!(struct_statement, "\nwhere").unwrap();
         for c in contracts {
             writeln!(
@@ -160,11 +140,11 @@ pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
     // Impl statement
     let mut impl_stmt = String::from("#[async_trait]\nimpl");
     if !contracts.is_empty() {
-        write_bounds(&mut impl_stmt);
+        write_letter_bounds(&mut impl_stmt, contracts, &[]);
     }
-    write!(impl_stmt, "ServiceContract for {}", service_name).unwrap();
+    write!(impl_stmt, " ServiceContract for {}", service_name).unwrap();
     if !contracts.is_empty() {
-        write_bounds(&mut impl_stmt);
+        write_letter_bounds(&mut impl_stmt, contracts, &[]);
         write!(impl_stmt, "\nwhere\n").unwrap();
         for c in contracts {
             writeln!(
@@ -175,8 +155,63 @@ pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
             )
             .unwrap();
         }
+        write!(impl_stmt, "{{\n}}").unwrap();
+    } else {
+        write!(impl_stmt, " {{}}").unwrap();
     }
-    write!(impl_stmt, "{{\n}}").unwrap();
 
     writeln!(buf, "{}{}{}", use_stmt, struct_statement, impl_stmt).unwrap();
+}
+
+pub fn mw_interceptor(buf: &mut String, service_name: &str, contracts: &[&str]) {
+    let mut use_stmt = String::new();
+    write!(use_stmt, "use super::contract::").unwrap();
+    if !contracts.is_empty() {
+        write!(use_stmt, "{{{}Contract, ", service_name,).unwrap();
+        write_contracts_use(&mut use_stmt, contracts);
+    } else {
+        writeln!(use_stmt, "{}Contract;", service_name).unwrap();
+    }
+    writeln!(use_stmt, "use super::domain::{};", service_name).unwrap();
+    writeln!(use_stmt, "use actix_web::dev::{{forward_ready, Service, ServiceRequest, ServiceResponse, Transform}};").unwrap();
+    writeln!(
+        use_stmt,
+        "use futures_util::future::LocalBoxFuture;\nuse futures_util::FutureExt;"
+    )
+    .unwrap();
+    writeln!(
+        use_stmt,
+        "use std::{{\n{INDENT}future::{{ready, Ready\n}},\n{INDENT}rc::Rc,\n}};\n"
+    )
+    .unwrap();
+
+    let struct_stmt = String::new();
+    writeln!(use_stmt, "#[derive(Debug, Clone)]").unwrap();
+}
+
+fn write_letter_bounds(stmt: &mut String, contracts: &[&str], append: &[&str]) {
+    write!(stmt, "<").unwrap();
+    for a in append {
+        write!(stmt, "{a}, ").unwrap();
+    }
+    for (i, c) in contracts.iter().enumerate() {
+        if i == contracts.len() - 1 {
+            write!(stmt, "{}", &uppercase(c)[..1]).unwrap();
+        } else {
+            write!(stmt, "{}, ", &uppercase(c)[..1]).unwrap();
+        }
+    }
+    write!(stmt, ">").unwrap();
+}
+
+/// Writes the closing `};` tokens as well
+fn write_contracts_use(buf: &mut String, contracts: &[&str]) {
+    for (i, c) in contracts.iter().enumerate() {
+        if i == contracts.len() - 1 {
+            write!(buf, "{}Contract", uppercase(c)).unwrap();
+        } else {
+            write!(buf, "{}Contract, ", uppercase(c)).unwrap();
+        }
+    }
+    writeln!(buf, "}};").unwrap();
 }

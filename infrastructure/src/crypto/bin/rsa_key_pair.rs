@@ -32,17 +32,12 @@ fn generate_rsa_key_pair() -> Result<(), WriteError> {
     let pub_key = RsaPublicKey::from(&priv_key);
 
     if fs::create_dir(Path::new("./encryption")).is_err() {
-        println!("Directory `encryption` already exists, generating key pair");
-        println!("Attempting to remove old key pair dir");
-
         match fs::remove_dir_all(Path::new(KEY_PATH)) {
             Ok(()) => println!("Deleted old key_pair directory"),
 
             Err(_) => println!("No `keypair` directory found"),
         }
     }
-
-    println!("Generating keypair");
 
     if let Err(e) = fs::create_dir(Path::new(KEY_PATH)) {
         return Err(WriteError::FileSystemError(e));

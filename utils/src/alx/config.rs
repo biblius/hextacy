@@ -46,7 +46,7 @@ pub enum ConfigFormat {
 impl Display for ProjectConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for ep in &self.endpoints {
-            writeln!(f, "- Endpoint: '{}'\nRoutes: ", ep.id)?;
+            writeln!(f, "- Endpoint: '{}'\nRoutes: ", ep.name)?;
             for r in &ep.routes {
                 writeln!(f, "{INDENT}Method: {}", r.method)?;
                 writeln!(f, "{INDENT}Path: {}", r.path)?;
@@ -61,6 +61,7 @@ impl Display for ProjectConfig {
                     "{INDENT}MW: {:?}\n",
                     r.middleware.as_ref().unwrap_or(&vec![])
                 )?;
+                writeln!(f, "{INDENT}Handler: {:?}", r.input)?;
             }
         }
         Ok(())
@@ -70,7 +71,8 @@ impl Display for ProjectConfig {
 /// Defines an endpoint in the project structure.
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Endpoint {
-    pub id: String,
+    pub name: String,
+    pub full_path: String,
     pub routes: Vec<RouteHandler>,
 }
 
@@ -129,7 +131,7 @@ pub struct HandlerInput {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct Data {
-    pub wrapper_id: String,
+    pub id: String,
     pub fields: Vec<Field>,
 }
 
@@ -138,7 +140,7 @@ pub struct Field {
     pub name: String,
     pub ty: String,
     pub required: bool,
-    pub validation: Option<String>,
+    pub validation: Vec<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]

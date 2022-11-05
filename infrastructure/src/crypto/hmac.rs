@@ -64,7 +64,6 @@ mod tests {
         );
         let nonce = uuid::Uuid::new_v4().to_string();
         let hmac = generate_hmac("REG_TOKEN_SECRET", &nonce, BASE64).unwrap();
-        println!("{hmac}");
         let res = verify_hmac("REG_TOKEN_SECRET", &nonce, &hmac, BASE64).unwrap();
         assert!(res);
 

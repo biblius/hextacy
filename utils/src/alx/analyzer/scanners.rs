@@ -1,6 +1,7 @@
 use crate::{
     analyzer::util::{analyze_call_recursive, analyze_path_recursive},
     config::{Data, Field, Handler, HandlerInput, Route},
+    print,
 };
 use colored::Colorize;
 use std::collections::HashMap;
@@ -21,7 +22,10 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
         .filter(|stmt| matches!(stmt, syn::Stmt::Semi(_, _)))
         .collect::<Vec<syn::Stmt>>();
 
-    println!("Found {} inner cfg.service calls", inner_calls.len());
+    print(&format!(
+        "Found {} inner cfg.service calls",
+        inner_calls.len()
+    ));
 
     let mut setup = Vec::<Route>::new();
     let mut route = Route::default();
@@ -62,6 +66,10 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
             }
         }
         if route != Route::default() {
+            print(&format!(
+                "\u{1F517} Found route {} for handler {}",
+                route.path, route.handler_name
+            ));
             setup.push(route);
             route = Route::default();
         }
@@ -156,7 +164,7 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
                 }
             }
         });
-        println!("Created {:?}", handler);
+        print(&format!("\u{1F44C} Found handler {}", handler.name));
         handlers.push(handler);
     }
     handlers
@@ -165,7 +173,7 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
 pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
     let mut inputs = vec![];
     for item in items.iter() {
-        let mut data_wrapper = Data::default();
+        let mut input = Data::default();
 
         // We filtered struct items before sending them to this functions
         // so they will all be structs
@@ -173,7 +181,7 @@ pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
             if strct.ident.to_string().contains("Response") {
                 continue;
             }
-            data_wrapper.wrapper_id = strct.ident.to_string();
+            input.id = strct.ident.to_string();
             // Iterate through struct fields
             for field in strct.fields.iter() {
                 let name = field.ident.as_ref().unwrap().to_string();
@@ -181,7 +189,7 @@ pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
                     name,
                     ty: String::new(),
                     required: false,
-                    validation: None,
+                    validation: vec![],
                 };
 
                 // Struct fields will always be Path types
@@ -202,14 +210,19 @@ pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
                 for attr in field.attrs.iter() {
                     let validation = attr.path.is_ident("validate");
                     if validation {
-                        f.validation =
-                            Some(attr.tokens.to_string().replace("(", "").replace(")", ""));
+                        let val = attr
+                            .tokens
+                            .to_string()
+                            .replacen("(", "", 1)
+                            .replacen(")", "", 1);
+                        f.validation.push(val);
                     }
                 }
-                data_wrapper.fields.push(f);
+                input.fields.push(f);
             }
         }
-        inputs.push(data_wrapper);
+        print(&format!("💽 Found request data {}", input.id));
+        inputs.push(input);
     }
     inputs
 }
