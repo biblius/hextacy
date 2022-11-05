@@ -1,9 +1,10 @@
 use crate::{
-    analyzer::util::scan_call_recursive,
+    analyzer::util::{analyze_call_recursive, analyze_path_recursive},
     config::{Data, Field, Handler, HandlerInput, Route},
 };
 use colored::Colorize;
 use std::collections::HashMap;
+use std::fmt::Write;
 
 /// Scan a setup.rs file for route info
 pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
@@ -48,7 +49,7 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
                     if let syn::Expr::MethodCall(ref service_call) = arg {
                         let mut level = 0;
                         let mut route_config = HashMap::<usize, Vec<String>>::new();
-                        scan_call_recursive(
+                        analyze_call_recursive(
                             service_call.clone(),
                             &mut route,
                             &mut level,
@@ -123,7 +124,7 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
                     for seg in p.path.segments {
                         // We don't care about the web prefix
                         if seg.ident != "web" {
-                            // The identity is the extractor type which holds the data type,
+                            // The identity is the extractor type which holds the inputs type,
                             // usually in angle bracket argument form
                             let ext_type = seg.ident.to_string();
                             let data_type = match seg.arguments {
@@ -162,39 +163,50 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
 }
 
 pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
-    let data = vec![];
+    let mut inputs = vec![];
     for item in items.iter() {
-        println!("ITEM: {:#?}", item);
-        let mut data = Data::default();
+        let mut data_wrapper = Data::default();
+
         // We filtered struct items before sending them to this functions
         // so they will all be structs
         if let syn::Item::Struct(strct) = item {
-            data.wrapper_id = strct.ident.to_string();
-            println!("STRUCT ID: {}", data.wrapper_id);
+            if strct.ident.to_string().contains("Response") {
+                continue;
+            }
+            data_wrapper.wrapper_id = strct.ident.to_string();
+            // Iterate through struct fields
             for field in strct.fields.iter() {
-                let mut f = Field::default();
-                println!("FIELD IDENT: {}", field.ident.as_ref().unwrap().to_string());
-                f.name = field.ident.as_ref().unwrap().to_string();
+                let name = field.ident.as_ref().unwrap().to_string();
+                let mut f = Field {
+                    name,
+                    ty: String::new(),
+                    required: false,
+                    validation: None,
+                };
 
+                // Struct fields will always be Path types
                 if let syn::Type::Path(ref ty) = field.ty {
-                    if let Some(ref id) = ty.path.get_ident() {
-                        println!("IDENT IS SIMPLE: {:#?}", ty);
-                        f.required = true;
-                        f.ty = id.to_string();
-                    } else {
-                        println!("IDENT IS MORE COMPLEX: {:#?}", ty);
+                    let mut nested: Vec<String> = vec![];
+                    analyze_path_recursive(ty, &mut f, &mut nested);
+                    if !nested.is_empty() {
+                        let mut typ = nested.join("<");
+                        write!(typ, "{}", ">".repeat(nested.len() - 1)).unwrap();
+                        f.ty = typ;
                     }
                 }
 
+                // And search for field attributes for validation
                 for attr in field.attrs.iter() {
                     let validation = attr.path.is_ident("validate");
-                    println!("HAS VALIDATION: {}", validation);
-                    if validation {}
-                    println!("VALIDATION TOKENS: {}", attr.tokens.to_string());
+                    if validation {
+                        f.validation =
+                            Some(attr.tokens.to_string().replace("(", "").replace(")", ""));
+                    }
                 }
-                println!("FIELD: {:#?}", f);
+                data_wrapper.fields.push(f);
             }
         }
+        inputs.push(data_wrapper);
     }
-    data
+    inputs
 }

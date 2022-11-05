@@ -59,25 +59,51 @@ pub fn handle_analyze(opts: AnalyzeOptions) {
         data: HashMap::new(),
     };
     router_read_recursive(path, &mut scan, &analyze).unwrap();
+    println!("SCAN RESULTS: {:#?}", scan);
     let mut pc = ProjectConfig::default();
     for ep_path in scan.routes.keys() {
+        // Get the handlers under the current path
         let empty = vec![];
         let handlers = match scan.handlers.get(ep_path) {
             Some(h) => h,
             None => &empty,
         };
+
+        // Get the data
+        let empty = vec![];
+        let data = match scan.data.get(ep_path) {
+            Some(h) => h,
+            None => &empty,
+        };
+
+        // Get the routes
         let routes = scan.routes.get(ep_path).expect("Impossible!");
         let mut ep = Endpoint {
             id: ep_path.to_string(),
             routes: vec![],
         };
+
         for route in routes {
             let mut handler = handlers
                 .iter()
                 .filter(|h| h.name == route.handler_name)
                 .collect::<Vec<&Handler>>();
+            let mut data = data
+                .iter()
+                .filter(|d| {
+                    for h in handler.iter() {
+                        for i in h.inputs.iter() {
+                            if i.data_type == d.wrapper_id {
+                                return true;
+                            }
+                        }
+                    }
+                    false
+                })
+                .collect::<Vec<&Data>>();
             let handler = handler.pop();
-            let rh: RouteHandler = (route.to_owned(), handler).into();
+            let data = data.pop();
+            let rh: RouteHandler = (route.to_owned(), handler, data).into();
             ep.routes.push(rh);
         }
         pc.endpoints.push(ep);

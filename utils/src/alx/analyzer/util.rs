@@ -1,9 +1,9 @@
-use crate::config::Route;
+use crate::config::{Field, Route};
 use std::collections::HashMap;
-use syn::ExprMethodCall;
+use syn::{ExprMethodCall, TypePath};
 
 /// Read a method call recursively and map all its arguments and receivers
-pub(super) fn scan_call_recursive(
+pub(super) fn analyze_call_recursive(
     method_call: ExprMethodCall,
     route: &mut Route,
     level: &mut usize,
@@ -11,7 +11,7 @@ pub(super) fn scan_call_recursive(
 ) {
     // If the receiver is another method call, scan it recursively.
     if let syn::Expr::MethodCall(ref meth_call) = *method_call.receiver {
-        scan_call_recursive(meth_call.clone(), route, level, stuff);
+        analyze_call_recursive(meth_call.clone(), route, level, stuff);
     }
 
     // This checks for the resource("/path") string literal.
@@ -48,7 +48,7 @@ pub(super) fn scan_call_recursive(
         if let syn::Expr::MethodCall(ref mut meth_call) = arg {
             // And if the receiver is another one scan recursively
             if let syn::Expr::MethodCall(ref call) = *meth_call.receiver {
-                scan_call_recursive(call.clone(), route, level, stuff);
+                analyze_call_recursive(call.clone(), route, level, stuff);
             }
 
             // Otherwise check if the receiver is a function call
@@ -132,4 +132,33 @@ pub(super) fn scan_call_recursive(
         }
     }
     *level += 1;
+}
+
+pub(super) fn analyze_path_recursive(ty: &TypePath, f: &mut Field, buf: &mut Vec<String>) {
+    // First check for a simple identifier, i.e. a field with a single primitive
+    if let Some(ref id) = ty.path.get_ident() {
+        f.required = true;
+        f.ty = id.to_string();
+    } else {
+        // Otherwise check for angle bracket nested types such as Options and Vecs
+        // Grab the top level identifier of the type in question
+        let typ = ty.path.segments.first().unwrap().ident.to_string();
+        buf.push(typ);
+
+        // Here we can safely unwrap because we know it contains something since we entered the else block
+        match ty.path.segments.first().unwrap().arguments {
+            // I've yet to find a type that contains params without angle brackets
+            syn::PathArguments::AngleBracketed(ref args) => {
+                // Check again for a simple type, if it's not simple go through the function once more
+                if let syn::GenericArgument::Type(syn::Type::Path(t)) = args.args.first().unwrap() {
+                    if let Some(id) = t.path.get_ident() {
+                        buf.push(id.to_string());
+                    } else {
+                        analyze_path_recursive(t, f, buf);
+                    }
+                }
+            }
+            _ => panic!("Not yet supported"),
+        }
+    }
 }

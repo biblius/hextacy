@@ -81,16 +81,18 @@ pub struct RouteHandler {
     pub handler: Option<Handler>,
     pub middleware: Option<Vec<String>>,
     pub service: Option<String>,
+    pub input: Option<Data>,
 }
 
-impl From<(&Route, Option<&Handler>)> for RouteHandler {
-    fn from((r, h): (&Route, Option<&Handler>)) -> Self {
+impl From<(&Route, Option<&Handler>, Option<&Data>)> for RouteHandler {
+    fn from((r, h, d): (&Route, Option<&Handler>, Option<&Data>)) -> Self {
         Self {
             method: r.method.to_string(),
             path: r.path.to_string(),
             handler: h.cloned(),
             middleware: r.middleware.clone(),
             service: r.service.clone(),
+            input: d.cloned(),
         }
     }
 }
