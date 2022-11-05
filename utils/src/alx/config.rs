@@ -130,8 +130,6 @@ pub struct HandlerInput {
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct Data {
     pub wrapper_id: String,
-    /// Contains the struct's fields where the first
-    /// element is the field name and the second the field type
     pub fields: Vec<Field>,
 }
 

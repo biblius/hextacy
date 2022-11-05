@@ -191,6 +191,9 @@ pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
                     if !nested.is_empty() {
                         let mut typ = nested.join("<");
                         write!(typ, "{}", ">".repeat(nested.len() - 1)).unwrap();
+                        if typ.contains("Option") {
+                            f.required = false;
+                        }
                         f.ty = typ;
                     }
                 }
