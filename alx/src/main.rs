@@ -4,9 +4,9 @@ mod commands;
 mod config;
 mod error;
 
-use crate::analyzer::analyze::handle;
+use crate::analyzer::analyze;
 use crate::commands::alx::{Alx, Command};
-use crate::commands::generate::handle_gen_route;
+use crate::commands::generate::{handle_gen_mw, handle_gen_route};
 use clap::Parser;
 use commands::generate::GenSubject;
 use std::sync::atomic::AtomicBool;
@@ -15,7 +15,7 @@ pub const INDENT: &str = "    ";
 pub const DEFAULT_API_PATH: &str = "server/src/api";
 pub const DEFAULT_MIDDLEWARE_PATH: &str = "server/src/api/middleware";
 pub const DEFAULT_ROUTER_PATH: &str = "server/src/api/router";
-pub const FILES: [&str; 7] = [
+pub const ROUTE_FILES: [&str; 7] = [
     "contract",
     "data",
     "domain",
@@ -24,6 +24,7 @@ pub const FILES: [&str; 7] = [
     "mod",
     "setup",
 ];
+pub const MW_FILES: [&str; 5] = ["contract", "domain", "infrastructure", "interceptor", "mod"];
 
 static VERBOSE: AtomicBool = AtomicBool::new(false);
 
@@ -40,7 +41,14 @@ pub fn main() {
                 };
                 handle_gen_route(args, &path);
             }
-            GenSubject::Middleware(_) | GenSubject::MW(_) => {}
+            GenSubject::Middleware(args) | GenSubject::MW(args) => {
+                verbose(args.verbose);
+                let path = match args.path {
+                    Some(ref p) => p.to_string(),
+                    None => DEFAULT_MIDDLEWARE_PATH.to_string(),
+                };
+                handle_gen_mw(args, &path);
+            }
         },
         Command::Analyze(args) | Command::Anal(args) => {
             verbose(args.verbose);
@@ -48,7 +56,10 @@ pub fn main() {
                 Some(ref p) => p.to_string(),
                 None => DEFAULT_API_PATH.to_string(),
             };
-            handle(args, &path);
+            analyze::handle(args, &path);
+        }
+        Command::Envex(args) => {
+            commands::envex::envex(args.path);
         }
     }
 }

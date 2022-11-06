@@ -42,7 +42,7 @@ Contains the `env` and `logger` modules used for manipulating the env and loggin
 
 ### **Crypto**
 
-Contains cryptographic utilities for encrypting, signing and generating tokens.
+Contains cryptographic utilities for encrypting and signing data and generating tokens.
 
 ### **Web**
 
@@ -350,9 +350,35 @@ If a user changes their password their sessions will be purged and they will rec
 
 Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established (`forgot_password`, `verify_forgot_password`).
 
-## **CLI Tool**
+## **Alx**
 
-TBD
+A.K.A. the CLI tool provides a way of seamlessly generating and documenting endpoints and middleware.
+
+To set up the cli tool after cloning the repo enter
+
+```bash
+cargo install --path alx
+```
+
+from the project root.
+
+The list of top level commands can be viewed with the `alx -h` command.
+
+The most notable commands are `[g]enerate` which sets up endpoint/middleware boilerplate and `[anal]yze` which scans the router and middleware directories and constructs a Json/Yaml file containing endpoint info.
+
+Alx only works for the project structure described in [the router](#router).
+
+The `[g]enerate` command generates an endpoint structure like the one described in the router. It can generate `route [r]` and `middleware [mw]` boilerplate. Contracts can also supplied to the command with the `-c` flag followed by the contracts you wish to hook up to the endpoint, comma seperated e.g.
+
+```bash
+alx gen route <NAME> -c repo,cache
+```
+
+This will automagically hook up the contracts to the domain service and set up an infrastructure boilerplate. It will also append `pub(crate) mod <NAME>` to the router's `mod.rs`. It also takes in a `-p` argument which can be used to specify the directory you want to set up the endpoint.
+
+The `analyze` function heavily relies on the [syn crate](https://docs.rs/syn/latest/syn/). It analyzes the syntax of the `data`, `handler` and `setup` files and extracts the necessary info to document the endpoint.
+
+All commands take in the `-v <bool>` flag which stands for 'verbose' and if true print what alx is doing to stdout. By default, all commands are run as `-v false`.
 
 TODO:
 
@@ -362,9 +388,7 @@ TODO:
 
 - [ ] Parse scopes with cli tool
 
-- [ ] Directories in analyzing endpoints and CLI tool
-
-- [ ] Project config file for ez endpoint setup with the CLI tool
+- [ ] Directories in analyzing endpoints and CLI tool (currently works only with files)
 
 - [ ] Openssl with let's encrypt
 

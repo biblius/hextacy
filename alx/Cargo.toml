@@ -1,0 +1,18 @@
+[package]
+edition = "2021"
+name = "alx"
+version = "0.1.0"
+
+[[bin]]
+name = "alx"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.0.18", features = ["derive"] }
+colored = "2.0.0"
+env_logger = "0.9.1"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.87"
+serde_yaml = "0.9"
+syn = { version = "1.0.103", features = ["extra-traits", "full"] }
+thiserror = "1.0.37"

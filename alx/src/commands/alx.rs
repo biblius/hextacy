@@ -1,8 +1,7 @@
-use std::fmt::Display;
-
-use super::generate::GenerateSubject;
+use super::{envex::EnvExOptions, generate::GenerateSubject};
 use crate::analyzer::analyze::AnalyzeOptions;
 use clap::{Parser, Subcommand};
+use std::fmt::Display;
 
 #[derive(Debug, Parser)]
 #[command(author, version = "0.1", about, long_about = None)]
@@ -18,6 +17,8 @@ pub enum Command {
 
     Analyze(AnalyzeOptions),
     Anal(AnalyzeOptions),
+
+    Envex(EnvExOptions),
 }
 
 impl Display for Command {
@@ -32,6 +33,7 @@ impl Display for Command {
                 }
             },
             Command::Analyze(_) | Command::Anal(_) => write!(f, "analyze"),
+            Command::Envex(_) => write!(f, "generate .env.example"),
         }
     }
 }
