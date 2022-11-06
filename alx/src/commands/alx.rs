@@ -13,6 +13,7 @@ pub struct Alx {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Generate(GenerateSubject),
+    Gen(GenerateSubject),
     G(GenerateSubject),
 
     Analyze(AnalyzeOptions),
@@ -24,7 +25,7 @@ pub enum Command {
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::Generate(s) | Command::G(s) => match s.subject {
+            Command::Generate(s) | Command::Gen(s) | Command::G(s) => match s.subject {
                 super::generate::GenSubject::Route(_) | super::generate::GenSubject::R(_) => {
                     write!(f, "generate route")
                 }

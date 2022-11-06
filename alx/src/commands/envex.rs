@@ -16,8 +16,8 @@ pub fn envex(path: Option<String>) {
         None => String::from("./.env"),
     };
 
-    let env_file =
-        std::fs::read_to_string(&path).expect(&format!("Couldn't load .env file at {}", path));
+    let env_file = std::fs::read_to_string(&path)
+        .unwrap_or_else(|_| panic!("Couldn't load .env file at {}", path));
 
     let mut example = String::new();
 

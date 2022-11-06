@@ -28,7 +28,6 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
     ));
 
     let mut setup = Vec::<Route>::new();
-    let mut route = Route::default();
 
     for call in inner_calls {
         // cfg.service() calls will always be method calls
@@ -53,28 +52,82 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
                     if let syn::Expr::MethodCall(ref service_call) = arg {
                         let mut level = 0;
                         let mut route_config = HashMap::<usize, Vec<String>>::new();
-                        analyze_call_recursive(
-                            service_call.clone(),
-                            &mut route,
-                            &mut level,
-                            &mut route_config,
-                        );
-                        println!("Mapped: {:?}", route_config);
+
+                        analyze_call_recursive(service_call.clone(), &mut route_config, &mut level);
+
+                        // Entry at key 100 will always contain the route path
+                        let mut path = route_config.get(&100).unwrap().clone();
+                        let path = path.pop().unwrap();
+
+                        // Create temporary vec in case of multiple middleware wraps
+                        let mut temp_routes: Vec<Route> = vec![];
+                        let mut index = 0;
+                        while let Some(item) = route_config.get(&index) {
+                            let mut mw = vec![];
+                            let j = check_next(&route_config, &mut index, &mut mw);
+                            if j == index + 1 {
+                                // Since middleware wraps everything before it we have to add it
+                                // to the preceding routes
+                                if !mw.is_empty() {
+                                    temp_routes.iter_mut().for_each(|route| {
+                                        if let Some(ref mut mdlw) = route.middleware {
+                                            for m in mw.iter() {
+                                                mdlw.push(m.clone())
+                                            }
+                                        } else {
+                                            route.middleware = Some(mw.clone());
+                                        }
+                                    });
+                                }
+                                let route = Route {
+                                    method: item[0].to_string(),
+                                    handler_name: item[2].to_string(),
+                                    path: path.clone(),
+                                    middleware: if mw.is_empty() {
+                                        None
+                                    } else {
+                                        Some(mw.clone())
+                                    },
+                                    service: if item[1].is_empty() {
+                                        None
+                                    } else {
+                                        Some(item[1].to_string())
+                                    },
+                                };
+                                temp_routes.push(route);
+                                index += 1;
+                                mw.clear();
+                            } else {
+                                index = j;
+                            }
+                        }
+                        for tr in temp_routes {
+                            setup.push(tr);
+                        }
                     }
-                    // println!("ARG: {:#?}", arg);
                 }
             }
         }
-        if route != Route::default() {
-            print(&format!(
-                "\u{1F517} Found route {} for handler {}",
-                route.path, route.handler_name
-            ));
-            setup.push(route);
-            route = Route::default();
-        }
     }
     setup
+}
+
+/// Check if the next hashmap entry is a middleware and call this recursively
+/// until we find a route entry. Populates the given mw vector with the found
+/// middleware. Returns the index of the first found route entry if any.
+fn check_next(
+    hm: &HashMap<usize, Vec<String>>,
+    current: &mut usize,
+    mw: &mut Vec<String>,
+) -> usize {
+    match hm.get(&(*current + 1)) {
+        Some(entry) if entry.len() == 1 => {
+            mw.push(entry[0].clone());
+            *current += 1;
+            check_next(hm, current, mw)
+        }
+        _ => *current + 1,
+    }
 }
 
 /// Scan the handler.rs file for handler info
@@ -164,12 +217,13 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
                 }
             }
         });
-        print(&format!("\u{1F44C} Found handler {}", handler.name));
+        print(&format!("👌 Found handler {}", handler.name));
         handlers.push(handler);
     }
     handlers
 }
 
+/// Scan the data.rs file for data info
 pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
     let mut inputs = vec![];
     for item in items.iter() {
@@ -213,8 +267,8 @@ pub(super) fn scan_data(items: Vec<syn::Item>) -> Vec<Data> {
                         let val = attr
                             .tokens
                             .to_string()
-                            .replacen("(", "", 1)
-                            .replacen(")", "", 1);
+                            .replacen('(', "", 1)
+                            .replacen(')', "", 1);
                         f.validation.push(val);
                     }
                 }

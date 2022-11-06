@@ -384,6 +384,8 @@ TODO:
 
 - [ ] Add maxmind and activity logging middleware
 
+- [ ] Oauth stuff
+
 - [ ] Make MW addable through CLI tool
 
 - [ ] Parse scopes with cli tool

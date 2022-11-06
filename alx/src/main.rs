@@ -32,7 +32,7 @@ pub fn main() {
     let alx = Alx::parse();
     println!("Running {} ", alx.command);
     match alx.command {
-        Command::Generate(cmd) | Command::G(cmd) => match cmd.subject {
+        Command::Generate(cmd) | Command::Gen(cmd) | Command::G(cmd) => match cmd.subject {
             GenSubject::Route(args) | GenSubject::R(args) => {
                 verbose(args.verbose);
                 let path = match args.path {

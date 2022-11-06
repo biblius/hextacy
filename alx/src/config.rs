@@ -76,6 +76,7 @@ pub struct Endpoint {
     pub routes: Vec<RouteHandler>,
 }
 
+/// Love child of [Route] and [Handler]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RouteHandler {
     pub method: String,
@@ -110,14 +111,18 @@ pub struct Route {
     pub path: String,
     /// The middleware wrapped around the route, if any
     pub middleware: Option<Vec<String>>,
+    /// The service this route uses
     pub service: Option<String>,
 }
 
 /// Intermediary struct for capturing all handler functions
 #[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Handler {
+    /// Handler name
     pub name: String,
+    /// The inputs (args) for this handler function
     pub inputs: Vec<HandlerInput>,
+    /// Trait bounds for the handler, if any
     pub bound: Option<String>,
 }
 
