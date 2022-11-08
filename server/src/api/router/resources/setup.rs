@@ -1,4 +1,4 @@
-use super::favicon::favicon;
+use super::handler::favicon::favicon;
 use actix_web::web::{self, ServiceConfig};
 
 pub(crate) fn routes(cfg: &mut ServiceConfig) {

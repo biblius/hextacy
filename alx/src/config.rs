@@ -43,6 +43,16 @@ pub enum ConfigFormat {
     Both,
 }
 
+impl Display for ConfigFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigFormat::Json => write!(f, ".json"),
+            ConfigFormat::Yaml => write!(f, ".yaml"),
+            ConfigFormat::Both => write!(f, ""),
+        }
+    }
+}
+
 impl Display for ProjectConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for ep in &self.endpoints {
@@ -77,7 +87,7 @@ pub struct Endpoint {
 }
 
 /// Love child of [Route] and [Handler]
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RouteHandler {
     pub method: String,
     pub path: String,
@@ -87,8 +97,8 @@ pub struct RouteHandler {
     pub input: Option<Data>,
 }
 
-impl From<(&Route, Option<&Handler>, Option<&Data>)> for RouteHandler {
-    fn from((r, h, d): (&Route, Option<&Handler>, Option<&Data>)) -> Self {
+impl From<(&mut Route, Option<&Handler>, Option<&Data>)> for RouteHandler {
+    fn from((r, h, d): (&mut Route, Option<&Handler>, Option<&Data>)) -> Self {
         Self {
             method: r.method.to_string(),
             path: r.path.to_string(),
@@ -101,7 +111,7 @@ impl From<(&Route, Option<&Handler>, Option<&Data>)> for RouteHandler {
 }
 
 /// Intermediary struct for capturing setup functions
-#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq, Eq)]
 pub struct Route {
     /// The HTTP method for the route
     pub method: String,

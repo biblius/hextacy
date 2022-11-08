@@ -1,2 +1,2 @@
-pub mod favicon;
+pub mod handler;
 pub mod setup;

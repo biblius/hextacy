@@ -2,7 +2,7 @@ use crate::helpers::lazy::resources::FAVICON;
 use actix_web::{body::BoxBody, HttpResponseBuilder, Responder};
 use reqwest::{header, StatusCode};
 
-pub(super) async fn favicon() -> impl Responder {
+pub(in super::super) async fn favicon() -> impl Responder {
     HttpResponseBuilder::new(StatusCode::OK)
         .append_header((
             header::CONTENT_TYPE,

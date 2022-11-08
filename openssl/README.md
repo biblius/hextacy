@@ -1,6 +1,6 @@
 # OPEN SSL SETUP
 
-The `openssl.sh` script in this directory can be utilised to quickly generate a CA and a self signed certificate.
+The `openssl.sh` script in this directory can be utilised to quickly generate a CA and a self signed certificate to enable HTTPS for development on local connections.
 
 Make sure to `cd` in the script's directory and then execute it so your files get generated neatly in an isolated directory. All the files generated are git ignored.
 
@@ -26,7 +26,7 @@ Run the script to generate the CA private key (1), the CA (2), the certificate p
       openssl x509 -in 'ca.pem' -text
       ```
 
-- 3. Generate a private key for the certificate, this will need to be uploaded wherever you want your certificate to be accepted.
+- 3. Generate a private key for the certificate,
 
       ```bash
       openssl genrsa -out 'key.pem' 4096
@@ -50,7 +50,7 @@ Run the script to generate the CA private key (1), the CA (2), the certificate p
       openssl x509 -req -sha256 -days 365 -in 'cert.csr' -CA 'ca.pem' -CAkey 'ca-key.pem' -out 'cert.pem' -extfile 'extfile.cnf' -CAcreateserial
       ```
 
-There should be 4 files in total. After the've been successfully generated, depending on your machine you will have to add the `ca.pem` to your machine's trusted CAs since it was used to sign the actual certificate.
+There should be 4 files in total. After they've been successfully generated, depending on your machine you will have to add the `ca.pem` to your machine's trusted CAs since it was used to sign the actual certificate.
 
 - Mac - Open up the *Keychain Acces* app, head to the *System* section and drag and drop the `ca.pem` file to it. Double click the file, expand the *Trust* section and set 'When using this certificate' to *Always trust*.
 
@@ -88,4 +88,4 @@ HttpServer::new(move || {
 .run()
 ```
 
-The server should now be securely accessible on `https://localhost`
+The server should now be securely accessible on `https://localhost:8000`

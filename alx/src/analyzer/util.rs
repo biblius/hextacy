@@ -15,7 +15,6 @@ pub(super) fn analyze_call_recursive(
     route_config: &mut HashMap<usize, Vec<String>>,
     level: &mut usize,
 ) {
-    // println!("METHOD CALL: {:#?}", method_call);
     // If the receiver is another method call, scan it recursively.
     if let syn::Expr::MethodCall(ref meth_call) = *method_call.receiver {
         analyze_call_recursive(meth_call.clone(), route_config, level);

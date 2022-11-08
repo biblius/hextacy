@@ -25,12 +25,11 @@ pub const ROUTE_FILES: [&str; 7] = [
     "setup",
 ];
 pub const MW_FILES: [&str; 5] = ["contract", "domain", "infrastructure", "interceptor", "mod"];
-
 static VERBOSE: AtomicBool = AtomicBool::new(false);
 
 pub fn main() {
     let alx = Alx::parse();
-    println!("Running {} ", alx.command);
+    println!("{}", alx.command);
     match alx.command {
         Command::Generate(cmd) | Command::Gen(cmd) | Command::G(cmd) => match cmd.subject {
             GenSubject::Route(args) | GenSubject::R(args) => {

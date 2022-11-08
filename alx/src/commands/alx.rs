@@ -27,14 +27,14 @@ impl Display for Command {
         match self {
             Command::Generate(s) | Command::Gen(s) | Command::G(s) => match s.subject {
                 super::generate::GenSubject::Route(_) | super::generate::GenSubject::R(_) => {
-                    write!(f, "generate route")
+                    write!(f, "Generating route")
                 }
                 super::generate::GenSubject::Middleware(_) | super::generate::GenSubject::MW(_) => {
-                    write!(f, "generate middleware")
+                    write!(f, "Generating middleware")
                 }
             },
-            Command::Analyze(_) | Command::Anal(_) => write!(f, "analyze"),
-            Command::Envex(_) => write!(f, "generate .env.example"),
+            Command::Analyze(_) | Command::Anal(_) => write!(f, "Analyzing"),
+            Command::Envex(_) => write!(f, "Generating .env.example"),
         }
     }
 }

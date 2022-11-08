@@ -19,12 +19,14 @@ pub struct ScanResult {
     pub data: HashMap<String, Vec<Data>>,
 }
 
+#[derive(Debug)]
 pub enum FileScanResult {
     Handlers(Vec<Handler>),
     Routes(Vec<Route>),
     Data(Vec<Data>),
 }
 
+#[derive(Debug, Clone)]
 pub enum AlxFileType {
     Setup,
     Handler,
@@ -46,7 +48,8 @@ pub struct AnalyzeOptions {
     pub path: Option<String>,
 }
 
-/// Analyzes the router directory recursively and extracts routing info
+/// Analyzes the router directory recursively and extracts routing info. Assembles the ProjectConfig struct
+/// after it calling the scanners to do their thing.
 pub fn handle(opts: AnalyzeOptions, api_path: &str) {
     let format = match opts.format {
         Some(f) => match f.as_str() {
@@ -62,31 +65,31 @@ pub fn handle(opts: AnalyzeOptions, api_path: &str) {
         data: HashMap::new(),
     };
     let path = format!("{}/router", api_path);
-    router_read_recursive(Path::new(&path), &mut scan, &analyze).unwrap();
+    router_read_recursive(Path::new(&path), &mut scan, &analyze, None).unwrap();
+
     let mut pc = ProjectConfig::default();
-    for ep_path in scan.routes.keys() {
+    for ep_name in scan.routes.keys() {
         // Grab the endpoint name
-        let ep_name = ep_path.as_str().split('/').collect::<Vec<&str>>();
-        let ep_name = ep_name[ep_name.len() - 1];
+        let file_path = format!("{}/{}", path, ep_name);
         // Get the handlers under the current path
         let empty = vec![];
-        let handlers = match scan.handlers.get(ep_path) {
+        let handlers = match scan.handlers.get(ep_name) {
             Some(h) => h,
             None => &empty,
         };
 
         // Get the data
         let empty = vec![];
-        let data = match scan.data.get(ep_path) {
+        let data = match scan.data.get(ep_name) {
             Some(h) => h,
             None => &empty,
         };
 
         // Get the routes
-        let routes = scan.routes.get(ep_path).expect("Impossible!");
+        let routes = scan.routes.get(ep_name).expect("Impossible!");
         let mut ep = Endpoint {
             name: ep_name.to_string(),
-            full_path: ep_path.to_string(),
+            full_path: file_path.to_string(),
             routes: vec![],
         };
 
@@ -115,21 +118,30 @@ pub fn handle(opts: AnalyzeOptions, api_path: &str) {
             let handler = handler.pop();
             let data = data.pop();
 
-            let rh: RouteHandler = (route.to_owned(), handler, data).into();
+            let rh = RouteHandler {
+                method: route.method.clone(),
+                path: route.path.clone(),
+                handler: handler.cloned(),
+                middleware: route.middleware.clone(),
+                service: route.service.clone(),
+                input: data.cloned(),
+            };
             ep.routes.push(rh);
         }
         pc.endpoints.push(ep);
     }
+    println!("Writing alx_lock{format}");
     pc.write_config_lock(format).unwrap();
 }
 
 /// Recursively read the file system at the server router
 /// The `callback()` is a function to execute once we find an entry we're interested in,
-/// which in our case is `analyze`
+/// which in our case is [analyze]
 pub fn router_read_recursive(
     dir: &Path,
     scan: &mut ScanResult,
     callback: &dyn Fn(&DirEntry, AlxFileType) -> Result<FileScanResult, AlxError>,
+    dir_type: Option<AlxFileType>,
 ) -> Result<(), AlxError> {
     print(&format!(
         "\u{1F4D6} Reading {} \u{1F4D6}",
@@ -138,32 +150,72 @@ pub fn router_read_recursive(
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
 
-        let dirname = dir.to_string_lossy().to_string();
+        // Ep name is the id of the endpoint, i.e. router/<id>
+        let ep_name = if dir_type.is_some() {
+            let name = dir.clone().to_string_lossy().to_string();
+            let name = name.split('/').collect::<Vec<&str>>();
+            name[name.len() - 2].to_string()
+        } else {
+            let name = dir.to_string_lossy().to_string();
+            let n = name.split('/').collect::<Vec<&str>>();
+            n[n.len() - 1].to_string()
+        };
 
         let path = entry.path();
+
+        // Check if it's a directory and run according to the predefined ones
         if path.is_dir() {
-            router_read_recursive(&path, scan, callback)?;
+            if path.ends_with("handler") {
+                router_read_recursive(&path, scan, callback, Some(AlxFileType::Handler))?;
+            } else if path.ends_with("setup") {
+                router_read_recursive(&path, scan, callback, Some(AlxFileType::Setup))?;
+            } else if path.ends_with("data") {
+                router_read_recursive(&path, scan, callback, Some(AlxFileType::Data))?;
+            } else {
+                router_read_recursive(&path, scan, callback, None)?;
+            }
         } else {
             let file_name = entry.file_name().into_string().unwrap();
 
             print(&format!("\u{1F440} Analyzing {}", entry.path().display()));
 
+            if let Some(dir_type) = dir_type.clone() {
+                match callback(&entry, dir_type)? {
+                    FileScanResult::Handlers(ref mut handlers) => {
+                        scan.handlers
+                            .entry(ep_name)
+                            .and_modify(|entry| entry.append(handlers))
+                            .or_insert_with(|| handlers.to_vec());
+                    }
+                    FileScanResult::Routes(ref mut routes) => {
+                        scan.routes
+                            .entry(ep_name)
+                            .and_modify(|entry| entry.append(routes))
+                            .or_insert_with(|| routes.to_vec());
+                    }
+                    FileScanResult::Data(data) => {
+                        scan.data.insert(ep_name.to_string(), data);
+                    }
+                }
+                continue;
+            }
+
             if file_name.contains("setup") {
-                let routes = callback(&entry, AlxFileType::Setup).unwrap();
+                let routes = callback(&entry, AlxFileType::Setup)?;
                 if let FileScanResult::Routes(routes) = routes {
-                    scan.routes.insert(dirname.clone(), routes);
+                    scan.routes.insert(ep_name.to_string(), routes);
                 }
             }
             if file_name.contains("handler") {
-                let handlers = callback(&entry, AlxFileType::Handler).unwrap();
+                let handlers = callback(&entry, AlxFileType::Handler)?;
                 if let FileScanResult::Handlers(handlers) = handlers {
-                    scan.handlers.insert(dirname.clone(), handlers);
+                    scan.handlers.insert(ep_name.to_string(), handlers);
                 }
             }
             if file_name.contains("data") {
-                let data = callback(&entry, AlxFileType::Data).unwrap();
+                let data = callback(&entry, AlxFileType::Data)?;
                 if let FileScanResult::Data(data) = data {
-                    scan.data.insert(dirname.clone(), data);
+                    scan.data.insert(ep_name.to_string(), data);
                 }
             }
         }
