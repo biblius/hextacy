@@ -14,12 +14,12 @@ use std::fs;
 #[derive(Debug, Args)]
 pub struct GenerateSubject {
     #[clap(subcommand)]
-    pub subject: GenSubject,
+    pub subject: GenerateSubcommand,
 }
 
 /// Commands for generating stuff.
 #[derive(Debug, Subcommand)]
-pub enum GenSubject {
+pub enum GenerateSubcommand {
     /// Generate a route.
     Route(GenerateArgs),
     /// Shorthand for route.
@@ -30,22 +30,23 @@ pub enum GenSubject {
     MW(GenerateArgs),
 }
 
-/// Contains endpoint information
+/// Generate arguments
 #[derive(Debug, Args)]
 pub struct GenerateArgs {
-    /// The name of the router endpoint.
+    /// The name of the route of middleware.
     pub name: String,
-    #[arg(short, long)]
     /// The various services or repositories the endpoint will use. Comma seperated. e.g. `-c repo,cache`
+    #[arg(short, long)]
     pub contracts: Option<String>,
-    #[arg(short, long)]
     /// The path to the API you wish to generate this endpoint. Defaults to ./server/api/router
-    pub path: Option<String>,
-    /// Print what's going to std out
     #[arg(short, long)]
-    pub verbose: Option<bool>,
+    pub path: Option<String>,
+    /// Print what's going on to stdout
+    #[arg(short, long, action)]
+    pub verbose: bool,
 }
 
+/// Generate route boilerplate
 pub fn handle_gen_route(args: GenerateArgs, router_path: &str) {
     let mut ep_path = format!("{}/{}", router_path, args.name);
     // If a path is given switch to it
@@ -95,6 +96,7 @@ pub fn handle_gen_route(args: GenerateArgs, router_path: &str) {
     ))
 }
 
+/// Generate middleware boilerplate
 pub fn handle_gen_mw(args: GenerateArgs, mw_path: &str) {
     let mut ep_path = format!("{}/{}", mw_path, args.name);
     // If a path is given switch to it

@@ -1,7 +1,7 @@
 {
 	"info": {
 		"_postman_id": "430f8107-28be-4e74-a687-d082027b9da4",
-		"name": "Alchemy Testing",
+		"name": "Alchemy Starter",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "21281292"
 	},
@@ -38,7 +38,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"josip.benkodakovic+3@barrage.net\",\n    \"password\": \"{{PASSWORD}}\",\n    \"remember\": true\n}",
+							"raw": "{\n    \"email\": \"{{EMAIL}}\",\n    \"password\": \"{{PASSWORD}}\",\n    \"remember\": true\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -241,7 +241,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"josip.benkodakovic+5@barrage.net\",\n    \"username\": \"Bedgus\",\n    \"password\": \"{{PASSWORD}}\"\n}",
+							"raw": "{\n    \"email\": \"{{EMAIL}}\",\n    \"username\": \"\",\n    \"password\": \"{{PASSWORD}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -320,7 +320,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"email\": \"josip.benkodakovic+3@barrage.net\"\n}",
+							"raw": "{\n    \"email\": \"{{EMAIL}}\"\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -392,7 +392,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"token\": \"{{OTP_TOKEN}}\",\n    \"password\": \"485629\",\n    \"remember\": false\n}",
+							"raw": "{\n    \"token\": \"{{OTP_TOKEN}}\",\n    \"password\": \"441766\",\n    \"remember\": false\n}",
 							"options": {
 								"raw": {
 									"language": "json"

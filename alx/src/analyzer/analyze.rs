@@ -41,8 +41,8 @@ pub struct AnalyzeOptions {
     #[arg(short, long)]
     pub format: Option<String>,
     /// Print what's going on to std out
-    #[arg(short, long)]
-    pub verbose: Option<bool>,
+    #[arg(short, long, action)]
+    pub verbose: bool,
     /// Specify the path to read from.
     #[arg(short, long)]
     pub path: Option<String>,
@@ -152,7 +152,7 @@ pub fn router_read_recursive(
 
         // Ep name is the id of the endpoint, i.e. router/<id>
         let ep_name = if dir_type.is_some() {
-            let name = dir.clone().to_string_lossy().to_string();
+            let name = dir.to_string_lossy().to_string();
             let name = name.split('/').collect::<Vec<&str>>();
             name[name.len() - 2].to_string()
         } else {

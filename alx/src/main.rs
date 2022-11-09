@@ -7,8 +7,11 @@ mod error;
 use crate::analyzer::analyze;
 use crate::commands::alx::{Alx, Command};
 use crate::commands::generate::{handle_gen_mw, handle_gen_route};
+use crate::commands::migration::{
+    migration_generate, migration_redo_all, migration_rev, migration_run,
+};
 use clap::Parser;
-use commands::generate::GenSubject;
+use commands::generate::GenerateSubcommand;
 use std::sync::atomic::AtomicBool;
 
 pub const INDENT: &str = "    ";
@@ -32,7 +35,7 @@ pub fn main() {
     println!("{}", alx.command);
     match alx.command {
         Command::Generate(cmd) | Command::Gen(cmd) | Command::G(cmd) => match cmd.subject {
-            GenSubject::Route(args) | GenSubject::R(args) => {
+            GenerateSubcommand::Route(args) | GenerateSubcommand::R(args) => {
                 verbose(args.verbose);
                 let path = match args.path {
                     Some(ref p) => p.to_string(),
@@ -40,7 +43,7 @@ pub fn main() {
                 };
                 handle_gen_route(args, &path);
             }
-            GenSubject::Middleware(args) | GenSubject::MW(args) => {
+            GenerateSubcommand::Middleware(args) | GenerateSubcommand::MW(args) => {
                 verbose(args.verbose);
                 let path = match args.path {
                     Some(ref p) => p.to_string(),
@@ -60,6 +63,12 @@ pub fn main() {
         Command::Envex(args) => {
             commands::envex::envex(args.path);
         }
+        Command::Migration(c) | Command::Mig(c) | Command::M(c) => match c.action {
+            commands::migration::MigrationSubcommand::Gen(args) => migration_generate(args),
+            commands::migration::MigrationSubcommand::Run => migration_run(),
+            commands::migration::MigrationSubcommand::Rev => migration_rev(),
+            commands::migration::MigrationSubcommand::Redo(args) => migration_redo_all(args),
+        },
     }
 }
 
@@ -74,8 +83,6 @@ pub fn print(s: &str) {
     }
 }
 
-fn verbose(v: Option<bool>) {
-    if let Some(v) = v {
-        VERBOSE.fetch_or(v, std::sync::atomic::Ordering::SeqCst);
-    }
+fn verbose(v: bool) {
+    VERBOSE.fetch_or(v, std::sync::atomic::Ordering::SeqCst);
 }
