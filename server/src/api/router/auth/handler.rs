@@ -1,56 +1,59 @@
 use super::{
     contract::ServiceContract,
     data::{
-        ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
-        RegistrationData, ResendRegToken, ResetPassword,
+        ChangePassword, ChangePasswordPayload, Credentials, CredentialsPayload, EmailToken,
+        EmailTokenPayload, ForgotPassword, ForgotPasswordPayload, ForgotPasswordVerify,
+        ForgotPasswordVerifyPayload, Logout, Otp, OtpPayload, RegistrationData,
+        RegistrationDataPayload, ResendRegToken, ResendRegTokenPayload, ResetPassword,
+        ResetPasswordPayload,
     },
 };
 use crate::error::Error;
 use actix_web::{web, HttpRequest, Responder};
 use infrastructure::web::http::request::extract_session;
 use tracing::info;
-use validator::Validate;
+use validify::Validify;
 
 /// Verifies the user's login credentials and either establishes a session if the user
 /// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
 pub(super) async fn login<T: ServiceContract>(
-    data: web::Json<Credentials>,
+    data: web::Json<CredentialsPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Credentials login : {:?}", data.0);
-    service.login(data.0).await
+    let credentials = Credentials::validify(data.0)?;
+    info!("Credentials login : {:?}", credentials);
+    service.login(credentials).await
 }
 
 /// Starts the registration process for the user and sends an email containing a temporary
 /// token used to complete the registration
 pub(super) async fn start_registration<T: ServiceContract>(
-    data: web::Json<RegistrationData>,
+    data: web::Json<RegistrationDataPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Start Registration: {:?}", data.0);
-    service.start_registration(data.0).await
+    let registration = RegistrationData::validify(data.0)?;
+    info!("Start Registration: {:?}", registration);
+    service.start_registration(registration).await
 }
 
 /// Verifies the user's registration token
 pub(super) async fn verify_registration_token<T: ServiceContract>(
-    data: web::Query<EmailToken>,
+    data: web::Query<EmailTokenPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Verify registration token: {:?}", data);
-    service.verify_registration_token(data.0).await
+    let email_token = EmailToken::validify(data.0)?;
+    info!("Verify registration token: {:?}", email_token);
+    service.verify_registration_token(email_token).await
 }
 
 /// Resend the user's registration token in case it expired
 pub(super) async fn resend_registration_token<T: ServiceContract>(
-    data: web::Json<ResendRegToken>,
+    data: web::Json<ResendRegTokenPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Resend registration token: {:?}", data.0.email);
-    service.resend_registration_token(data.0).await
+    let reg_token = ResendRegToken::validify(data.0)?;
+    info!("Resend registration token: {:?}", reg_token.email);
+    service.resend_registration_token(reg_token).await
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
@@ -65,54 +68,54 @@ pub(super) async fn set_otp_secret<T: ServiceContract>(
 
 /// Verifies the user's OTP if they have 2FA enabled
 pub(super) async fn verify_otp<T: ServiceContract>(
-    data: web::Json<Otp>,
+    data: web::Json<OtpPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("OTP login : {:?}", data.0);
-    service.verify_otp(data.0).await
+    let otp = Otp::validify(data.0)?;
+    info!("OTP login : {:?}", otp);
+    service.verify_otp(otp).await
 }
 
 /// Changes the user's password and purges all their sessions
 pub(super) async fn change_password<T: ServiceContract>(
-    data: web::Json<ChangePassword>,
+    data: web::Json<ChangePasswordPayload>,
     req: HttpRequest,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
+    let change_pw = ChangePassword::validify(data.0)?;
     let session = extract_session(req)?;
     info!("Updating password for {}", session.user_id);
-    service.change_password(session, data.0).await
+    service.change_password(session, change_pw).await
 }
 
 /// Sends a forgot password token via email
 pub(super) async fn forgot_password<T: ServiceContract>(
-    data: web::Json<ForgotPassword>,
+    data: web::Json<ForgotPasswordPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Forgot password, sending token to {}", data.0.email);
-    service.forgot_password(data.0).await
+    let forgot_pw = ForgotPassword::validify(data.0)?;
+    info!("Forgot password, sending token to {}", forgot_pw.email);
+    service.forgot_password(forgot_pw).await
 }
 
 /// Changes the user's password and purges all their sessions
 pub(super) async fn verify_forgot_password<T: ServiceContract>(
-    data: web::Json<ForgotPasswordVerify>,
+    data: web::Json<ForgotPasswordVerifyPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
+    let forgot_pw_v = ForgotPasswordVerify::validify(data.0)?;
     info!("Forgot password, setting new");
-    service.verify_forgot_password(data.0).await
+    service.verify_forgot_password(forgot_pw_v).await
 }
 
 /// Changes the user's password and purges all their sessions
 pub(super) async fn reset_password<T: ServiceContract>(
-    data: web::Query<ResetPassword>,
+    data: web::Query<ResetPasswordPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    data.0.validate().map_err(Error::new)?;
-    info!("Resetting password token: {:?}", data.0);
-    service.reset_password(data.0).await
+    let reset_pw = ResetPassword::validify(data.0)?;
+    info!("Resetting password token: {:?}", reset_pw);
+    service.reset_password(reset_pw).await
 }
 
 /// Logs the user out. Optionally purges their sessions, Requires a valid session to be established beforehand

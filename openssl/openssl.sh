@@ -14,7 +14,7 @@ openssl req -new -x509 -sha256 -days 365 -key 'ca-key.pem' -out 'ca.pem' -subj "
 openssl genrsa -out 'key.pem' 4096
 
 # (4) Generate a certificate signing request.
-openssl req -new -sha256 -subj "/C=HR/ST=OS/L=Osijek/O=Myco/OU=Myco/CN=localhost" -key 'key.pem' -out 'cert.csr'
+openssl req -new -sha256 -subj "/C=HR/ST=OS/L=Osijek/O=Alx/OU=Alx/CN=localhost" -key 'key.pem' -out 'cert.csr'
 
 # (5) Create a config file for the certificate. Contains DNS names or IP addresses that the cert will be valid for.
 echo "subjectAltName=DNS:localhost,IP:127.0.0.1" >extfile.cnf

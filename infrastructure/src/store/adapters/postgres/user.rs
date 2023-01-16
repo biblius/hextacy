@@ -71,7 +71,7 @@ impl UserRepository for PgUserAdapter {
             .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
     }
 
-    /// Sets the user's frozen flag to true
+    /// Update the user's email verified at field to now
     async fn update_email_verified_at(&self, user_id: &str) -> Result<User, Self::Error> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))

@@ -144,12 +144,14 @@ pub struct HandlerInput {
     pub data_type: String,
 }
 
+/// Represents a data payload expected to be received from the client
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct Data {
     pub id: String,
     pub fields: Vec<Field>,
 }
 
+/// Represents a field of a client web payload (Data)
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq)]
 pub struct Field {
     pub name: String,

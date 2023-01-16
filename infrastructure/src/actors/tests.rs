@@ -236,6 +236,32 @@ mod direct {
         Ok(())
     }
 
+    #[test]
+    fn multi_send() {
+        let sys = System::new();
+        let act = MyActor::<SampleData> {
+            id: "lmeo",
+            p: PhantomData,
+        };
+
+        // Initialize the signal
+        let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
+            lol: "lmao".to_string(),
+            lel: "lmeo".to_string(),
+        })
+        .into();
+
+        let exec = async move {
+            let addr = act.start();
+            let r = addr.send(sig.clone()).await;
+            assert!(r.is_ok());
+            let r = addr.send(sig).await;
+            assert!(r.is_ok());
+        };
+
+        sys.block_on(exec);
+    }
+
     /// Mock Actor
     struct MyActor<T> {
         id: &'static str,

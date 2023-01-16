@@ -106,7 +106,7 @@ fn handle_db_url() {
         println!("Successfully loaded POSTGRES_URL");
     }
 
-    if let Err(_) = std::env::var("DATABASE_URL") {
+    if std::env::var("DATABASE_URL").is_err() {
         println!("Enter the database name you want to run the migrations in:");
         let mut buf = String::new();
         stdin().read_line(&mut buf).expect("Couldn't read line");

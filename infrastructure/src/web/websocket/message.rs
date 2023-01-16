@@ -94,7 +94,7 @@ mod tests {
             lol: "lol".to_string(),
             lel: "lel".to_string(),
         };
-        let ws_signal = WsMessage::new("SampleData", None, data.clone());
+        let ws_signal = WsMessage::new("SampleData", None, data);
 
         let signal: Signal<SampleData> = ws_signal.into();
 

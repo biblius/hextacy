@@ -378,19 +378,13 @@ This will automagically hook up the contracts to the domain service and set up a
 
 The `analyze` function heavily relies on the [syn crate](https://docs.rs/syn/latest/syn/). It analyzes the syntax of the `data`, `handler` and `setup` files and extracts the necessary info to document the endpoint.
 
-All commands take in the `-v <bool>` flag which stands for 'verbose' and if true print what alx is doing to stdout. By default, all commands are run as `-v false`.
+All commands take in the `-v` flag which stands for 'verbose' and if true print what alx is doing to stdout. By default, all commands are run quietly.
 
 TODO:
 
 - [ ] Add maxmind and activity logging middleware
 
 - [ ] Oauth stuff
-
-- [ ] Make MW addable through CLI tool
-
-- [ ] Parse scopes with cli tool
-
-- [ ] Directories in analyzing endpoints and CLI tool (currently works only with files)
 
 - [ ] Openssl with let's encrypt
 

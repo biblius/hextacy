@@ -85,7 +85,7 @@ pub fn handle_gen_route(args: GenerateArgs, router_path: &str) {
             "mod" => boiler::plate::r#mod(&mut contents, BoilerType::Route),
             _ => {}
         }
-        fs::write(&format!("{}/{}.rs", ep_path, file), contents.clone())
+        fs::write(format!("{}/{}.rs", ep_path, file), contents.clone())
             .expect("Could't write to file");
         contents.clear();
     }
@@ -137,7 +137,7 @@ pub fn handle_gen_mw(args: GenerateArgs, mw_path: &str) {
             "mod" => boiler::plate::r#mod(&mut contents, BoilerType::MW),
             _ => {}
         }
-        fs::write(&format!("{}/{}.rs", ep_path, file), contents.clone())
+        fs::write(format!("{}/{}.rs", ep_path, file), contents.clone())
             .expect("Could't write to file");
         contents.clear();
     }

@@ -1,7 +1,7 @@
 [package]
+edition = "2021"
 name = "infrastructure"
 version = "0.1.0"
-edition = "2021"
 
 [lib]
 name = "infrastructure"
@@ -20,9 +20,9 @@ name = "generate_secret"
 path = "src/crypto/bin/generate_secret.rs"
 
 [dependencies]
+chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
-chrono = { version = "0.4", features = ["serde"] }
 
 # Config and logging
 
@@ -49,31 +49,31 @@ lettre = "0.10.1"
 
 # Storage
 
-r2d2 = "0.8.10"
-uuid = { version = "1.1.2", features = ["v4"] }
-mongodb = { version = "2.3.1", features = ["tokio-runtime", "tokio-sync"] }
-r2d2_redis = "0.14.0"
 diesel = { version = "2.0.1", features = [
-  "postgres",
   "chrono",
+  "postgres",
   "r2d2",
   "serde_json",
 ] }
+mongodb = { version = "2.3.1", features = ["tokio-runtime", "tokio-sync"] }
+r2d2 = "0.8.10"
+r2d2_redis = "0.14.0"
+uuid = { version = "1.1.2", features = ["v4"] }
 
 # Crypto
 
-data-encoding = "2.3.2"
 bcrypt = "0.13.0"
-rsa = { version = "0.6.1", features = ["pem"] }
-rand = "0.8.5"
+data-encoding = "2.3.2"
 hmac = "0.12.1"
-sha2 = "0.10.6"
 jsonwebtoken = "8.1.1"
+rand = "0.8.5"
+rsa = { version = "0.6.1", features = ["pem"] }
+sha2 = "0.10.6"
 thotp = "0.1.11"
 
 # Utility and pretty
 
 async-trait = "0.1.42"
+colored = "2.0.0"
 lazy_static = "1.4.0"
 thiserror = "1.0.37"
-colored = "2.0.0"

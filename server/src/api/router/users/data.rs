@@ -2,9 +2,10 @@ use derive_new::new;
 use infrastructure::store::repository::user::{SortOptions, User};
 use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use validify::validify;
 
-#[derive(Debug, Deserialize, Validate)]
+#[derive(Debug, Deserialize)]
+#[validify]
 #[serde(rename_all = "camelCase")]
 pub(super) struct GetUsersPaginated {
     #[validate(range(min = 1, max = 65_535))]

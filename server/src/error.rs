@@ -5,7 +5,7 @@ use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
 use thiserror::{self, Error};
-use validator::{ValidationError, ValidationErrors};
+use validify::{ValidationError, ValidationErrors};
 
 #[derive(Debug, Error)]
 pub(crate) enum Error {
@@ -39,9 +39,7 @@ pub(crate) enum Error {
 
 impl From<ValidationErrors> for Error {
     fn from(e: ValidationErrors) -> Self {
-        let mut errors = vec![];
-        Self::nest_validation_errors(e, &mut errors);
-        Self::Validation(errors)
+        Self::Validation(e.errors().to_vec())
     }
 }
 
@@ -116,27 +114,6 @@ impl Error {
         match self {
             Error::Validation(errors) => Some(errors.clone()),
             _ => None,
-        }
-    }
-
-    /// Nests validation errors to one vec
-    fn nest_validation_errors(errs: ValidationErrors, buff: &mut Vec<ValidationError>) {
-        for err in errs.errors().values() {
-            match err {
-                validator::ValidationErrorsKind::Struct(box_error) => {
-                    Self::nest_validation_errors(*box_error.clone(), buff);
-                }
-                validator::ValidationErrorsKind::List(e) => {
-                    for er in e.clone().into_values() {
-                        Self::nest_validation_errors(*er.clone(), buff);
-                    }
-                }
-                validator::ValidationErrorsKind::Field(e) => {
-                    for er in e {
-                        buff.push(er.clone());
-                    }
-                }
-            }
         }
     }
 }

@@ -193,11 +193,17 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
                                     // There's usually just one angle bracketed arg since all the data
                                     // should come from some kind of wrapper struct from data.rs
                                     match arg.args.first().unwrap() {
-                                        syn::GenericArgument::Type(t) => {
+                                        syn::GenericArgument::Type(ty) => {
                                             // The same goes for the path, this is where we'll find the
                                             // data type
-                                            if let syn::Type::Path(t) = t {
-                                                t.path.segments.first().unwrap().ident.to_string()
+                                            if let syn::Type::Path(path) = ty {
+                                                path.path
+                                                    .segments
+                                                    .first()
+                                                    .unwrap()
+                                                    .ident
+                                                    .to_string()
+                                                    .replace("Payload", "")
                                             } else {
                                                 panic!("Found a funky syn Type")
                                             }

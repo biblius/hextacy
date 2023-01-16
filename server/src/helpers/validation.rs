@@ -1,7 +1,6 @@
 use lazy_static::lazy_static;
 use regex::Regex;
 use tracing::trace;
-use validator::ValidationError;
 
 lazy_static! {
     /// Crazy email regex
@@ -22,52 +21,4 @@ lazy_static! {
     trace!("Loading AN_NON_EMPTY regex");
     Regex::new("^[a-zA-Z0-9 ]+$").unwrap()
   };
-}
-
-/// Trims the string and verifies it's not empty and is alphanumeric with spaces.
-pub fn _non_empty_alnum(input: &str) -> Result<(), ValidationError> {
-    let i = input.trim();
-    if i.is_empty() {
-        return Err(ValidationError::new("Can't be empty"));
-    }
-    if !AN_NON_EMPTY.is_match(i) {
-        return Err(ValidationError::new("Must be alphanumeric"));
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use validator::Validate;
-
-    #[derive(Debug, Validate)]
-    struct Data {
-        #[validate(custom = "_non_empty_alnum")]
-        s: &'static str,
-    }
-
-    #[test]
-    fn _non_empty() {
-        let data = Data { s: "    " };
-        assert!(matches!(data.validate(), Err(_)));
-
-        let data = Data { s: "\n" };
-        assert!(matches!(data.validate(), Err(_)));
-
-        let data = Data { s: "  ok   " };
-        assert!(matches!(data.validate(), Ok(_)));
-
-        let data = Data { s: "n0_t  ok   " };
-        assert!(matches!(data.validate(), Err(_)));
-
-        let data = Data { s: "5t1ll ok \n  " };
-        assert!(matches!(data.validate(), Ok(_)));
-    }
-
-    #[test]
-    fn email() {}
-
-    #[test]
-    fn phone() {}
 }
