@@ -16,7 +16,7 @@ pub(super) fn scan_setup(functions: Vec<syn::ItemFn>) -> Vec<Route> {
         None => vec![],
     };
 
-    // Filter out the cfg.service calls
+    // Filter out the cfg.service calls since they all end with semicolons
     let inner_calls = routes_fn_inner
         .drain(..)
         .filter(|stmt| matches!(stmt, syn::Stmt::Semi(_, _)))

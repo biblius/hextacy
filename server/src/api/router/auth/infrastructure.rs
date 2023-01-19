@@ -1,157 +1,35 @@
-use super::contract::{CacheContract, EmailContract, RepositoryContract};
-use crate::helpers::cache::Cache as Cacher;
-use crate::{error::Error, helpers::cache::CacheId};
-use async_trait::async_trait;
+use super::contract::{CacheContract, EmailContract};
+use crate::error::Error;
 use chrono::Utc;
-
 use infrastructure::clients::email::lettre::SmtpTransport;
 use infrastructure::config;
 use infrastructure::config::constants::OTP_THROTTLE_DURATION_SECONDS;
 use infrastructure::services::email;
-use infrastructure::store::adapters::postgres::PgAdapterError;
-use infrastructure::store::adapters::AdapterError;
-use infrastructure::store::models::user_session::UserSession;
-use infrastructure::store::repository::session::{Session, SessionRepository};
-use infrastructure::store::repository::user::{User, UserRepository};
+use infrastructure::storage::cache::{CacheId, Cacher};
+use infrastructure::storage::models::session::UserSession;
 use infrastructure::{
-    clients::store::redis::{Commands, Redis},
+    clients::storage::redis::{Commands, Redis},
     config::constants::{SESSION_CACHE_DURATION_SECONDS, WRONG_PASSWORD_CACHE_DURATION},
 };
 use serde::{de::DeserializeOwned, Serialize};
 use std::sync::Arc;
 use tracing::debug;
 
-#[derive(Debug)]
-pub(super) struct Repository<UR, SR>
-where
-    UR: UserRepository,
-    SR: SessionRepository,
-{
-    pub user_repo: UR,
-    pub session_repo: SR,
-}
-
-#[async_trait]
-impl<UR, SR> RepositoryContract for Repository<UR, SR>
-where
-    UR: UserRepository<Error = PgAdapterError> + Send + Sync,
-    SR: SessionRepository<Error = PgAdapterError> + Send + Sync,
-{
-    /// Creates a new user
-    async fn create_user(
-        &self,
-        email: &str,
-        username: &str,
-        password: &str,
-    ) -> Result<User, Error> {
-        debug!("Creating user with email: {}", email);
-        self.user_repo
-            .create(email, username, password)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Gets a user by their id
-    async fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
-        debug!("Getting user with ID {}", id);
-        self.user_repo
-            .get_by_id(id)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Gets a user by their email
-    async fn get_user_by_email(&self, email: &str) -> Result<User, Error> {
-        debug!("Getting user with email {}", email);
-        self.user_repo
-            .get_by_email(email)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Marks the user's account as frozen
-    async fn freeze_user(&self, user_id: &str) -> Result<User, Error> {
-        debug!("Freezing user with id: {user_id}");
-        self.user_repo
-            .freeze(user_id)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Updates the user's password field
-    async fn update_user_password(&self, user_id: &str, pw_hash: &str) -> Result<User, Error> {
-        debug!("Updating password for user: {user_id}");
-        self.user_repo
-            .update_password(user_id, pw_hash)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Updates the user's email_verified_at field upon successfully verifying their registration token
-    async fn update_email_verified_at(&self, user_id: &str) -> Result<User, Error> {
-        debug!("Updating verification status for: {user_id}");
-        self.user_repo
-            .update_email_verified_at(user_id)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Generates a random OTP secret and stores it to the user
-    async fn set_user_otp_secret(&self, user_id: &str, secret: &str) -> Result<User, Error> {
-        debug!("Setting OTP secret for: {user_id}");
-        self.user_repo
-            .update_otp_secret(user_id, secret)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Creates session for given user
-    async fn create_session(
-        &self,
-        user: &User,
-        csrf_token: &str,
-        permanent: bool,
-    ) -> Result<Session, Error> {
-        debug!("Creating session for user: {}", &user.id);
-        self.session_repo
-            .create(user, csrf_token, permanent)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Expires user session
-    async fn expire_session(&self, session_id: &str) -> Result<Session, Error> {
-        debug!("Expiring session for: {session_id}");
-        self.session_repo
-            .expire(session_id)
-            .await
-            .map_err(|e| AdapterError::Postgres(e).into())
-    }
-
-    /// Expires all user sessions
-    async fn purge_sessions<'a>(
-        &self,
-        user_id: &str,
-        skip: Option<&'a str>,
-    ) -> Result<Vec<Session>, Error> {
-        debug!("Purging all sessions for: {user_id}");
-        self.session_repo
-            .purge(user_id, skip)
-            .await
-            .map_err(|_| AdapterError::DoesNotExist("User".to_string()).into())
-    }
-}
-
 pub(super) struct Cache {
     pub client: Arc<Redis>,
 }
 
-#[async_trait]
+impl Cacher for Cache {
+    fn domain() -> &'static str {
+        "auth"
+    }
+}
+
 impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
-    async fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error> {
+    fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error> {
         debug!("Caching session with ID {}", session.id);
-        Cacher::set(
+        <Self as Cacher>::set(
             CacheId::Session,
             session_id,
             session,
@@ -162,36 +40,37 @@ impl CacheContract for Cache {
     }
 
     /// Sets a token as a key to the provided value in the cache
-    async fn set_token<T: Serialize + Sync + Send>(
+    fn set_token<T: Serialize + Sync + Send>(
         &self,
         cache_id: CacheId,
         token: &str,
         value: &T,
         ex: Option<usize>,
     ) -> Result<(), Error> {
-        Cacher::set(cache_id, token, value, ex, &mut self.client.connect()?).map_err(Error::new)
+        <Self as Cacher>::set(cache_id, token, value, ex, &mut self.client.connect()?)
+            .map_err(Error::new)
     }
 
     /// Gets a value from the cache stored under the token
-    async fn get_token<T: DeserializeOwned + Sync + Send>(
+    fn get_token<T: DeserializeOwned + Sync + Send>(
         &self,
         cache_id: CacheId,
         token: &str,
     ) -> Result<T, Error> {
-        Cacher::get(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
+        <Self as Cacher>::get(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
     }
 
     /// Deletes the value in the cache stored under the token
-    async fn delete_token(&self, cache_id: CacheId, token: &str) -> Result<(), Error> {
-        Cacher::delete(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
+    fn delete_token(&self, cache_id: CacheId, token: &str) -> Result<(), Error> {
+        <Self as Cacher>::delete(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
     }
 
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
     /// will be created, otherwise they will be incremented.
-    async fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
+    fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
         debug!("Caching login attempt for: {user_id}");
         let mut connection = self.client.connect()?;
-        let key = Cacher::prefix_id(CacheId::LoginAttempts, &user_id);
+        let key = Self::construct_key(CacheId::LoginAttempts, user_id);
         match connection.incr::<&str, u8, u8>(&key, 1) {
             Ok(c) => Ok(c),
             Err(_) => connection
@@ -201,23 +80,30 @@ impl CacheContract for Cache {
     }
 
     /// Removes the user's login attempts from the cache
-    async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
+    fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
         debug!("Deleting login attempts for: {}", &user_id);
-        Cacher::delete(CacheId::LoginAttempts, user_id, &mut self.client.connect()?)
+        <Self as Cacher>::delete(CacheId::LoginAttempts, user_id, &mut self.client.connect()?)
             .map_err(Error::new)
     }
 
-    /// The first attempt sets the throttle to now. Each subsequent one increments it by 3 seconds.
-    async fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
+    /// Cache the OTP throttle and attempts. The throttle always gets set to now and the attempts always get
+    /// incremented. The domain takes care of the actual throttling.
+    fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
         debug!("Throttling OTP attempts for: {user_id}");
 
         let mut connection = self.client.connect()?;
-        let throttle_key = Cacher::prefix_id(CacheId::OTPThrottle, &user_id);
-        let attempt_key = Cacher::prefix_id(CacheId::OTPAttempts, &user_id);
+
+        let throttle_key = Self::construct_key(CacheId::OTPThrottle, user_id);
+        let attempt_key = Self::construct_key(CacheId::OTPAttempts, user_id);
+
+        println!("THROTTLE KEY: {}", throttle_key);
 
         match connection.get::<&str, Option<i64>>(&attempt_key) {
             Ok(attempts) => {
+                // Increment or init the attempts
                 let attempts = attempts.map_or_else(|| 1, |a| a + 1);
+
+                // Override the throttle key to now
                 connection
                     .set_ex::<&str, i64, _>(
                         &throttle_key,
@@ -225,6 +111,8 @@ impl CacheContract for Cache {
                         OTP_THROTTLE_DURATION_SECONDS,
                     )
                     .map_err(Error::new)?;
+
+                // Increment the number of failed attempts
                 connection
                     .set_ex::<&str, i64, String>(
                         &attempt_key,
@@ -235,6 +123,7 @@ impl CacheContract for Cache {
                 Ok(attempts)
             }
             Err(_) => {
+                // No key has been found in which case we cache
                 connection
                     .set_ex::<&str, i64, _>(
                         &throttle_key,
@@ -249,10 +138,10 @@ impl CacheContract for Cache {
         }
     }
 
-    async fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
+    fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
         let mut conn = self.client.connect()?;
-        Cacher::delete(CacheId::OTPThrottle, user_id, &mut conn)?;
-        Cacher::delete(CacheId::OTPAttempts, user_id, &mut conn)?;
+        <Self as Cacher>::delete(CacheId::OTPThrottle, user_id, &mut conn)?;
+        <Self as Cacher>::delete(CacheId::OTPAttempts, user_id, &mut conn)?;
         Ok(())
     }
 }
@@ -261,9 +150,8 @@ pub(super) struct Email {
     pub client: Arc<SmtpTransport>,
 }
 
-#[async_trait]
 impl EmailContract for Email {
-    async fn send_registration_token(
+    fn send_registration_token(
         &self,
         token: &str,
         username: &str,
@@ -287,12 +175,7 @@ impl EmailContract for Email {
         .map_err(Error::new)
     }
 
-    async fn send_reset_password(
-        &self,
-        username: &str,
-        email: &str,
-        temp_pw: &str,
-    ) -> Result<(), Error> {
+    fn send_reset_password(&self, username: &str, email: &str, temp_pw: &str) -> Result<(), Error> {
         debug!("Sending reset password email to {email}");
         let mail = email::from_template(
             "reset_password",
@@ -301,12 +184,7 @@ impl EmailContract for Email {
         email::send(None, username, email, "Reset password", mail, &self.client).map_err(Error::new)
     }
 
-    async fn alert_password_change(
-        &self,
-        username: &str,
-        email: &str,
-        token: &str,
-    ) -> Result<(), Error> {
+    fn alert_password_change(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
@@ -318,12 +196,7 @@ impl EmailContract for Email {
             .map_err(Error::new)
     }
 
-    async fn send_forgot_password(
-        &self,
-        username: &str,
-        email: &str,
-        token: &str,
-    ) -> Result<(), Error> {
+    fn send_forgot_password(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending forgot password email to {email}");
         let mail = email::from_template(
             "forgot_password",
@@ -340,12 +213,7 @@ impl EmailContract for Email {
         .map_err(Error::new)
     }
 
-    async fn send_freeze_account(
-        &self,
-        username: &str,
-        email: &str,
-        token: &str,
-    ) -> Result<(), Error> {
+    fn send_freeze_account(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
         let domain = config::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");

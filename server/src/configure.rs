@@ -2,7 +2,7 @@ use crate::api::router;
 use actix_web::web::ServiceConfig;
 use infrastructure::clients::{
     email,
-    store::{postgres::Postgres, redis::Redis},
+    storage::{postgres::Postgres, redis::Redis},
 };
 use std::sync::Arc;
 use tracing::info;

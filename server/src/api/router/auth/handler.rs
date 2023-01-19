@@ -9,8 +9,8 @@ use super::{
     },
 };
 use crate::error::Error;
+use crate::helpers::request::extract_session;
 use actix_web::{web, HttpRequest, Responder};
-use infrastructure::web::http::request::extract_session;
 use tracing::info;
 use validify::Validify;
 
@@ -22,7 +22,7 @@ pub(super) async fn login<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let credentials = Credentials::validify(data.0)?;
     info!("Credentials login : {:?}", credentials);
-    service.login(credentials).await
+    service.login(credentials)
 }
 
 /// Starts the registration process for the user and sends an email containing a temporary
@@ -33,7 +33,7 @@ pub(super) async fn start_registration<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let registration = RegistrationData::validify(data.0)?;
     info!("Start Registration: {:?}", registration);
-    service.start_registration(registration).await
+    service.start_registration(registration)
 }
 
 /// Verifies the user's registration token
@@ -43,7 +43,7 @@ pub(super) async fn verify_registration_token<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let email_token = EmailToken::validify(data.0)?;
     info!("Verify registration token: {:?}", email_token);
-    service.verify_registration_token(email_token).await
+    service.verify_registration_token(email_token)
 }
 
 /// Resend the user's registration token in case it expired
@@ -53,7 +53,7 @@ pub(super) async fn resend_registration_token<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let reg_token = ResendRegToken::validify(data.0)?;
     info!("Resend registration token: {:?}", reg_token.email);
-    service.resend_registration_token(reg_token).await
+    service.resend_registration_token(reg_token)
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
@@ -63,7 +63,7 @@ pub(super) async fn set_otp_secret<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let session = extract_session(req)?;
     info!("Registering OTP secret for: {}", session.user_id);
-    service.set_otp_secret(&session.user_id).await
+    service.set_otp_secret(&session.user_id)
 }
 
 /// Verifies the user's OTP if they have 2FA enabled
@@ -73,7 +73,7 @@ pub(super) async fn verify_otp<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let otp = Otp::validify(data.0)?;
     info!("OTP login : {:?}", otp);
-    service.verify_otp(otp).await
+    service.verify_otp(otp)
 }
 
 /// Changes the user's password and purges all their sessions
@@ -85,7 +85,7 @@ pub(super) async fn change_password<T: ServiceContract>(
     let change_pw = ChangePassword::validify(data.0)?;
     let session = extract_session(req)?;
     info!("Updating password for {}", session.user_id);
-    service.change_password(session, change_pw).await
+    service.change_password(session, change_pw)
 }
 
 /// Sends a forgot password token via email
@@ -95,7 +95,7 @@ pub(super) async fn forgot_password<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let forgot_pw = ForgotPassword::validify(data.0)?;
     info!("Forgot password, sending token to {}", forgot_pw.email);
-    service.forgot_password(forgot_pw).await
+    service.forgot_password(forgot_pw)
 }
 
 /// Changes the user's password and purges all their sessions
@@ -105,7 +105,7 @@ pub(super) async fn verify_forgot_password<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let forgot_pw_v = ForgotPasswordVerify::validify(data.0)?;
     info!("Forgot password, setting new");
-    service.verify_forgot_password(forgot_pw_v).await
+    service.verify_forgot_password(forgot_pw_v)
 }
 
 /// Changes the user's password and purges all their sessions
@@ -115,7 +115,7 @@ pub(super) async fn reset_password<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let reset_pw = ResetPassword::validify(data.0)?;
     info!("Resetting password token: {:?}", reset_pw);
-    service.reset_password(reset_pw).await
+    service.reset_password(reset_pw)
 }
 
 /// Logs the user out. Optionally purges their sessions, Requires a valid session to be established beforehand
@@ -126,5 +126,5 @@ pub(super) async fn logout<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let session = extract_session(req)?;
     info!("Logging out {}", session.user_id);
-    service.logout(session, data.0).await
+    service.logout(session, data.0)
 }

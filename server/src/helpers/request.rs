@@ -1,8 +1,5 @@
 use actix_web::{HttpMessage, HttpRequest};
-
-use crate::store::models::user_session::UserSession;
-
-use super::HttpError;
+use infrastructure::{storage::models::session::UserSession, web::http::HttpError};
 
 /// Utility for quickly dropping the request extensions reference and getting the
 /// cloned session

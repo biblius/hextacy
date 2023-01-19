@@ -1,3 +1,3 @@
-pub mod cache;
-pub mod lazy;
+pub mod request;
+pub mod resources;
 pub mod validation;

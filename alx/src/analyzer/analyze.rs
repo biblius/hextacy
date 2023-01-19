@@ -12,6 +12,13 @@ use std::{
     path::Path,
 };
 
+/// Maps endpoint names to their respective properties.
+///
+/// Scanned files include:
+///
+/// - handler.rs
+/// - setup.rs
+/// - data.rs
 #[derive(Debug)]
 pub struct ScanResult {
     pub handlers: HashMap<String, Vec<Handler>>,
@@ -19,6 +26,7 @@ pub struct ScanResult {
     pub data: HashMap<String, Vec<Data>>,
 }
 
+/// Enumeration of the types of files
 #[derive(Debug)]
 pub enum FileScanResult {
     Handlers(Vec<Handler>),

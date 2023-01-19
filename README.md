@@ -12,11 +12,24 @@ Here you'll find all the database clients, adapters and repositories as well as 
 
 The most notable here is the *store* module, where data sources are located. It is divided in to three parts:
 
-### **Store**
+### **Storage**
 
 - #### **Repository**
 
-  Contains data structures and the interfaces with which we interact with them. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the domain logic.
+  Contains interfaces for interacting with application models. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the domain logic.
+
+  A very simple repository would look something like:
+
+  ```rust
+  pub trait UserRepository {
+    fn get_paginated(
+        &self,
+        page: u16,
+        per_page: u16,
+        sort_by: Option<SortOptions>,
+    ) -> Result<Vec<User>, RepositoryError>;
+  }
+  ```
 
 - #### **Adapters**
 
@@ -24,7 +37,11 @@ The most notable here is the *store* module, where data sources are located. It 
 
 - #### **Models**
 
-  Where application models are located. These aren't necessarily meant to be stored in databases and serve as utility structures for responses, the cache and intermediary data that can be used across the project.
+  Where application models are located.
+
+- #### **Cache**
+
+  Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
 
 The store adapters utilize connections established from the clients module:
 
@@ -32,7 +49,7 @@ The store adapters utilize connections established from the clients module:
 
 Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs.
 
-### **Actors**
+### **Actors** TODO: Restructure this to just a websocket handler
 
 Module containing an implementation of a basic broadcastable message and a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
@@ -77,15 +94,6 @@ The router contains the endpoints of the server. The endpoints provide a compact
   pub(super) trait ServiceContract {
     async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
   }
-
-  #[async_trait]
-  pub(super) trait RepositoryContract {
-    async fn get_paginated(
-        &self,
-        page: u16,
-        per_page: u16,
-    ) -> Result<Vec<User>, Error>;
-  }
   ```
 
   No implementation details are written here, only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
@@ -96,7 +104,8 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
   ```rust
   // We expect this in the query params
-  #[derive(Debug, Deserialize, Validate)]
+  #[derive(Debug, Deserialize)]
+  #[validify]
   #[serde(rename_all = "camelCase")]
   pub(super) struct GetUsersPaginated {
     #[validate(range(min = 1, max = 65_535))]
@@ -112,10 +121,9 @@ The router contains the endpoints of the server. The endpoints provide a compact
     users: Vec<User>,
   }
   impl Response for UserResponse {}
-
   ```
 
-  We also specify how the inputs get validated by the [validator](https://docs.rs/validator/latest/validator/) crate. The response trait is a utility trait for converting this struct to a response, as you'll see in the domain.
+  We also specify how the inputs get validated by the [validify](https://crates.io/crates/validify) crate. The response trait is a utility trait for converting this struct to a response, as you'll see in the domain.
 
 - #### **infrastructure.rs**
 
@@ -124,17 +132,17 @@ The router contains the endpoints of the server. The endpoints provide a compact
   ```rust
   use super::contract::RepositoryContract;
 
-  pub(super) struct Repository<UR>
+  pub(super) struct Repository<R>
   where
-    UR: UserRepository,
+    R: UserRepository,
   {
-    pub user_repo: UR,
+    pub user_repo: R,
   }
 
   #[async_trait]
-  impl<UR> RepositoryContract for Repository<UR>
+  impl<R> RepositoryContract for Repository<R>
   where
-    UR: UserRepository<Error = PgAdapterError> + Send + Sync,
+    R: UserRepository + Send + Sync,
   {
     async fn get_paginated(
         &self,
@@ -150,28 +158,28 @@ The router contains the endpoints of the server. The endpoints provide a compact
   }
   ```
 
-  Here, `UserRepository` is again seperated from the business logic as we can plug in any adapter that implements it. In our case we are using the `PgUserAdapter`, a struct containing a postgres specific implementation and we define the error type to be a `PgAdapterError` as `Repository` requires a specific error for each implementation.
+  Note that this is solely to demonstrate what an infrastructure file would look like. Normally, one would define the service to directly contain the user repository (as shown below in the domain) so this file, in the case of this example is unnecessary. Check out the `auth` endpoint from the server to see what it would actually look like.
 
 - #### **domain.rs**
 
   Here we define the domain logic, i.e. we implement the behaviour we want this service to have when we get a request for this route. This part is where all of the infrastructure pieces tie together and perform the business. This is where we implement the `ServiceContract` for this module's `UserService` struct.
 
   ```rust
-  use super::{
-    contract::{RepositoryContract, ServiceContract},
+  use super::contract::ServiceContract;
+  use infrastructure::storage::repository::user::UserRepository;
 
-  pub(super) struct UserService<R: RepositoryContract> {
-    pub repository: R,
+  pub(super) struct UserService<R: UserRepository> {
+    pub user_repo: R,
   }
 
   #[async_trait]
   impl<R> ServiceContract for UserService<R>
   where
-    R: RepositoryContract + Send + Sync,
+    R: UserRepository + Send + Sync,
   {
     async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
         let users = self
-            .repository
+            .user_repo
             .get_paginated(
                 data.page.unwrap_or(1_u16),
                 data.per_page.unwrap_or(25),
@@ -213,22 +221,20 @@ The router contains the endpoints of the server. The endpoints provide a compact
 
   pub(crate) fn routes(pg: Arc<Postgres>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repository: Repository {
-            user_repo: PgUserAdapter { client: pg.clone() },
-        },
+          user_repo: PgUserAdapter { client: pg.clone() },
     };
 
     cfg.app_data(Data::new(service));
 
     cfg.service(
         web::resource("/users")
-            .route(web::get().to(handler::get_paginated::<UserService<Repository<PgUserAdapter>>>))
+            .route(web::get().to(handler::get_paginated::<UserService<PgUserAdapter>>))
     );
   }
 
   ```
 
-  This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository.
+  This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository. Also note that this is the only file we specify the exact adapter to plug in to the service.
 
 #### **Middleware**
 

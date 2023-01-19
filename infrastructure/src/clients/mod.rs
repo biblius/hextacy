@@ -1,5 +1,5 @@
 pub mod email;
-pub mod store;
+pub mod storage;
 
 use thiserror::Error;
 

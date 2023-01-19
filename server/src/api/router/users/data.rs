@@ -1,5 +1,5 @@
 use derive_new::new;
-use infrastructure::store::repository::user::{SortOptions, User};
+use infrastructure::storage::models::user::{SortOptions, User};
 use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use validify::validify;

@@ -4,6 +4,7 @@ use std::{fmt::Display, fs, path::Path};
 
 const INDENT: &str = "    ";
 
+/// A rust representation of the alx.json documentation file
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct ProjectConfig {
     pub endpoints: Vec<Endpoint>,

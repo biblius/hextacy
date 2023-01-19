@@ -1,18 +1,15 @@
-use std::sync::Arc;
-
 use super::{schema::sessions, PgAdapterError};
 use crate::{
-    clients::store::postgres::Postgres,
-    store::repository::{
-        role::Role,
-        session::{Session, SessionRepository},
-        user::User,
+    clients::storage::postgres::Postgres,
+    storage::{
+        models::{session::Session, user::User},
+        repository::{role::Role, session::SessionRepository, RepositoryError},
     },
 };
-use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
+use std::sync::Arc;
 
 #[derive(Debug, Serialize, Insertable)]
 #[diesel(table_name = sessions)]
@@ -29,16 +26,9 @@ pub struct PgSessionAdapter {
     pub client: Arc<Postgres>,
 }
 
-#[async_trait]
 impl SessionRepository for PgSessionAdapter {
-    type Error = PgAdapterError;
     /// Create a new user session. If the permanent flag is true, the session's `expires_at` field will be set to the maximum possible value
-    async fn create(
-        &self,
-        user: &User,
-        csrf: &str,
-        permanent: bool,
-    ) -> Result<Session, PgAdapterError> {
+    fn create(&self, user: &User, csrf: &str, permanent: bool) -> Result<Session, RepositoryError> {
         use super::schema::sessions::dsl::*;
 
         let new = NewSession {
@@ -56,57 +46,51 @@ impl SessionRepository for PgSessionAdapter {
         diesel::insert_into(sessions)
             .values(new)
             .get_result::<Session>(&mut self.client.connect()?)
-            .map_err(PgAdapterError::new)
+            .map_err(|e| e.into())
     }
 
     /// Gets an unexpired session with its corresponding CSRF token
-    async fn get_valid_by_id(
-        &self,
-        session_id: &str,
-        csrf: &str,
-    ) -> Result<Session, PgAdapterError> {
+    fn get_valid_by_id(&self, session_id: &str, csrf: &str) -> Result<Session, RepositoryError> {
         use super::schema::sessions::dsl::*;
         sessions
             .filter(id.eq(session_id))
             .filter(csrf_token.eq(csrf))
             .filter(expires_at.gt(chrono::Utc::now()))
             .first::<Session>(&mut self.client.connect()?)
-            .map_err(PgAdapterError::new)
+            .map_err(|e| e.into())
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
-    async fn refresh(&self, session_id: &str, csrf: &str) -> Result<Session, PgAdapterError> {
+    fn refresh(&self, session_id: &str, csrf: &str) -> Result<Session, RepositoryError> {
         use super::schema::sessions::dsl::*;
 
         diesel::update(sessions)
             .filter(id.eq(session_id))
             .filter(csrf_token.eq(csrf))
             .set(expires_at.eq(Utc::now() + Duration::minutes(30)))
-            .load::<Session>(&mut self.client.connect()?)
-            .map_err(PgAdapterError::new)?
+            .load::<Session>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()).into())
     }
 
     /// Updates the sessions `expires_at` field to now
-    async fn expire(&self, session_id: &str) -> Result<Session, PgAdapterError> {
+    fn expire(&self, session_id: &str) -> Result<Session, RepositoryError> {
         use super::schema::sessions::dsl::*;
 
         diesel::update(sessions)
             .filter(id.eq(session_id))
             .set(expires_at.eq(Utc::now()))
-            .load::<Session>(&mut self.client.connect()?)
-            .map_err(PgAdapterError::new)?
+            .load::<Session>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("Session".to_string()).into())
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    async fn purge<'a>(
+    fn purge<'a>(
         &self,
         usr_id: &str,
         skip: Option<&'a str>,
-    ) -> Result<Vec<Session>, PgAdapterError> {
+    ) -> Result<Vec<Session>, RepositoryError> {
         use super::schema::sessions::dsl::*;
 
         let mut query = diesel::update(sessions)
@@ -121,6 +105,6 @@ impl SessionRepository for PgSessionAdapter {
 
         query
             .load::<Session>(&mut self.client.connect()?)
-            .map_err(PgAdapterError::new)
+            .map_err(|e| e.into())
     }
 }

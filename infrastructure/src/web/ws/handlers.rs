@@ -17,7 +17,7 @@ where
     }
 }
 
-/// A handler for the websocket data stream. All the signals received from the client will land
+/// A handler for the websocket data stream. All messages received from the client will land
 /// on the `ws::Message::Text` where the actor then handles the signal appropriately.
 impl<T> StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession<T>
 where

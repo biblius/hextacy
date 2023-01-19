@@ -18,13 +18,12 @@ pub const INDENT: &str = "    ";
 pub const DEFAULT_API_PATH: &str = "server/src/api";
 pub const DEFAULT_MIDDLEWARE_PATH: &str = "server/src/api/middleware";
 pub const DEFAULT_ROUTER_PATH: &str = "server/src/api/router";
-pub const ROUTE_FILES: [&str; 7] = [
+pub const ROUTE_FILES: [&str; 6] = [
     "contract",
     "data",
     "domain",
     "handler",
     "infrastructure",
-    "mod",
     "setup",
 ];
 pub const MW_FILES: [&str; 5] = ["contract", "domain", "infrastructure", "interceptor", "mod"];

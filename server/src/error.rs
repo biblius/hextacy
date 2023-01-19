@@ -1,6 +1,5 @@
-use crate::helpers::cache::CacheId;
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::clients::store::redis;
+use infrastructure::{clients::storage::redis, storage::cache::CacheId};
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -14,9 +13,11 @@ pub(crate) enum Error {
     #[error("Client Error: {0}")]
     ClientError(#[from] infrastructure::clients::ClientError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] crate::helpers::cache::CacheError),
+    Cache(#[from] infrastructure::storage::cache::CacheError),
     #[error("Adapter Error: {0}")]
-    Adapter(#[from] infrastructure::store::adapters::AdapterError),
+    Adapter(#[from] infrastructure::storage::adapters::AdapterError),
+    #[error("Repository Error: {0}")]
+    Repository(#[from] infrastructure::storage::repository::RepositoryError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
@@ -97,7 +98,7 @@ impl Error {
             /*
              * Adapter
              */
-            Self::Adapter(infrastructure::store::adapters::AdapterError::DoesNotExist(r)) => {
+            Self::Adapter(infrastructure::storage::adapters::AdapterError::DoesNotExist(r)) => {
                 ("NOT_FOUND", format!("Resource does not exist: {}", r))
             }
 

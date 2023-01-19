@@ -1,18 +1,16 @@
-use super::{domain::UserService, handler, infrastructure::Repository};
+use super::{domain::UserService, handler};
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
 use infrastructure::{
-    clients::store::{postgres::Postgres, redis::Redis},
-    store::adapters::postgres::user::PgUserAdapter,
-    store::repository::role::Role,
+    clients::storage::{postgres::Postgres, redis::Redis},
+    storage::adapters::postgres::user::PgUserAdapter,
+    storage::repository::role::Role,
 };
 use std::sync::Arc;
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repository: Repository {
-            user_repo: PgUserAdapter { client: pg.clone() },
-        },
+        repository: PgUserAdapter { client: pg.clone() },
     };
     let auth_guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 
@@ -21,7 +19,7 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
     // Show all
     cfg.service(
         web::resource("/users")
-            .route(web::get().to(handler::get_paginated::<UserService<Repository<PgUserAdapter>>>))
+            .route(web::get().to(handler::get_paginated::<UserService<PgUserAdapter>>))
             .wrap(auth_guard),
     );
 }

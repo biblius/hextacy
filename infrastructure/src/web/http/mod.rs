@@ -1,6 +1,5 @@
 pub mod cookie;
 pub mod cors;
-pub mod request;
 pub mod response;
 pub mod security_headers;
 

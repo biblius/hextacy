@@ -1,9 +1,11 @@
 use super::{schema::users, PgAdapterError};
 use crate::{
-    clients::store::postgres::Postgres,
-    store::repository::user::{SortOptions, User, UserRepository},
+    clients::storage::postgres::Postgres,
+    storage::{
+        models::user::{SortOptions, User},
+        repository::{user::UserRepository, RepositoryError},
+    },
 };
-use async_trait::async_trait;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -21,16 +23,13 @@ pub struct PgUserAdapter {
     pub client: Arc<Postgres>,
 }
 
-#[async_trait]
 impl UserRepository for PgUserAdapter {
-    type Error = PgAdapterError;
-
-    async fn create(
+    fn create(
         &self,
         user_email: &str,
         user_name: &str,
         user_pw: &str,
-    ) -> Result<User, Self::Error> {
+    ) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         diesel::insert_into(users)
             .values(NewUser {
@@ -39,79 +38,75 @@ impl UserRepository for PgUserAdapter {
                 password: user_pw,
             })
             .get_result::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)
+            .map_err(|e| e.into())
     }
 
     /// Fetches a user by their ID
-    async fn get_by_id(&self, user_id: &str) -> Result<User, Self::Error> {
+    fn get_by_id(&self, user_id: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         users
             .filter(id.eq(user_id))
             .first::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)
+            .map_err(|e| e.into())
     }
 
     /// Fetches a user by their email
-    async fn get_by_email(&self, user_email: &str) -> Result<User, Self::Error> {
+    fn get_by_email(&self, user_email: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         users
             .filter(email.eq(user_email))
             .first::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)
+            .map_err(|e| e.into())
     }
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
-    async fn update_password(&self, user_id: &str, pw_hash: &str) -> Result<User, Self::Error> {
+    fn update_password(&self, user_id: &str, pw_hash: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(password.eq(pw_hash))
-            .load::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)?
+            .load::<User>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()).into())
     }
 
     /// Update the user's email verified at field to now
-    async fn update_email_verified_at(&self, user_id: &str) -> Result<User, Self::Error> {
+    fn update_email_verified_at(&self, user_id: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(email_verified_at.eq(chrono::Utc::now()))
-            .load::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)?
+            .load::<User>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()).into())
     }
 
     /// Updates the user's OTP secret to the given key
-    async fn update_otp_secret(&self, user_id: &str, secret: &str) -> Result<User, Self::Error> {
+    fn update_otp_secret(&self, user_id: &str, secret: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(otp_secret.eq(Some(secret)))
-            .load::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)?
+            .load::<User>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()).into())
     }
 
     /// Sets the user's frozen flag to true
-    async fn freeze(&self, user_id: &str) -> Result<User, Self::Error> {
+    fn freeze(&self, user_id: &str) -> Result<User, RepositoryError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
-            .load::<User>(&mut self.client.connect()?)
-            .map_err(Self::Error::new)?
+            .load::<User>(&mut self.client.connect()?)?
             .pop()
-            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()))
+            .ok_or_else(|| PgAdapterError::DoesNotExist("User".to_string()).into())
     }
 
     /// Returns the total count of users and a vec of users constrained by the options as
     /// the first and second element respectively
-    async fn get_paginated(
+    fn get_paginated(
         &self,
         page: u16,
         per_page: u16,
         sort: Option<SortOptions>,
-    ) -> Result<Vec<User>, Self::Error> {
+    ) -> Result<Vec<User>, RepositoryError> {
         use super::schema::users::dsl::*;
         let mut query = users.into_boxed();
 

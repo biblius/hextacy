@@ -71,9 +71,10 @@ rsa = { version = "0.6.1", features = ["pem"] }
 sha2 = "0.10.6"
 thotp = "0.1.11"
 
-# Utility and pretty
+# Utility and testing
 
 async-trait = "0.1.42"
 colored = "2.0.0"
 lazy_static = "1.4.0"
+mockall = "0.11.3"
 thiserror = "1.0.37"

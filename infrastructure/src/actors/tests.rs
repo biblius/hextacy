@@ -126,7 +126,7 @@ mod broker {
 
 mod direct {
     use super::super::Signal;
-    use crate::web::websocket::message::WsMessage;
+    use crate::web::ws::message::WsMessage;
     use actix::{
         fut, Actor, ActorFutureExt, Context, ContextFutureSpawner, Handler, Recipient, System,
         WrapFuture,

@@ -1,10 +1,8 @@
 use super::user::User;
-use super::{role::Role, RepositoryError};
-use async_trait::async_trait;
+use crate::storage::repository::role::Role;
 use chrono::NaiveDateTime;
-use diesel::prelude::*;
+use diesel::Queryable;
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 
 /// The repository session model
 #[derive(Debug, Clone, Deserialize, Serialize, Queryable)]
@@ -46,31 +44,40 @@ impl Session {
     }
 }
 
-#[async_trait]
-pub trait SessionRepository {
-    type Error: Error + Into<RepositoryError>;
+/// A cacheable struct with a session and its user appended to it for quick access.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UserSession {
+    pub id: String,
+    pub csrf: String,
+    pub user_id: String,
+    pub user_role: Role,
+    pub user_email: String,
+    pub user_name: String,
+    pub user_phone: Option<String>,
+    pub frozen: bool,
+    pub google_id: Option<String>,
+    pub github_id: Option<String>,
+    pub expires_at: i64,
+}
 
-    /// Create a session
-    async fn create(
-        &self,
-        user: &User,
-        csrf: &str,
-        permanent: bool,
-    ) -> Result<Session, Self::Error>;
+impl UserSession {
+    pub fn new(user: User, session: Session) -> Self {
+        Self {
+            id: session.id,
+            csrf: session.csrf_token,
+            user_id: user.id,
+            user_role: user.role,
+            user_email: user.email,
+            user_name: user.username,
+            user_phone: user.phone,
+            frozen: user.frozen,
+            google_id: user.google_id,
+            github_id: user.github_id,
+            expires_at: session.expires_at.timestamp(),
+        }
+    }
 
-    /// Get unexpired session corresponding to the CSRF token
-    async fn get_valid_by_id(&self, id: &str, csrf: &str) -> Result<Session, Self::Error>;
-
-    /// Update session's `expires_at` field
-    async fn refresh(&self, id: &str, csrf: &str) -> Result<Session, Self::Error>;
-
-    /// Update session's `expires_at` field to now
-    async fn expire(&self, id: &str) -> Result<Session, Self::Error>;
-
-    /// Expire all user sessions. A session ID can be provided to skip purging a specific session.
-    async fn purge<'a>(
-        &self,
-        user_id: &str,
-        skip: Option<&'a str>,
-    ) -> Result<Vec<Session>, Self::Error>;
+    pub fn is_permanent(&self) -> bool {
+        self.expires_at == NaiveDateTime::MAX.timestamp()
+    }
 }

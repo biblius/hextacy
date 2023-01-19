@@ -1,4 +1,4 @@
-use crate::helpers::lazy::resources::FAVICON;
+use crate::helpers::resources::FAVICON;
 use actix_web::{body::BoxBody, HttpResponseBuilder, Responder};
 use reqwest::{header, StatusCode};
 
