@@ -6,14 +6,15 @@ use std::{fmt::Debug, time::Instant};
 use tracing::{error, trace, warn};
 
 /// The session actor implements a handler only for the `RawJson` message type.
-/// Any message sent to this actor will get sent back to the web socket context as JSON data.
+/// Any RawJson message sent to this actor will get sent back to the web socket context as JSON data.
 impl<T> Handler<RawJson> for WsSession<T>
 where
-    T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Clone,
+    T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Message,
+    <T as Message>::Result: Send,
 {
     type Result = ();
     fn handle(&mut self, msg: RawJson, context: &mut Self::Context) {
-        context.text(msg.to_inner());
+        context.text(msg.into_inner());
     }
 }
 
@@ -21,7 +22,8 @@ where
 /// on the `ws::Message::Text` where the actor then handles the signal appropriately.
 impl<T> StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession<T>
 where
-    T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Clone,
+    T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Message,
+    <T as Message>::Result: Send,
 {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, context: &mut Self::Context) {
         let msg = match msg {
@@ -42,7 +44,7 @@ where
                 trace!("Session: {} got pong", self.id,)
             }
             ws::Message::Text(text) => {
-                self.handle_ws_signal(text.to_string(), context)
+                self.handle_ws_message(text.to_string())
                     .map_err(|e| error!("An error occurred while processing a message: {e}"))
                     .unwrap();
             }

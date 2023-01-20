@@ -49,7 +49,7 @@ The store adapters utilize connections established from the clients module:
 
 Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs.
 
-### **Actors** TODO: Restructure this to just a websocket handler
+### **Actors**
 
 Module containing an implementation of a basic broadcastable message and a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 

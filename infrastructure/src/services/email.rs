@@ -1,29 +1,39 @@
-use crate::{clients::ClientError, config};
+use crate::clients::ClientError;
 use lettre::{message::header::ContentType, Message, SmtpTransport, Transport};
 use std::{fmt::Write, fs, path::Path};
 use tracing::debug;
 
-pub const EMAIL_DIRECTORY: &str = "resources/emails";
-
 /// Load a template from an HTML file and replace all the keywords with the targets.
 /// Keywords must be formatted as `{{keyword}}`.
-pub fn from_template(template_name: &str, replacements: &[(&str, &str)]) -> String {
-    let template = fs::read_to_string(Path::new(&format!(
-        "{}/{}.html",
-        EMAIL_DIRECTORY, template_name
-    )))
-    .expect("Couldn't load template");
+pub fn from_template(dir: &str, template_name: &str, replacements: &[(&str, &str)]) -> String {
+    let template = fs::read_to_string(Path::new(&format!("{}/{}.html", dir, template_name)))
+        .expect("Couldn't load template");
 
     let mut email = String::new();
-    'first: for line in template.lines() {
-        for (search, target) in replacements {
-            let search = format!("{{{{{}}}}}", search);
-            if line.contains(&search) {
-                writeln!(email, "{}", line.replace(&search, target)).unwrap();
-                continue 'first;
+
+    for line in template.lines() {
+        let mut buf = String::new();
+
+        for (target, replace_with) in replacements {
+            // Target {{vars}} with rusty hyper-dimensional vag
+            let target = format!("{{{{{}}}}}", target);
+
+            if !line.contains(&target) {
+                continue;
+            }
+
+            if buf.is_empty() {
+                buf = line.replace(&target, replace_with);
+            } else {
+                buf = buf.replace(&target, replace_with)
             }
         }
-        writeln!(email, "{}", line).unwrap();
+        if !buf.is_empty() {
+            writeln!(email, "{}", buf).unwrap();
+        } else {
+            writeln!(email, "{}", line).unwrap();
+        }
+        buf.clear()
     }
     email
 }
@@ -37,10 +47,10 @@ pub fn send(
     body: String,
     client: &SmtpTransport,
 ) -> Result<(), ClientError> {
-    let sender = config::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
+    let sender = crate::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
 
     let from = from.map_or_else(
-        || format!("rps_chat <{}>", sender),
+        || format!("Alx <{}>", sender),
         |s| format!("{} <{}>", s, sender),
     );
     let to = format!("{} <{}>", to_uname, to_email);

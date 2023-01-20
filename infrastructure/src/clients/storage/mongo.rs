@@ -1,4 +1,4 @@
-use crate::config::env;
+use crate::env;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
     sync::Client as SyncClient,

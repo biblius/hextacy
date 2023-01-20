@@ -1,4 +1,3 @@
-use super::env;
 use env_logger::fmt::Color;
 use log4rs::{
     append::file::FileAppender,
@@ -6,14 +5,27 @@ use log4rs::{
     encode::pattern::PatternEncoder,
     Config,
 };
-use std::io::Write;
+use std::{env, io::Write};
 use tracing::log::{Level, LevelFilter};
 
+/// Represents the logging level:
+///
+/// 0 => OFF
+///
+/// 1 => INFO
+///
+/// 2 => DEBUG
+///
+/// 3 => TRACE
+///
+/// Errors and warns are always logged.
+
 pub fn init(level: &str) {
+    // Set to trace since we filter out everything with our custom log level
     match level {
         "info" | "INFO" | "debug" | "DEBUG" | "trace" | "TRACE" | "error" | "ERROR" | "warn"
-        | "WARN" | "off" | "OFF" => env::set("RUST_LOG", level),
-        _ => env::set("RUST_LOG", "info"),
+        | "WARN" | "off" | "OFF" => env::set_var("RUST_LOG", level),
+        _ => env::set_var("RUST_LOG", "info"),
     };
 
     env_logger::builder()
@@ -22,7 +34,6 @@ pub fn init(level: &str) {
         .format_suffix("\n")
         .format(|buf, record| {
             let mut style = buf.style();
-
             match record.level() {
                 Level::Error => style.set_color(Color::Red),
                 Level::Warn => style.set_color(Color::Yellow),
@@ -33,18 +44,18 @@ pub fn init(level: &str) {
 
             // Pings in this module are at debug level for some reason so we don't want to
             // include it in the output
-            if !record.target().contains("h2::codec") {
-                writeln!(
-                    buf,
-                    "{} | {} | {} | {}",
-                    &chrono::Utc::now().to_string().replace('T', " ")[0..21],
-                    format_args!("{:^5}", style.value(record.level())),
-                    format_args!("{:^50}", record.target()),
-                    record.args(),
-                )
-            } else {
-                Ok(())
+            if record.target().contains("h2::codec") {
+                return Ok(());
             }
+
+            writeln!(
+                buf,
+                "{} | {} | {} | {}",
+                &chrono::Utc::now().to_string().replace('T', " ")[11..23],
+                format_args!("{:^5}", style.value(record.level())),
+                format_args!("{:^30}", record.target()),
+                record.args(),
+            )
         })
         .init()
 }

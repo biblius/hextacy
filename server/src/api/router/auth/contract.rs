@@ -2,12 +2,9 @@ use super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
     RegistrationData, ResendRegToken, ResetPassword,
 };
-use crate::error::Error;
+use crate::{config::cache::AuthCache, error::Error};
 use actix_web::HttpResponse;
-use infrastructure::storage::{
-    cache::CacheId,
-    models::{session::UserSession, user::User},
-};
+use infrastructure::storage::models::{session::UserSession, user::User};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[cfg_attr(test, mockall::automock)]
@@ -56,17 +53,17 @@ pub(super) trait CacheContract {
     fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error>;
     fn set_token<T: Serialize + Sync + Send + 'static>(
         &self,
-        cache_id: CacheId,
+        cache_id: AuthCache,
         key: &str,
         value: &T,
         ex: Option<usize>,
     ) -> Result<(), Error>;
     fn get_token<T: DeserializeOwned + Sync + Send + 'static>(
         &self,
-        cache_id: CacheId,
+        cache_id: AuthCache,
         key: &str,
     ) -> Result<T, Error>;
-    fn delete_token(&self, cache_id: CacheId, key: &str) -> Result<(), Error>;
+    fn delete_token(&self, cache_id: AuthCache, key: &str) -> Result<(), Error>;
     fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error>;
     fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error>;
     fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error>;

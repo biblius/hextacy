@@ -1,10 +1,12 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::{clients::storage::redis, storage::cache::CacheId};
+use infrastructure::clients::storage::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
 use thiserror::{self, Error};
 use validify::{ValidationError, ValidationErrors};
+
+use crate::config::cache::AuthCache;
 
 #[derive(Debug, Error)]
 pub(crate) enum Error {
@@ -85,11 +87,11 @@ impl Error {
                     ("FORBIDDEN", "Insufficient rights".to_string())
                 }
                 AuthenticationError::InvalidToken(id) => match id {
-                    CacheId::OTPToken => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
-                    CacheId::RegToken => {
+                    AuthCache::OTPToken => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
+                    AuthCache::RegToken => {
                         ("INVALID_TOKEN", "Invalid registration token".to_string())
                     }
-                    CacheId::PWToken => {
+                    AuthCache::PWToken => {
                         ("INVALID_TOKEN", "Invalid password change token".to_string())
                     }
                     _ => ("INVALID_TOKEN", "Token not found".to_string()),
@@ -180,7 +182,7 @@ pub(crate) enum AuthenticationError {
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Invalid token")]
-    InvalidToken(CacheId),
+    InvalidToken(AuthCache),
     #[error("Invalid OTP")]
     InvalidOTP,
     #[error("Invalid CSRF header")]

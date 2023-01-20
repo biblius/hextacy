@@ -1,7 +1,6 @@
+use super::CryptoError;
 use data_encoding::BASE32;
 use tracing::debug;
-
-use super::CryptoError;
 
 /// Generates an OTP secret of length 160
 #[inline]
@@ -26,8 +25,10 @@ pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, C
 
 /// Verifies a timed OTP against the given secret
 #[inline]
-pub fn verify_otp(password: &str, secret: &str) -> Result<(bool, i16), CryptoError> {
+pub fn verify_otp(password: &str, secret: &str) -> Result<bool, CryptoError> {
     debug!("Verifying TOTP {password}");
     let secret = BASE32.decode(secret.as_bytes())?;
-    thotp::verify_totp(password, &secret, 0).map_err(Into::into)
+    thotp::verify_totp(password, &secret, 0)
+        .map_err(Into::into)
+        .map(|(res, _)| res)
 }

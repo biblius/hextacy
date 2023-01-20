@@ -1,5 +1,6 @@
 use super::contract::{AuthGuardContract, CacheContract};
 use super::infratructure::Cache;
+use crate::config::constants::COOKIE_S_ID;
 use crate::error::{AuthenticationError, Error};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use infrastructure::clients::storage::postgres::Postgres;
@@ -8,9 +9,7 @@ use infrastructure::storage::adapters::postgres::user::PgUserAdapter;
 use infrastructure::storage::models::session::UserSession;
 use infrastructure::storage::repository::session::SessionRepository;
 use infrastructure::storage::repository::user::UserRepository;
-use infrastructure::{
-    clients::storage::redis::Redis, storage::repository::role::Role, web::http::cookie::S_ID,
-};
+use infrastructure::{clients::storage::redis::Redis, storage::repository::role::Role};
 use std::sync::Arc;
 use tracing::{debug, trace, warn};
 
@@ -96,7 +95,7 @@ where
 
     /// Extracts the `S_ID` cookie from the request
     fn get_session_cookie(&self, req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
-        req.cookie(S_ID)
+        req.cookie(COOKIE_S_ID)
             .ok_or_else(|| AuthenticationError::Unauthenticated.into())
     }
 

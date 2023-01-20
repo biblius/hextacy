@@ -1,5 +1,5 @@
 use super::super::ClientError;
-use crate::config::env;
+use crate::env;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection, State},
     Connection, PgConnection,

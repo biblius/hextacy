@@ -32,12 +32,14 @@ impl Session {
             username: user.username.clone(),
             user_role: user.role.clone(),
             csrf_token: csrf,
-            created_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
-            updated_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+            created_at: NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0)
+                .unwrap(),
+            updated_at: NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0)
+                .unwrap(),
             expires_at: if permanent {
                 NaiveDateTime::MAX
             } else {
-                NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0)
+                NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0).unwrap()
                     + chrono::Duration::minutes(30)
             },
         }

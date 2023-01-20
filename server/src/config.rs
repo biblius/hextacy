@@ -1,3 +1,6 @@
+pub mod cache;
+pub mod constants;
+
 use crate::api::router;
 use actix_web::web::ServiceConfig;
 use infrastructure::clients::{
@@ -7,7 +10,7 @@ use infrastructure::clients::{
 use std::sync::Arc;
 use tracing::info;
 
-pub(super) fn configure(cfg: &mut ServiceConfig) {
+pub(super) fn init(cfg: &mut ServiceConfig) {
     let pg = Arc::new(Postgres::new());
     info!("Postgres pool initialized");
 

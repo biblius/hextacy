@@ -1,21 +1,23 @@
 mod broker {
     use super::super::{
-        broker::signals::{IssueAsync, IssueSync, Subscribe},
+        broker::broadcast::{IssueAsync, IssueSync, Subscribe},
         broker::{Broker, DefaultBroker},
-        Signal,
     };
-    use actix::{Actor, Context, Handler, System};
+    use actix::{Actor, Context, Handler, Message, System};
     use colored::Colorize;
     use std::sync::mpsc;
     use tracing::{debug, info};
 
     const BROKER_ID: &str = "TEST_BROKER";
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Message)]
+    #[rtype("()")]
     struct SampleData;
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Message)]
+    #[rtype("()")]
     struct Sample;
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Message)]
+    #[rtype("()")]
     struct OtherSample;
 
     struct TestActor {
@@ -29,21 +31,21 @@ mod broker {
         }
     }
 
-    impl Handler<Signal<SampleData>> for TestActor {
+    impl Handler<SampleData> for TestActor {
         type Result = ();
-        fn handle(&mut self, sig: Signal<SampleData>, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, sig: SampleData, _: &mut Self::Context) -> Self::Result {
             debug!("{}{}{:?}", self.id, " -- received signal: ".purple(), sig);
         }
     }
-    impl Handler<Signal<Sample>> for TestActor {
+    impl Handler<Sample> for TestActor {
         type Result = ();
-        fn handle(&mut self, sig: Signal<Sample>, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, sig: Sample, _: &mut Self::Context) -> Self::Result {
             debug!("{}{}{:?}", self.id, " -- received signal: ".purple(), sig);
         }
     }
-    impl Handler<Signal<OtherSample>> for TestActor {
+    impl Handler<OtherSample> for TestActor {
         type Result = ();
-        fn handle(&mut self, sig: Signal<OtherSample>, _: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, sig: OtherSample, _: &mut Self::Context) -> Self::Result {
             debug!("{}{}{:?}", self.id, " -- received signal: ".purple(), sig);
         }
     }
@@ -56,9 +58,9 @@ mod broker {
         let test_act = TestActor { id: "TEST_ACTOR" };
         let other_act = TestActor { id: "OTHER_ACTOR" };
 
-        let sig = Signal::new("test", SampleData {}, None);
-        let sig_s = Signal::new("test", Sample {}, None);
-        let sig_o = Signal::new("test", OtherSample {}, None);
+        let sig = SampleData {};
+        let sig_s = Sample {};
+        let sig_o = OtherSample {};
 
         let (tx, rx) = mpsc::channel::<usize>();
 
@@ -66,10 +68,10 @@ mod broker {
             let addr = test_act.start();
             let other_addr = other_act.start();
 
-            broker.add_sub::<Signal<SampleData>>(addr.clone().recipient());
-            broker.add_sub::<Signal<SampleData>>(other_addr.clone().recipient());
-            broker.add_sub::<Signal<Sample>>(addr.recipient());
-            broker.add_sub::<Signal<OtherSample>>(other_addr.recipient());
+            broker.add_sub::<SampleData>(addr.clone().recipient());
+            broker.add_sub::<SampleData>(other_addr.clone().recipient());
+            broker.add_sub::<Sample>(addr.recipient());
+            broker.add_sub::<OtherSample>(other_addr.recipient());
 
             // There should be 8 received signal logs in total
             let addr_b = broker.start();
@@ -99,8 +101,8 @@ mod broker {
         let test_act = TestActor { id: "TEST_ACTOR" };
         let other_act = TestActor { id: "OTHER_ACTOR" };
 
-        let sig = Signal::new("test", SampleData {}, None);
-        let sig_s = Signal::new("test", Sample {}, None);
+        let sig = SampleData {};
+        let sig_s = Sample {};
 
         let exec = async move {
             let b_addr = broker.start();
@@ -109,11 +111,11 @@ mod broker {
             let addr_o = other_act.start();
 
             b_addr
-                .send(Subscribe::<Signal<SampleData>>::new(addr.recipient()))
+                .send(Subscribe::<SampleData>::new(addr.recipient()))
                 .await
                 .unwrap();
             b_addr
-                .send(Subscribe::<Signal<Sample>>::new(addr_o.recipient()))
+                .send(Subscribe::<Sample>::new(addr_o.recipient()))
                 .await
                 .unwrap();
             b_addr.send(IssueSync::new(sig)).await.unwrap();
@@ -125,11 +127,10 @@ mod broker {
 }
 
 mod direct {
-    use super::super::Signal;
-    use crate::web::ws::message::WsMessage;
+
     use actix::{
-        fut, Actor, ActorFutureExt, Context, ContextFutureSpawner, Handler, Recipient, System,
-        WrapFuture,
+        fut, Actor, ActorFutureExt, Context, ContextFutureSpawner, Handler, Message, Recipient,
+        System, WrapFuture,
     };
     use serde::{de::DeserializeOwned, Deserialize, Serialize};
     use std::fmt::Debug;
@@ -137,6 +138,8 @@ mod direct {
     use std::sync::mpsc;
     use std::{collections::HashMap, marker::PhantomData};
     use tracing::{debug, error, info};
+
+    use crate::web::ws::message::WsMessage;
 
     /// Also tests WsMessage conversion to system message
     #[test]
@@ -152,11 +155,11 @@ mod direct {
         };
 
         // Initialize the signal
-        let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
+        let sig = WsMessage::__mock(SampleData {
             lol: "lol".to_string(),
             lel: "lel".to_string(),
         })
-        .into();
+        .data;
 
         // Set up channel so we can get back the result on this thread
         let (tx, rx) = mpsc::channel::<usize>();
@@ -205,11 +208,11 @@ mod direct {
         };
 
         // Initialize the signal
-        let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
+        let sig = WsMessage::__mock(SampleData {
             lol: "lmao".to_string(),
             lel: "lmeo".to_string(),
         })
-        .into();
+        .data;
 
         // Init channel for result
         let (tx, rx) = mpsc::channel::<usize>();
@@ -245,11 +248,11 @@ mod direct {
         };
 
         // Initialize the signal
-        let sig: Signal<SampleData> = WsMessage::__mock(SampleData {
+        let sig = WsMessage::__mock(SampleData {
             lol: "lmao".to_string(),
             lel: "lmeo".to_string(),
         })
-        .into();
+        .data;
 
         let exec = async move {
             let addr = act.start();
@@ -278,37 +281,43 @@ mod direct {
         }
     }
 
-    impl Handler<Signal<SampleData>> for MyActor<SampleData> {
+    impl Handler<SampleData> for MyActor<SampleData> {
         type Result = ();
 
-        fn handle(&mut self, mut sig: Signal<SampleData>, _: &mut Self::Context) -> Self::Result {
-            sig.data_mut().lol = "Modified lmao".to_string();
-            sig.data_mut().lel = "Modified lmeo".to_string();
+        fn handle(&mut self, mut sig: SampleData, _: &mut Self::Context) -> Self::Result {
+            sig.lol = "Modified lmao".to_string();
+            sig.lel = "Modified lmeo".to_string();
             debug!("{} -- received signal : {:?}", self.id, sig);
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize, Clone)]
+    #[derive(Debug, Serialize, Deserialize, Clone, Message)]
+    #[rtype("()")]
     struct SampleData {
         lol: String,
         lel: String,
     }
 
     /// Test Actor is wired to broadcast a SampleData signal whenever it receives one
-    struct TestActor<T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Clone> {
+    struct TestActor<T>
+    where
+        T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Message + Clone,
+        <T as Message>::Result: Send,
+    {
         id: &'static str,
-        addr_book: HashMap<&'static str, Recipient<Signal<T>>>,
+        addr_book: HashMap<&'static str, Recipient<T>>,
     }
 
     impl<T> TestActor<T>
     where
-        T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Clone + Unpin,
+        T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Message + Clone,
+        <T as Message>::Result: Send,
     {
-        pub fn register_addr(&mut self, service_id: &'static str, rec: Recipient<Signal<T>>) {
+        pub fn register_addr(&mut self, service_id: &'static str, rec: Recipient<T>) {
             let _ = self.addr_book.insert(service_id, rec);
         }
 
-        pub fn broadcast(&mut self, signal: Signal<T>, ctx: &mut Context<Self>) {
+        pub fn broadcast(&mut self, signal: T, ctx: &mut Context<Self>) {
             debug!("{} -- broadcasting", self.id);
             for addr in self.addr_book.values() {
                 addr.send(signal.clone())
@@ -331,7 +340,8 @@ mod direct {
 
     impl<T> Actor for TestActor<T>
     where
-        T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Unpin + Clone,
+        T: 'static + Serialize + DeserializeOwned + Send + Sync + Debug + Message + Clone,
+        <T as Message>::Result: Send,
     {
         type Context = Context<Self>;
 
@@ -340,10 +350,10 @@ mod direct {
         }
     }
 
-    impl Handler<Signal<SampleData>> for TestActor<SampleData> {
+    impl Handler<SampleData> for TestActor<SampleData> {
         type Result = ();
 
-        fn handle(&mut self, sig: Signal<SampleData>, ctx: &mut Self::Context) -> Self::Result {
+        fn handle(&mut self, sig: SampleData, ctx: &mut Self::Context) -> Self::Result {
             debug!("{} -- received signal : {:?}", self.id, sig);
             self.broadcast(sig, ctx);
         }

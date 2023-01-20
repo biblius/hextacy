@@ -4,7 +4,6 @@ pub mod otp;
 pub mod utility;
 
 pub use bcrypt::BcryptError;
-
 use thiserror::Error;
 
 #[derive(Debug, Error)]

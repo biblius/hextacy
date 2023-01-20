@@ -1,13 +1,11 @@
+use super::CryptoError;
 use colored::Colorize;
 use jsonwebtoken::*;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-
 use tracing::info;
-
-use super::CryptoError;
 
 /// Used for jwts. sub is the actual payload, iat and exp are unix timestamps representing the issued at and expiration times respectively.
 /// As per https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
@@ -92,18 +90,22 @@ mod tests {
 
         //Issued at
         let now = jsonwebtoken::get_current_timestamp();
+
         //Expires in 5 minutes
         let expires = now + 60 * 5;
+
         //Generate the claims
         let user = User {
             id: String::from("lol"),
             username: String::from("lawl"),
         };
+
         let claims = Claims::new(
             serde_json::to_string(&user).unwrap(),
             "biblius".to_string(),
             expires,
         );
+
         //Encode jwt
         let token = encode(
             &jsonwebtoken::Header::new(Algorithm::RS256),

@@ -54,15 +54,14 @@ impl User {
             github_id: None,
             frozen,
             email_verified_at: if verified {
-                Some(NaiveDateTime::from_timestamp(
-                    chrono::Utc::now().timestamp(),
-                    0,
-                ))
+                NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0)
             } else {
                 None
             },
-            created_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
-            updated_at: NaiveDateTime::from_timestamp(chrono::Utc::now().timestamp(), 0),
+            created_at: NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0)
+                .unwrap(),
+            updated_at: NaiveDateTime::from_timestamp_opt(chrono::Utc::now().timestamp(), 0)
+                .unwrap(),
         }
     }
 }

@@ -1,9 +1,9 @@
-pub mod signals;
+pub mod broadcast;
 
 use actix::{prelude::*, Recipient};
 use actix::{Actor, Context, Handler};
+use broadcast::{Broadcast, IssueAsync, IssueSync, Subscribe};
 use colored::Colorize;
-use signals::{Broadcast, IssueAsync, IssueSync, Subscribe};
 use std::any::Any;
 use std::fmt::Debug;
 use std::marker::PhantomData;

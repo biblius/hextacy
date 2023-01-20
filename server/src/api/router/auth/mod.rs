@@ -17,29 +17,28 @@ mod tests {
         },
         domain::Authentication,
     };
-    use crate::error::{AuthenticationError, Error};
+    use crate::{
+        config::cache::AuthCache,
+        error::{AuthenticationError, Error},
+    };
     use actix_web::body::to_bytes;
     use chrono::NaiveDateTime;
     use data_encoding::{BASE32, BASE64URL};
     use derive_new::new;
     use infrastructure::{
-        config::env,
         crypto::{
             hmac::generate_hmac,
             utility::{bcrypt_hash, uuid},
+        },
+        env,
+        storage::repository::{
+            role::Role, session::MockSessionRepository, user::MockUserRepository, RepositoryError,
         },
         storage::{
             adapters::AdapterError,
             models::{
                 session::{Session, UserSession},
                 user::User,
-            },
-        },
-        storage::{
-            cache::CacheId,
-            repository::{
-                role::Role, session::MockSessionRepository, user::MockUserRepository,
-                RepositoryError,
             },
         },
         web::http::response::Response,
@@ -216,7 +215,7 @@ mod tests {
             Ok(_) => panic!("Not good"),
             Err(e) => assert!(matches!(
                 e,
-                Error::Authentication(AuthenticationError::InvalidToken(CacheId::RegToken))
+                Error::Authentication(AuthenticationError::InvalidToken(AuthCache::RegToken))
             )),
         };
     }
@@ -583,7 +582,7 @@ mod tests {
             Ok(_) => panic!("Not good"),
             Err(e) => assert!(matches!(
                 e,
-                Error::Authentication(AuthenticationError::InvalidToken(CacheId::PWToken))
+                Error::Authentication(AuthenticationError::InvalidToken(AuthCache::PWToken))
             )),
         };
     }
@@ -717,7 +716,7 @@ mod tests {
             Ok(_) => panic!("Not good"),
             Err(e) => assert!(matches!(
                 e,
-                Error::Authentication(AuthenticationError::InvalidToken(CacheId::PWToken))
+                Error::Authentication(AuthenticationError::InvalidToken(AuthCache::PWToken))
             )),
         }
     }

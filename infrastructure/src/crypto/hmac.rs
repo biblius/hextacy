@@ -1,16 +1,15 @@
-use crate::config::env;
+use super::CryptoError;
+use crate::env;
 use data_encoding::Encoding;
 use hmac::Mac;
 use sha2::Sha256;
 use tracing::debug;
 
-use super::CryptoError;
-
 // Generate an HMAC token with the given environment secret and the provided buffer.
 ///
 /// The token is encoded to the provided encoding.
 ///
-/// Panics if the provided `env_key` is not set in the .env file.
+/// #### Panics if the provided `env_key` is not set in the .env file.
 pub fn generate_hmac(
     env_key: &str,
     nonce: &str,
@@ -52,13 +51,11 @@ pub fn verify_hmac(
 mod tests {
     use data_encoding::{BASE32, BASE64, BASE64URL};
 
-    use crate::config;
-
     use super::*;
 
     #[test]
     fn hmac() {
-        config::env::set(
+        crate::env::set(
             "REG_TOKEN_SECRET",
             "0e7cfad46e31c2bfd76bb0687385b87536898b209a9aef13e94b430d7d3585f7",
         );

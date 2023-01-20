@@ -24,3 +24,7 @@ pub const OTP_THROTTLE_INCREMENT: i64 = 3;
 
 /// Throttle emails for half a minute to stop craziness
 pub const EMAIL_THROTTLE_DURATION_SECONDS: usize = 30;
+
+pub const EMAIL_DIRECTORY: &str = "resources/emails";
+
+pub const COOKIE_S_ID: &str = "S_ID";

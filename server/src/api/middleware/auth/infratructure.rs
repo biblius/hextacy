@@ -1,13 +1,12 @@
 use super::contract::CacheContract;
-use crate::error::Error;
+use crate::{
+    config::{cache::AuthCache, constants::SESSION_CACHE_DURATION_SECONDS},
+    error::Error,
+};
 use chrono::Utc;
 use infrastructure::{
     clients::storage::redis::{Commands, Redis},
-    config::constants::SESSION_CACHE_DURATION_SECONDS,
-    storage::{
-        cache::{CacheId, Cacher},
-        models::session::UserSession,
-    },
+    storage::{cache::Cacher, models::session::UserSession},
 };
 use std::sync::Arc;
 
@@ -24,12 +23,13 @@ impl Cacher for Cache {
 
 impl CacheContract for Cache {
     fn get_session_by_id(&self, id: &str) -> Result<UserSession, Error> {
-        <Self as Cacher>::get(CacheId::Session, id, &mut self.client.connect()?).map_err(Error::new)
+        <Self as Cacher>::get(AuthCache::Session, id, &mut self.client.connect()?)
+            .map_err(Error::new)
     }
 
     fn cache_session(&self, id: &str, session: &UserSession) -> Result<(), Error> {
         <Self as Cacher>::set(
-            CacheId::Session,
+            AuthCache::Session,
             id,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),

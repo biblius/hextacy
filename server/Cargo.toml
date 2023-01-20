@@ -39,3 +39,4 @@ serde_json = "1.0.85"
 thiserror = "1.0.37"
 tracing = "0.1.35"
 tokio-cron-scheduler = "0.9.1"
+logger = { version = "0.1.0", path = "../logger" }

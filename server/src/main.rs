@@ -1,13 +1,10 @@
 mod api;
-pub mod configure;
+pub mod config;
 mod error;
 mod helpers;
 
 use actix_web::{middleware::Logger, App, HttpServer};
-use infrastructure::{
-    config::{env, logger},
-    web::http,
-};
+use infrastructure::{env, web::http};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing::info;
 
@@ -39,7 +36,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .configure(configure::configure)
+            .configure(config::init)
             .wrap(http::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
             .wrap(http::security_headers::default())
             .wrap(Logger::default())
