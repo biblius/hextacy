@@ -1,7 +1,7 @@
 mod broker {
     use super::super::{
-        broker::broadcast::{IssueAsync, IssueSync, Subscribe},
-        broker::{Broker, DefaultBroker},
+        broker::Broker,
+        broker::{IssueAsync, IssueSync, Subscribe},
     };
     use actix::{Actor, Context, Handler, Message, System};
     use colored::Colorize;
@@ -53,7 +53,7 @@ mod broker {
     fn add_sub() {
         info!("\n========== TEST - BROKER ADD SUB ==========\n");
         let sys = System::new();
-        let mut broker = Broker::<DefaultBroker>::new(BROKER_ID);
+        let mut broker = Broker::new(BROKER_ID);
 
         let test_act = TestActor { id: "TEST_ACTOR" };
         let other_act = TestActor { id: "OTHER_ACTOR" };
@@ -96,7 +96,7 @@ mod broker {
     fn handle_subscribe() {
         info!("\n========== TEST - BROKER HANDLE SUBSCRIBE ==========\n");
         let sys = System::new();
-        let broker = Broker::<DefaultBroker>::new(BROKER_ID);
+        let broker = Broker::new(BROKER_ID);
 
         let test_act = TestActor { id: "TEST_ACTOR" };
         let other_act = TestActor { id: "OTHER_ACTOR" };
@@ -128,6 +128,7 @@ mod broker {
 
 mod direct {
 
+    use crate::web::ws::message::WsMessage;
     use actix::{
         fut, Actor, ActorFutureExt, Context, ContextFutureSpawner, Handler, Message, Recipient,
         System, WrapFuture,
@@ -138,8 +139,6 @@ mod direct {
     use std::sync::mpsc;
     use std::{collections::HashMap, marker::PhantomData};
     use tracing::{debug, error, info};
-
-    use crate::web::ws::message::WsMessage;
 
     /// Also tests WsMessage conversion to system message
     #[test]
