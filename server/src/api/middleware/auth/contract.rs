@@ -1,6 +1,6 @@
 use crate::error::Error;
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
-use infrastructure::storage::{models::session::UserSession, repository::role::Role};
+use storage::{models::role::Role, models::session::UserSession};
 
 pub(crate) trait AuthGuardContract {
     fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<UserSession, Error>;

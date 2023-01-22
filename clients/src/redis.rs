@@ -1,5 +1,4 @@
-use super::super::ClientError;
-use crate::env;
+use super::ClientError;
 use diesel::r2d2::State;
 use r2d2_redis::{
     r2d2::{Pool, PooledConnection},
@@ -7,6 +6,7 @@ use r2d2_redis::{
     RedisConnectionManager,
 };
 use tracing::{info, trace};
+use utils::env;
 
 pub use r2d2_redis::redis::Commands;
 pub use r2d2_redis::redis::FromRedisValue;

@@ -1,5 +1,6 @@
 use actix_web::{HttpMessage, HttpRequest};
-use infrastructure::{storage::models::session::UserSession, web::http::HttpError};
+use infrastructure::web::http::HttpError;
+use storage::models::session::UserSession;
 
 /// Utility for quickly dropping the request extensions reference and getting the
 /// cloned session

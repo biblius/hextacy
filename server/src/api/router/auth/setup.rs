@@ -6,14 +6,12 @@ use super::{
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
 use infrastructure::{
-    clients::{
-        email::lettre::SmtpTransport,
-        storage::{postgres::Postgres, redis::Redis},
-    },
-    storage::adapters::postgres::{session::PgSessionAdapter, user::PgUserAdapter},
-    storage::repository::role::Role,
+    clients::{postgres::Postgres, redis::Redis},
+    services::email::lettre::SmtpTransport,
 };
 use std::sync::Arc;
+use storage::adapters::postgres::{session::PgSessionAdapter, user::PgUserAdapter};
+use storage::models::role::Role;
 
 pub(crate) fn routes(
     pg: Arc<Postgres>,

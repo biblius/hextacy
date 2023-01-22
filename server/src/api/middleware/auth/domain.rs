@@ -3,14 +3,15 @@ use super::infratructure::Cache;
 use crate::config::constants::COOKIE_S_ID;
 use crate::error::{AuthenticationError, Error};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
-use infrastructure::clients::storage::postgres::Postgres;
-use infrastructure::storage::adapters::postgres::session::PgSessionAdapter;
-use infrastructure::storage::adapters::postgres::user::PgUserAdapter;
-use infrastructure::storage::models::session::UserSession;
-use infrastructure::storage::repository::session::SessionRepository;
-use infrastructure::storage::repository::user::UserRepository;
-use infrastructure::{clients::storage::redis::Redis, storage::repository::role::Role};
+use infrastructure::clients::postgres::Postgres;
+use infrastructure::clients::redis::Redis;
 use std::sync::Arc;
+use storage::adapters::postgres::session::PgSessionAdapter;
+use storage::adapters::postgres::user::PgUserAdapter;
+use storage::models::role::Role;
+use storage::models::session::UserSession;
+use storage::repository::session::SessionRepository;
+use storage::repository::user::UserRepository;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]

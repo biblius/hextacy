@@ -4,8 +4,7 @@ use super::data::{
 };
 use crate::{config::cache::AuthCache, error::Error};
 use actix_web::HttpResponse;
-use infrastructure::storage::models::{session::UserSession, user::User};
-use serde::{de::DeserializeOwned, Serialize};
+use storage::models::{session::UserSession, user::User};
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait ServiceContract {
@@ -51,23 +50,30 @@ pub(super) trait ServiceContract {
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait CacheContract {
     fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error>;
-    fn set_token<T: Serialize + Sync + Send + 'static>(
+
+    // String tokens
+    fn set_token(
         &self,
         cache_id: AuthCache,
         key: &str,
-        value: &T,
+        value: &str,
         ex: Option<usize>,
     ) -> Result<(), Error>;
-    fn get_token<T: DeserializeOwned + Sync + Send + 'static>(
-        &self,
-        cache_id: AuthCache,
-        key: &str,
-    ) -> Result<T, Error>;
+    fn get_token(&self, cache_id: AuthCache, key: &str) -> Result<String, Error>;
     fn delete_token(&self, cache_id: AuthCache, key: &str) -> Result<(), Error>;
+
+    // Login
     fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error>;
     fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error>;
+
+    // Otp
+    fn get_otp_throttle(&self, cache_id: AuthCache, user_id: &str) -> Result<i64, Error>;
     fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error>;
     fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error>;
+
+    // Email
+    fn set_email_throttle(&self, user_id: &str) -> Result<(), Error>;
+    fn get_email_throttle(&self, user_id: &str) -> Result<i64, Error>;
 }
 
 #[cfg_attr(test, mockall::automock)]

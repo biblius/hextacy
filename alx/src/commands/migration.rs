@@ -138,7 +138,7 @@ fn get_absolute_migration_path() -> String {
         panic!("diesel.toml not found")
     }
 
-    print("Found diesel.toml file");
+    println!("Found diesel.toml file");
 
     let toml_path = String::from_utf8(diesel_toml[1..].to_vec()).unwrap();
     let adapter_path = toml_path.replace("/diesel.toml", "");

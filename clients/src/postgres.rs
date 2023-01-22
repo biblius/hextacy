@@ -1,10 +1,10 @@
-use super::super::ClientError;
-use crate::env;
+use super::ClientError;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection, State},
     Connection, PgConnection,
 };
 use tracing::{info, trace};
+use utils::env;
 
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;

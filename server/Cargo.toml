@@ -33,10 +33,11 @@ async-trait = "0.1.42"
 derive-new = "0.5.9"
 futures-util = "0.3.24"
 lazy_static = "1.4.0"
+logger = { version = "0.1.0", path = "../logger" }
 regex = "1.6.0"
 serde = { version = "1.0.145", features = ["derive"] }
 serde_json = "1.0.85"
+storage = { path = "../storage" }
 thiserror = "1.0.37"
-tracing = "0.1.35"
 tokio-cron-scheduler = "0.9.1"
-logger = { version = "0.1.0", path = "../logger" }
+tracing = "0.1.35"

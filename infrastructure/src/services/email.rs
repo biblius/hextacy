@@ -1,7 +1,33 @@
-use crate::clients::ClientError;
+pub use lettre;
+use lettre::transport::smtp::authentication::Credentials;
 use lettre::{message::header::ContentType, Message, SmtpTransport, Transport};
 use std::{fmt::Write, fs, path::Path};
 use tracing::debug;
+
+use super::ServiceError;
+
+/// Build an email client from the environment.
+pub fn build_client() -> SmtpTransport {
+    let mut params =
+        utils::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
+
+    let password = params.pop().expect("SMTP_PASSWORD must be set");
+    let username = params.pop().expect("SMTP_USERNAME must be set");
+    let port = params
+        .pop()
+        .expect("SMTP_PORT must be set")
+        .parse::<u16>()
+        .expect("Invalid SMTP port");
+    let host = params.pop().expect("SMTP host must be set");
+
+    debug!("Building SMTP client");
+
+    SmtpTransport::relay(&host)
+        .expect("Could not establish SmtpTransport")
+        .credentials(Credentials::new(username, password))
+        .port(port)
+        .build()
+}
 
 /// Load a template from an HTML file and replace all the keywords with the targets.
 /// Keywords must be formatted as `{{keyword}}`.
@@ -46,8 +72,8 @@ pub fn send(
     subject: &str,
     body: String,
     client: &SmtpTransport,
-) -> Result<(), ClientError> {
-    let sender = crate::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
+) -> Result<(), ServiceError> {
+    let sender = utils::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
 
     let from = from.map_or_else(
         || format!("Alx <{}>", sender),

@@ -1,27 +1,33 @@
 use super::contract::{CacheContract, EmailContract};
 use crate::config::cache::AuthCache;
 use crate::config::constants::{
-    EMAIL_DIRECTORY, OTP_THROTTLE_DURATION_SECONDS, SESSION_CACHE_DURATION_SECONDS,
-    WRONG_PASSWORD_CACHE_DURATION,
+    EMAIL_DIRECTORY, EMAIL_THROTTLE_DURATION_SECONDS, OTP_THROTTLE_DURATION_SECONDS,
+    SESSION_CACHE_DURATION_SECONDS, WRONG_PASSWORD_CACHE_DURATION,
 };
 use crate::error::Error;
 use chrono::Utc;
-use infrastructure::clients::email::lettre::SmtpTransport;
-use infrastructure::clients::storage::redis::{Commands, Redis};
+use infrastructure::clients::redis::{Commands, Redis};
 use infrastructure::services::email;
-use infrastructure::storage::cache::Cacher;
-use infrastructure::storage::models::session::UserSession;
-use serde::{de::DeserializeOwned, Serialize};
+use infrastructure::services::email::lettre::SmtpTransport;
 use std::sync::Arc;
+use storage::cache::CacheAccess;
+use storage::models::session::UserSession;
 use tracing::debug;
 
 pub(super) struct Cache {
     pub client: Arc<Redis>,
 }
 
-impl Cacher for Cache {
+impl CacheAccess for Cache {
     fn domain() -> &'static str {
         "auth"
+    }
+
+    fn connection(
+        &self,
+    ) -> Result<infrastructure::clients::redis::RedisPoolConnection, storage::cache::CacheError>
+    {
+        self.client.connect().map_err(|e| e.into())
     }
 }
 
@@ -29,40 +35,34 @@ impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
     fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error> {
         debug!("Caching session with ID {}", session.id);
-        <Self as Cacher>::set(
+        self.set_json(
             AuthCache::Session,
             session_id,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
-            &mut self.client.connect()?,
         )
         .map_err(Error::new)
     }
 
     /// Sets a token as a key to the provided value in the cache
-    fn set_token<T: Serialize + Sync + Send>(
+    fn set_token(
         &self,
         cache_id: AuthCache,
         token: &str,
-        value: &T,
+        value: &str,
         ex: Option<usize>,
     ) -> Result<(), Error> {
-        <Self as Cacher>::set(cache_id, token, value, ex, &mut self.client.connect()?)
-            .map_err(Error::new)
+        self.set(cache_id, token, value, ex).map_err(Error::new)
     }
 
     /// Gets a value from the cache stored under the token
-    fn get_token<T: DeserializeOwned + Sync + Send>(
-        &self,
-        cache_id: AuthCache,
-        token: &str,
-    ) -> Result<T, Error> {
-        <Self as Cacher>::get(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
+    fn get_token(&self, cache_id: AuthCache, token: &str) -> Result<String, Error> {
+        self.get(cache_id, token).map_err(Error::new)
     }
 
     /// Deletes the value in the cache stored under the token
     fn delete_token(&self, cache_id: AuthCache, token: &str) -> Result<(), Error> {
-        <Self as Cacher>::delete(cache_id, token, &mut self.client.connect()?).map_err(Error::new)
+        self.delete(cache_id, token).map_err(Error::new)
     }
 
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
@@ -82,12 +82,12 @@ impl CacheContract for Cache {
     /// Removes the user's login attempts from the cache
     fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
         debug!("Deleting login attempts for: {}", &user_id);
-        <Self as Cacher>::delete(
-            AuthCache::LoginAttempts,
-            user_id,
-            &mut self.client.connect()?,
-        )
-        .map_err(Error::new)
+        self.delete(AuthCache::LoginAttempts, user_id)
+            .map_err(Error::new)
+    }
+
+    fn get_otp_throttle(&self, cache_id: AuthCache, user_id: &str) -> Result<i64, Error> {
+        self.get(cache_id, user_id).map_err(|e| e.into())
     }
 
     /// Cache the OTP throttle and attempts. The throttle always gets set to now and the attempts always get
@@ -95,18 +95,13 @@ impl CacheContract for Cache {
     fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
         debug!("Throttling OTP attempts for: {user_id}");
 
-        let mut connection = self.client.connect()?;
+        let mut connection = self.connection()?;
 
         let throttle_key = Self::construct_key(AuthCache::OTPThrottle, user_id);
         let attempt_key = Self::construct_key(AuthCache::OTPAttempts, user_id);
 
-        println!("THROTTLE KEY: {}", throttle_key);
-
-        match connection.get::<&str, Option<i64>>(&attempt_key) {
+        match connection.get::<&str, i64>(&attempt_key) {
             Ok(attempts) => {
-                // Increment or init the attempts
-                let attempts = attempts.map_or_else(|| 1, |a| a + 1);
-
                 // Override the throttle key to now
                 connection
                     .set_ex::<&str, i64, _>(
@@ -118,9 +113,9 @@ impl CacheContract for Cache {
 
                 // Increment the number of failed attempts
                 connection
-                    .set_ex::<&str, i64, String>(
+                    .set_ex::<&str, i64, _>(
                         &attempt_key,
-                        attempts,
+                        attempts + 1,
                         OTP_THROTTLE_DURATION_SECONDS,
                     )
                     .map_err(Error::new)?;
@@ -143,10 +138,24 @@ impl CacheContract for Cache {
     }
 
     fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
-        let mut conn = self.client.connect()?;
-        <Self as Cacher>::delete(AuthCache::OTPThrottle, user_id, &mut conn)?;
-        <Self as Cacher>::delete(AuthCache::OTPAttempts, user_id, &mut conn)?;
+        self.delete(AuthCache::OTPThrottle, user_id)?;
+        self.delete(AuthCache::OTPAttempts, user_id)?;
         Ok(())
+    }
+
+    fn set_email_throttle(&self, user_id: &str) -> Result<(), Error> {
+        self.set(
+            AuthCache::EmailThrottle,
+            user_id,
+            1,
+            Some(EMAIL_THROTTLE_DURATION_SECONDS),
+        )
+        .map_err(|e| e.into())
+    }
+
+    fn get_email_throttle(&self, user_id: &str) -> Result<i64, Error> {
+        self.get(AuthCache::EmailThrottle, user_id)
+            .map_err(|e| e.into())
     }
 }
 

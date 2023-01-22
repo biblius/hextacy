@@ -1,12 +1,10 @@
 use super::{domain::UserService, handler};
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
-use infrastructure::{
-    clients::storage::{postgres::Postgres, redis::Redis},
-    storage::adapters::postgres::user::PgUserAdapter,
-    storage::repository::role::Role,
-};
+use infrastructure::clients::{postgres::Postgres, redis::Redis};
 use std::sync::Arc;
+use storage::adapters::postgres::user::PgUserAdapter;
+use storage::models::role::Role;
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {

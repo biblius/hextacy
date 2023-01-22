@@ -6,16 +6,16 @@ use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Tr
 use actix_web::HttpMessage;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
-use infrastructure::clients::storage::postgres::Postgres;
-use infrastructure::clients::storage::redis::Redis;
-use infrastructure::storage::adapters::postgres::session::PgSessionAdapter;
-use infrastructure::storage::adapters::postgres::user::PgUserAdapter;
-use infrastructure::storage::repository::role::Role;
-use infrastructure::storage::repository::session::SessionRepository;
-use infrastructure::storage::repository::user::UserRepository;
+use infrastructure::clients::postgres::Postgres;
+use infrastructure::clients::redis::Redis;
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
+use storage::adapters::postgres::session::PgSessionAdapter;
+use storage::adapters::postgres::user::PgUserAdapter;
+use storage::models::role::Role;
+use storage::repository::session::SessionRepository;
+use storage::repository::user::UserRepository;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]

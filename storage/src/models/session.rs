@@ -1,5 +1,5 @@
+use super::role::Role;
 use super::user::User;
-use crate::storage::repository::role::Role;
 use chrono::NaiveDateTime;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};

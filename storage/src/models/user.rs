@@ -1,4 +1,4 @@
-use crate::storage::repository::role::Role;
+use super::role::Role;
 use chrono::NaiveDateTime;
 use diesel::Queryable;
 use serde::{Deserialize, Serialize};
@@ -45,7 +45,7 @@ impl User {
             role: Role::User,
             password,
             otp_secret: if with_otp {
-                Some(data_encoding::BASE32.encode(b"super_scret"))
+                Some("ON2XAZLSL5ZWG4TFOQ======".to_string())
             } else {
                 None
             },

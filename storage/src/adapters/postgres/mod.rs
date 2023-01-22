@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum PgAdapterError {
     #[error("Client error {0}")]
-    Client(#[from] crate::clients::ClientError),
+    Client(#[from] clients::ClientError),
     #[error("Diesel error {0}")]
     Diesel(#[from] diesel::result::Error),
     #[error("Does not exist: {0}")]

@@ -1,7 +1,7 @@
 use derive_new::new;
-use infrastructure::storage::models::user::{SortOptions, User};
 use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
+use storage::models::user::{SortOptions, User};
 use validify::validify;
 
 #[derive(Debug, Deserialize)]

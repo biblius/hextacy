@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::clients::storage::redis;
+use infrastructure::clients::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -13,13 +13,13 @@ pub(crate) enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
-    ClientError(#[from] infrastructure::clients::ClientError),
+    Client(#[from] infrastructure::clients::ClientError),
+    #[error("Service Error: {0}")]
+    Service(#[from] infrastructure::services::ServiceError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] infrastructure::storage::cache::CacheError),
+    Cache(#[from] storage::cache::CacheError),
     #[error("Adapter Error: {0}")]
-    Adapter(#[from] infrastructure::storage::adapters::AdapterError),
-    #[error("Repository Error: {0}")]
-    Repository(#[from] infrastructure::storage::repository::RepositoryError),
+    Adapter(#[from] storage::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
@@ -100,7 +100,7 @@ impl Error {
             /*
              * Adapter
              */
-            Self::Adapter(infrastructure::storage::adapters::AdapterError::DoesNotExist(r)) => {
+            Self::Adapter(storage::adapters::AdapterError::DoesNotExist(r)) => {
                 ("NOT_FOUND", format!("Resource does not exist: {}", r))
             }
 

@@ -1,7 +1,8 @@
-pub mod email;
-pub mod storage;
-
 use thiserror::Error;
+
+pub mod mongo;
+pub mod postgres;
+pub mod redis;
 
 #[derive(Debug, Error)]
 pub enum ClientError {
@@ -15,8 +16,4 @@ pub enum ClientError {
     RdDirectConnection(#[from] r2d2_redis::redis::RedisError),
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),
-    #[error("Lettre Error: {0}")]
-    Lettre(#[from] lettre::error::Error),
-    #[error("SMTP Error: {0}")]
-    SmtpTransport(#[from] lettre::transport::smtp::Error),
 }

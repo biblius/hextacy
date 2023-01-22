@@ -1,14 +1,48 @@
-use crate::env;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
     sync::Client as SyncClient,
     Client,
 };
 use tracing::trace;
+use utils::env;
+
+pub struct Mongo {
+    pub client: Client,
+}
+
+impl Mongo {
+    pub fn new() -> Self {
+        match Client::with_options(client_options()) {
+            Ok(client) => {
+                trace!("Built Mongo client");
+                Self { client }
+            }
+            Err(e) => panic!("Error occurred while building Mongo client: {e}"),
+        }
+    }
+
+    pub fn direct() -> Self {
+        let mut opts = client_options();
+        opts.direct_connection = Some(true);
+        match Client::with_options(opts) {
+            Ok(client) => {
+                trace!("Built Mongo client with direct connection");
+                Self { client }
+            }
+            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
+        }
+    }
+}
+
+impl Default for Mongo {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Searches for `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`,
 /// and `MONDO_DATABASE` environment variables and panics if any are not set.
-pub fn client_options() -> ClientOptions {
+fn client_options() -> ClientOptions {
     let mut params = env::get_multiple(&[
         "MONGO_HOST",
         "MONGO_PORT",
@@ -48,40 +82,6 @@ pub fn client_options() -> ClientOptions {
         .credential(credential)
         .default_database(database)
         .build()
-}
-
-pub struct Mongo {
-    pub client: Client,
-}
-
-impl Mongo {
-    pub fn new() -> Self {
-        match Client::with_options(client_options()) {
-            Ok(client) => {
-                trace!("Built Mongo client");
-                Self { client }
-            }
-            Err(e) => panic!("Error occurred while building Mongo client: {e}"),
-        }
-    }
-
-    pub fn direct() -> Self {
-        let mut opts = client_options();
-        opts.direct_connection = Some(true);
-        match Client::with_options(opts) {
-            Ok(client) => {
-                trace!("Built Mongo client with direct connection");
-                Self { client }
-            }
-            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
-        }
-    }
-}
-
-impl Default for Mongo {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 pub struct MongoSync {

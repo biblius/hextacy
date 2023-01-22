@@ -1,9 +1,9 @@
 use super::CryptoError;
-use crate::env;
 use data_encoding::Encoding;
 use hmac::Mac;
 use sha2::Sha256;
 use tracing::debug;
+use utils::env;
 
 // Generate an HMAC token with the given environment secret and the provided buffer.
 ///
@@ -55,7 +55,7 @@ mod tests {
 
     #[test]
     fn hmac() {
-        crate::env::set(
+        utils::env::set(
             "REG_TOKEN_SECRET",
             "0e7cfad46e31c2bfd76bb0687385b87536898b209a9aef13e94b430d7d3585f7",
         );

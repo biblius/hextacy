@@ -1,12 +1,11 @@
 use super::{schema::sessions, PgAdapterError};
 use crate::{
-    clients::storage::postgres::Postgres,
-    storage::{
-        models::{session::Session, user::User},
-        repository::{role::Role, session::SessionRepository, RepositoryError},
-    },
+    adapters::AdapterError,
+    models::{role::Role, session::Session, user::User},
+    repository::session::SessionRepository,
 };
 use chrono::{Duration, NaiveDateTime, Utc};
+use clients::postgres::Postgres;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
 use std::sync::Arc;
@@ -28,7 +27,7 @@ pub struct PgSessionAdapter {
 
 impl SessionRepository for PgSessionAdapter {
     /// Create a new user session. If the permanent flag is true, the session's `expires_at` field will be set to the maximum possible value
-    fn create(&self, user: &User, csrf: &str, permanent: bool) -> Result<Session, RepositoryError> {
+    fn create(&self, user: &User, csrf: &str, permanent: bool) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl::*;
 
         let new = NewSession {
@@ -50,7 +49,7 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Gets an unexpired session with its corresponding CSRF token
-    fn get_valid_by_id(&self, session_id: &str, csrf: &str) -> Result<Session, RepositoryError> {
+    fn get_valid_by_id(&self, session_id: &str, csrf: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl::*;
         sessions
             .filter(id.eq(session_id))
@@ -61,7 +60,7 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
-    fn refresh(&self, session_id: &str, csrf: &str) -> Result<Session, RepositoryError> {
+    fn refresh(&self, session_id: &str, csrf: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl::*;
 
         diesel::update(sessions)
@@ -74,7 +73,7 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Updates the sessions `expires_at` field to now
-    fn expire(&self, session_id: &str) -> Result<Session, RepositoryError> {
+    fn expire(&self, session_id: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl::*;
 
         diesel::update(sessions)
@@ -86,11 +85,7 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    fn purge<'a>(
-        &self,
-        usr_id: &str,
-        skip: Option<&'a str>,
-    ) -> Result<Vec<Session>, RepositoryError> {
+    fn purge<'a>(&self, usr_id: &str, skip: Option<&'a str>) -> Result<Vec<Session>, AdapterError> {
         use super::schema::sessions::dsl::*;
 
         let mut query = diesel::update(sessions)

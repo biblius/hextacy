@@ -3,9 +3,9 @@ pub mod constants;
 
 use crate::api::router;
 use actix_web::web::ServiceConfig;
-use infrastructure::clients::{
-    email,
-    storage::{postgres::Postgres, redis::Redis},
+use infrastructure::{
+    clients::{postgres::Postgres, redis::Redis},
+    services::email,
 };
 use std::sync::Arc;
 use tracing::info;

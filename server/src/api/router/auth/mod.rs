@@ -31,21 +31,20 @@ mod tests {
             utility::{bcrypt_hash, uuid},
         },
         env,
-        storage::repository::{
-            role::Role, session::MockSessionRepository, user::MockUserRepository, RepositoryError,
-        },
-        storage::{
-            adapters::AdapterError,
-            models::{
-                session::{Session, UserSession},
-                user::User,
-            },
-        },
         web::http::response::Response,
     };
     use lazy_static::lazy_static;
     use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};
+    use storage::{
+        adapters::AdapterError,
+        models::role::Role,
+        models::{
+            session::{Session, UserSession},
+            user::User,
+        },
+        repository::{session::MockSessionRepository, user::MockUserRepository},
+    };
 
     /// Mock this one here so we don't clog the code with unnecessary implementations
     #[derive(Debug, Serialize, Deserialize, new)]
@@ -112,11 +111,9 @@ mod tests {
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         // The service will first attempt to find an existing user
-        user_repo.expect_get_by_email().return_once_st(move |_| {
-            Err(RepositoryError::from(AdapterError::DoesNotExist(
-                "User".to_string(),
-            )))
-        });
+        user_repo
+            .expect_get_by_email()
+            .return_once_st(move |_| Err(AdapterError::DoesNotExist("User".to_string())));
         // Then create one
         user_repo
             .expect_create()
@@ -124,7 +121,7 @@ mod tests {
         // Cache their registration token
         cache
             .expect_set_token()
-            .return_once_st(move |_, _, _: &String, _| Ok(()));
+            .return_once_st(move |_, _, _: &str, _| Ok(()));
         // And send it via email
         email
             .expect_send_registration_token()
@@ -199,7 +196,7 @@ mod tests {
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
-            .expect_get_token::<String>()
+            .expect_get_token()
             .return_once(|_, _| Err(Error::None));
         let service = Authentication {
             user_repo,
@@ -237,20 +234,18 @@ mod tests {
             .return_once(move |_| Ok(user));
         // See if they have an email throttle
         cache
-            .expect_get_token::<i32>()
-            .return_once(|_, _| Err(Error::None));
+            .expect_get_email_throttle()
+            .return_once(|_| Err(Error::None));
         // Set the reg token
         cache
             .expect_set_token()
-            .return_once(|_, _, _: &String, _| Ok(()));
+            .return_once(|_, _, _: &str, _| Ok(()));
         // Send it
         email
             .expect_send_registration_token()
             .return_once(|_, _, _| Ok(()));
         // And set the email throttle
-        cache
-            .expect_set_token()
-            .return_once(|_, _, _: &i32, _| Ok(()));
+        cache.expect_set_email_throttle().return_once(|_| Ok(()));
         let service = Authentication {
             user_repo,
             session_repo,
@@ -347,7 +342,7 @@ mod tests {
         // Expect to cache an OTP token
         cache
             .expect_set_token()
-            .return_once(move |_, _, _: &String, _| Ok(()));
+            .return_once(move |_, _, _: &str, _| Ok(()));
         let auth = Authentication {
             user_repo,
             session_repo,
@@ -371,7 +366,7 @@ mod tests {
             .returning(move |_, _| Ok(USER_OTP.id.clone()));
         // Try to get the OTP throttle
         cache
-            .expect_get_token::<i64>()
+            .expect_get_otp_throttle()
             .return_once(move |_, _| Err(Error::None));
         // Get the user's ID stored behind the token
         user_repo
@@ -422,11 +417,9 @@ mod tests {
         let session_repo = MockSessionRepository::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
-        user_repo.expect_get_by_email().return_once(move |_| {
-            Err(RepositoryError::Adapter(AdapterError::DoesNotExist(
-                "User".to_string(),
-            )))
-        });
+        user_repo
+            .expect_get_by_email()
+            .return_once(move |_| Err(AdapterError::DoesNotExist("User".to_string())));
         let invalid_email = Credentials {
             email: "doesnt@exist.ever".to_string(),
             password: "not good".to_string(),
@@ -500,7 +493,7 @@ mod tests {
         // Set the reset pw token
         cache
             .expect_set_token()
-            .return_once(|_, _, _: &String, _| Ok(()));
+            .return_once(|_, _, _: &str, _| Ok(()));
         // Alert the user
         email
             .expect_alert_password_change()
@@ -566,7 +559,7 @@ mod tests {
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
-            .expect_get_token::<String>()
+            .expect_get_token()
             .return_once(|_, _| Err(Error::None));
         let auth = Authentication {
             user_repo,
@@ -599,8 +592,8 @@ mod tests {
             .return_once(|_| Ok(USER_NO_OTP.clone()));
         // Check email throttle
         cache
-            .expect_get_token::<i32>()
-            .return_once(|_, _| Err(Error::None));
+            .expect_get_email_throttle()
+            .return_once(|_| Err(Error::None));
         // Send email
         email
             .expect_send_forgot_password()
@@ -608,11 +601,9 @@ mod tests {
         // Set a pw change token
         cache
             .expect_set_token()
-            .returning(|_, _, _: &String, _| Ok(()));
+            .returning(|_, _, _: &str, _| Ok(()));
         // Set email throttle
-        cache
-            .expect_set_token()
-            .returning(|_, _, _: &i32, _| Ok(()));
+        cache.expect_set_email_throttle().returning(|_| Ok(()));
         let service = Authentication {
             user_repo,
             session_repo,
@@ -630,11 +621,9 @@ mod tests {
         let session_repo = MockSessionRepository::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
-        user_repo.expect_get_by_email().return_once(|_| {
-            Err(RepositoryError::Adapter(AdapterError::DoesNotExist(
-                "User".to_string(),
-            )))
-        });
+        user_repo
+            .expect_get_by_email()
+            .return_once(|_| Err(AdapterError::DoesNotExist("User".to_string())));
         let service = Authentication {
             user_repo,
             session_repo,
@@ -649,7 +638,7 @@ mod tests {
             Ok(_) => panic!("Not good"),
             Err(e) => assert!(matches!(
                 e,
-                Error::Repository(RepositoryError::Adapter(AdapterError::DoesNotExist(_msg)))
+                Error::Adapter(AdapterError::DoesNotExist(_msg))
             )),
         };
     }
@@ -699,7 +688,7 @@ mod tests {
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
-            .expect_get_token::<String>()
+            .expect_get_token()
             .return_once(|_, _| Err(Error::None));
         let auth = Authentication {
             user_repo,

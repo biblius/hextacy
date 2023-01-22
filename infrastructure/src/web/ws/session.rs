@@ -1,7 +1,7 @@
 //! Actor that manages client JSON messages
 use super::message::RawJson;
 use super::WsError;
-use crate::actors::broker::Broker;
+use crate::web::ws::broker::Broker;
 use actix::prelude::*;
 use actix_web_actors::ws;
 use colored::Colorize;
@@ -273,8 +273,8 @@ impl Debug for WsSession {
 /// Once the message is deserialized into the proper format, it will be broadcast via the session's
 /// broker handle, sending it to everyone subscribed to the message type.
 ///
-/// The foruth argument is largely irrelevant and only serves as an internal fn identifier cause I
-/// CBA to find another way.
+/// The fourth argument is largely irrelevant and only serves as an internal fn identifier cause I
+/// CBA to find another way to create custom fn identifiers.
 macro_rules! ws_register {
     ($session:expr, $domain:literal, $data:ty, $id:ident) => {
         fn $id(session: &WsSession, json: String) -> Result<(), WsError> {

@@ -1,11 +1,10 @@
 use super::{schema::users, PgAdapterError};
 use crate::{
-    clients::storage::postgres::Postgres,
-    storage::{
-        models::user::{SortOptions, User},
-        repository::{user::UserRepository, RepositoryError},
-    },
+    adapters::AdapterError,
+    models::user::{SortOptions, User},
+    repository::user::UserRepository,
 };
+use clients::postgres::Postgres;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -29,7 +28,7 @@ impl UserRepository for PgUserAdapter {
         user_email: &str,
         user_name: &str,
         user_pw: &str,
-    ) -> Result<User, RepositoryError> {
+    ) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::insert_into(users)
             .values(NewUser {
@@ -42,7 +41,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Fetches a user by their ID
-    fn get_by_id(&self, user_id: &str) -> Result<User, RepositoryError> {
+    fn get_by_id(&self, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(id.eq(user_id))
@@ -51,7 +50,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Fetches a user by their email
-    fn get_by_email(&self, user_email: &str) -> Result<User, RepositoryError> {
+    fn get_by_email(&self, user_email: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(email.eq(user_email))
@@ -60,7 +59,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
-    fn update_password(&self, user_id: &str, pw_hash: &str) -> Result<User, RepositoryError> {
+    fn update_password(&self, user_id: &str, pw_hash: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(password.eq(pw_hash))
@@ -70,7 +69,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Update the user's email verified at field to now
-    fn update_email_verified_at(&self, user_id: &str) -> Result<User, RepositoryError> {
+    fn update_email_verified_at(&self, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(email_verified_at.eq(chrono::Utc::now()))
@@ -80,7 +79,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Updates the user's OTP secret to the given key
-    fn update_otp_secret(&self, user_id: &str, secret: &str) -> Result<User, RepositoryError> {
+    fn update_otp_secret(&self, user_id: &str, secret: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(otp_secret.eq(Some(secret)))
@@ -90,7 +89,7 @@ impl UserRepository for PgUserAdapter {
     }
 
     /// Sets the user's frozen flag to true
-    fn freeze(&self, user_id: &str) -> Result<User, RepositoryError> {
+    fn freeze(&self, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
@@ -106,7 +105,7 @@ impl UserRepository for PgUserAdapter {
         page: u16,
         per_page: u16,
         sort: Option<SortOptions>,
-    ) -> Result<Vec<User>, RepositoryError> {
+    ) -> Result<Vec<User>, AdapterError> {
         use super::schema::users::dsl::*;
         let mut query = users.into_boxed();
 

@@ -4,36 +4,39 @@ use crate::{
     error::Error,
 };
 use chrono::Utc;
-use infrastructure::{
-    clients::storage::redis::{Commands, Redis},
-    storage::{cache::Cacher, models::session::UserSession},
-};
+use infrastructure::clients::redis::{Commands, Redis, RedisPoolConnection};
 use std::sync::Arc;
+use storage::{
+    cache::{CacheAccess, CacheError},
+    models::session::UserSession,
+};
 
 #[derive(Debug, Clone)]
 pub struct Cache {
     pub client: Arc<Redis>,
 }
 
-impl Cacher for Cache {
+impl CacheAccess for Cache {
     fn domain() -> &'static str {
         "auth"
+    }
+
+    fn connection(&self) -> Result<RedisPoolConnection, CacheError> {
+        self.client.connect().map_err(|e| e.into())
     }
 }
 
 impl CacheContract for Cache {
     fn get_session_by_id(&self, id: &str) -> Result<UserSession, Error> {
-        <Self as Cacher>::get(AuthCache::Session, id, &mut self.client.connect()?)
-            .map_err(Error::new)
+        self.get_json(AuthCache::Session, id).map_err(Error::new)
     }
 
     fn cache_session(&self, id: &str, session: &UserSession) -> Result<(), Error> {
-        <Self as Cacher>::set(
+        self.set_json(
             AuthCache::Session,
             id,
             session,
             Some(SESSION_CACHE_DURATION_SECONDS),
-            &mut self.client.connect()?,
         )
         .map_err(Error::new)
     }

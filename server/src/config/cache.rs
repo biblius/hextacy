@@ -1,4 +1,4 @@
-use infrastructure::storage::cache::CacheIdentifier;
+use storage::cache::CacheIdentifier;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AuthCache {

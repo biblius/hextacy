@@ -4,83 +4,6 @@ This repo is deisgned to quick start web server development with [actix_web](htt
 
 This kind of project structure is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
-The foundations of this starter are the infrastructure and server directories.
-
-## **Infrastructure**
-
-Here you'll find all the database clients, adapters and repositories as well as a bunch of crypto, web and actor helpers.
-
-The most notable here is the *store* module, where data sources are located. It is divided in to three parts:
-
-- ### **Storage**
-
-  - **Repository**
-
-    Contains interfaces for interacting with application models. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the domain logic.
-
-    A very simple repository would look something like:
-
-    ```rust
-    pub trait UserRepository {
-      fn get_paginated(
-          &self,
-          page: u16,
-          per_page: u16,
-          sort_by: Option<SortOptions>,
-      ) -> Result<Vec<User>, RepositoryError>;
-    }
-    ```
-
-  - **Adapters**
-
-    Contains the client specific implementations of the repository interfaces. Adapters adapt the behaviour dictated by their underlying repository. Seperating implementation from behaviour decouples any other module using a repository from the client specific code located in the adapter.
-
-  - **Models**
-
-    Where application models are located.
-
-  - **Cache**
-
-    Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
-
-  The storage adapters utilize connections established from the clients module:
-
-- ### **Clients**
-  
-    Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs.
-  
-- ### **Actors**
-  
-  Module containing an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
-  
-- ### **Config**
-  
-   Contains the `env` and `logger` modules used for manipulating the env and logging, respectively). The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits our needs better.
-  
-- ### **Crypto**
-
-  Contains cryptographic utilities for encrypting and signing data and generating tokens.
-
-- ### **Web**
-
-  Contains various helpers and utilities for HTTP and websockets.
-
-  - **Http**
-
-      The most notable here are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response.
-
-  - **ws**
-
-      Module containing a Websocket session handler.
-
-      Every message sent to this handler must have a top level `"domain"` field, indicating which type of message is being sent.
-
-      The domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS sessions will in turn publish them whenever they receive any from their clients.
-
-- ### **Services**
-
-  Starts out with a simple email service and is where system wide services should be located.
-
 ## **Server**
 
 The main binary.
@@ -288,6 +211,85 @@ The helpers module contains various helper functions usable throughout the serve
 The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
 
 If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this. It's best to keep everything scoped at the endpoint level except for `setup.rs`, which should be scoped at `api` level since we need it in `configure.rs`.
+
+## **Storage**
+
+The storage crate is project specific which is why it's completely seperated from the rest. It contains 3 main modules:
+
+- **Repository**
+
+    Contains interfaces for interacting with application models. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the domain logic.
+
+    A very simple repository would look something like:
+
+    ```rust
+    pub trait UserRepository {
+      fn get_paginated(
+          &self,
+          page: u16,
+          per_page: u16,
+          sort_by: Option<SortOptions>,
+      ) -> Result<Vec<User>, RepositoryError>;
+    }
+    ```
+
+- **Adapters**
+
+    Contains the client specific implementations of the repository interfaces. Adapters adapt the behaviour dictated by their underlying repository. Seperating implementation from behaviour decouples any other module using a repository from the client specific code located in the adapter.
+
+- **Models**
+
+    Where application models are located.
+
+- **Cache**
+
+    Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
+
+The storage adapters utilize connections established from the clients module:
+
+## **Clients**
+  
+  Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs.
+
+## **Logger**
+
+The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits your needs better.
+
+## **Infrastructure**
+
+Contains various utilities for working with http, email and websockets:
+
+- ### **Actors**
+  
+  An implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
+  
+- ### **Crypto**
+
+  Contains cryptographic utilities for encrypting and signing data and generating tokens.
+
+- ### **Web**
+
+  Contains various helpers and utilities for HTTP and websockets.
+
+  - **Http**
+
+      The most notable here are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response.
+
+  - **ws**
+
+      Module containing a Websocket session handler.
+
+      Every message sent to this handler must have a top level `"domain"` field. Domains are completely arbitrary and are used to tell the ws session which datatype to broadcast.
+
+      Domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS session actors will in turn publish them whenever they receive any from their respective clients.
+
+      Registered data types are usually enums which are then matched in handlers of the receiving actors. Enums should always be untagged, so as to mitigate unnecessary nestings from the client sockets.
+
+      Check out the `web::ws` module for more info and an example of how it works.
+
+- ### **Services**
+
+  Starts out with a simple email service and is where system wide services should be located.
 
 ## **Mocking**
 
