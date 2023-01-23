@@ -6,11 +6,11 @@ use crate::config::constants::{
 };
 use crate::error::Error;
 use chrono::Utc;
-use infrastructure::clients::redis::{Commands, Redis};
+use infrastructure::cache::{CacheAccess, CacheError};
+use infrastructure::clients::redis::{Commands, Redis, RedisPoolConnection};
 use infrastructure::services::email;
 use infrastructure::services::email::lettre::SmtpTransport;
 use std::sync::Arc;
-use storage::cache::CacheAccess;
 use storage::models::session::UserSession;
 use tracing::debug;
 
@@ -23,10 +23,7 @@ impl CacheAccess for Cache {
         "auth"
     }
 
-    fn connection(
-        &self,
-    ) -> Result<infrastructure::clients::redis::RedisPoolConnection, storage::cache::CacheError>
-    {
+    fn connection(&self) -> Result<RedisPoolConnection, CacheError> {
         self.client.connect().map_err(|e| e.into())
     }
 }

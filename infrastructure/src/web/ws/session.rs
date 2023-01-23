@@ -26,7 +26,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 ///
 /// ```
 /// use infrastructure::{
-///     actors::broker::{Broker, IssueSync, Subscribe},
+///     web::ws::broker::{Broker, IssueSync, Subscribe},
 ///     web::ws::message::ActorMessage,
 ///     ws_register,
 /// };

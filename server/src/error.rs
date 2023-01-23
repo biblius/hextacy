@@ -17,7 +17,7 @@ pub(crate) enum Error {
     #[error("Service Error: {0}")]
     Service(#[from] infrastructure::services::ServiceError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] storage::cache::CacheError),
+    Cache(#[from] infrastructure::cache::CacheError),
     #[error("Adapter Error: {0}")]
     Adapter(#[from] storage::adapters::AdapterError),
     #[error("Redis Error: {0}")]

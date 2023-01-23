@@ -4,12 +4,13 @@ use crate::{
     error::Error,
 };
 use chrono::Utc;
-use infrastructure::clients::redis::{Commands, Redis, RedisPoolConnection};
-use std::sync::Arc;
-use storage::{
-    cache::{CacheAccess, CacheError},
-    models::session::UserSession,
+use infrastructure::{
+    cache::CacheError,
+    clients::redis::{Commands, Redis, RedisPoolConnection},
+    CacheAccess,
 };
+use std::sync::Arc;
+use storage::models::session::UserSession;
 
 #[derive(Debug, Clone)]
 pub struct Cache {
