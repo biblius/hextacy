@@ -94,7 +94,8 @@ where
                     &user.email,
                     "Your account has been frozen due to too many invalid login attempts",
                 )
-                .to_response(StatusCode::LOCKED, None, None));
+                .to_response(StatusCode::LOCKED)
+                .finish());
             }
             return Err(AuthenticationError::InvalidCredentials.into());
         }
@@ -108,13 +109,9 @@ where
                 &user.id,
                 Some(OTP_TOKEN_DURATION_SECONDS),
             )?;
-            return Ok(
-                TwoFactorAuthResponse::new(&user.username, &token, remember).to_response(
-                    StatusCode::OK,
-                    None,
-                    None,
-                ),
-            );
+            return Ok(TwoFactorAuthResponse::new(&user.username, &token, remember)
+                .to_response(StatusCode::OK)
+                .finish());
         }
         self.session_response(user, remember)
     }
@@ -191,7 +188,8 @@ where
             &user.username,
             &user.email,
         )
-        .to_response(StatusCode::CREATED, None, None))
+        .to_response(StatusCode::CREATED)
+        .finish())
     }
 
     /// Verifies the registration token sent via email upon registration.
@@ -210,7 +208,8 @@ where
         self.cache.delete_token(AuthCache::RegToken, token)?;
         Ok(
             MessageResponse::new("Successfully verified registration token. Good job.")
-                .to_response(StatusCode::OK, None, None),
+                .to_response(StatusCode::OK)
+                .finish(),
         )
     }
 
@@ -244,7 +243,8 @@ where
 
         Ok(
             MessageResponse::new("Successfully sent registration token. Incoming email.")
-                .to_response(StatusCode::OK, None, None),
+                .to_response(StatusCode::OK)
+                .finish(),
         )
     }
 
@@ -284,7 +284,9 @@ where
             .alert_password_change(&user.username, &user.email, &token)?;
 
         info!("Successfully changed password for {}", session.user_id);
-        Ok(MessageResponse::new("Successfully changed password. All sessions have been purged, please log in again to continue.").to_response(StatusCode::OK, None, None))
+        Ok(MessageResponse::new("Successfully changed password. All sessions have been purged, please log in again to continue.")
+        .to_response(StatusCode::OK)
+        .finish())
     }
 
     /// Updates a user's password to a random string and sends it to them in the email
@@ -315,11 +317,9 @@ where
         self.purge_sessions(&user.id, None)?;
 
         Ok(
-            MessageResponse::new("Successfully reset password. Incoming email.").to_response(
-                StatusCode::OK,
-                None,
-                None,
-            ),
+            MessageResponse::new("Successfully reset password. Incoming email.")
+                .to_response(StatusCode::OK)
+                .finish(),
         )
     }
 
@@ -350,11 +350,9 @@ where
         self.cache.set_email_throttle(&user.id)?;
 
         Ok(
-            MessageResponse::new("Started forgot password routine. Incoming email.").to_response(
-                StatusCode::OK,
-                None,
-                None,
-            ),
+            MessageResponse::new("Started forgot password routine. Incoming email.")
+                .to_response(StatusCode::OK)
+                .finish(),
         )
     }
 
@@ -384,13 +382,10 @@ where
         }
         // Expire the cookie
         let cookie = cookie::create(COOKIE_S_ID, &session.id, true)?;
-        Ok(
-            MessageResponse::new("Successfully logged out, bye!").to_response(
-                StatusCode::OK,
-                Some(vec![cookie]),
-                None,
-            ),
-        )
+        Ok(MessageResponse::new("Successfully logged out, bye!")
+            .to_response(StatusCode::OK)
+            .with_cookies(vec![cookie])
+            .finish())
     }
 
     /// Expires all sessions in the database and deletes all corresponding cached sessions
@@ -419,13 +414,13 @@ where
         )?;
         info!("Successfully created session for {}", user.username);
         // Respond with the x-csrf header and the session ID
-        Ok(AuthenticationSuccessResponse::new(user).to_response(
-            StatusCode::OK,
-            Some(vec![session_cookie]),
-            Some(vec![(
+        Ok(AuthenticationSuccessResponse::new(user)
+            .to_response(StatusCode::OK)
+            .with_cookies(vec![session_cookie])
+            .with_headers(vec![(
                 HeaderName::from_static("x-csrf-token"),
                 HeaderValue::from_str(&csrf_token)?,
-            )]),
-        ))
+            )])
+            .finish())
     }
 }

@@ -25,6 +25,8 @@ where
             data.sort_by,
         )?;
 
-        Ok(UserResponse::new(users).to_response(StatusCode::OK, None, None))
+        Ok(UserResponse::new(users)
+            .to_response(StatusCode::OK)
+            .finish())
     }
 }

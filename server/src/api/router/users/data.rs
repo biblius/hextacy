@@ -20,4 +20,4 @@ pub struct UserResponse {
     users: Vec<User>,
 }
 
-impl Response for UserResponse {}
+impl Response<'_> for UserResponse {}

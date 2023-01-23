@@ -310,13 +310,9 @@ mod tests {
         service
             .expect_session_response()
             .return_once_st(move |_, _| {
-                Ok(
-                    AuthenticationSuccessResponse::new(USER_NO_OTP.clone()).to_response(
-                        StatusCode::OK,
-                        None,
-                        None,
-                    ),
-                )
+                Ok(AuthenticationSuccessResponse::new(USER_NO_OTP.clone())
+                    .to_response(StatusCode::OK)
+                    .finish())
             });
         let auth = Authentication {
             user_repo,

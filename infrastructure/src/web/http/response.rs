@@ -8,30 +8,62 @@ use actix_web::{
 use cookie::Cookie;
 use serde::Serialize;
 
+pub struct ResponseBuilder<'a, T: Response<'a>> {
+    code: StatusCode,
+    body: T,
+    cookies: Vec<Cookie<'a>>,
+    headers: Vec<(HeaderName, HeaderValue)>,
+}
+
+impl<'a, T> ResponseBuilder<'a, T>
+where
+    T: Response<'a>,
+{
+    pub fn with_cookies(mut self, cookies: Vec<Cookie<'a>>) -> ResponseBuilder<T> {
+        for c in cookies {
+            self.cookies.push(c);
+        }
+        self
+    }
+
+    pub fn with_headers(
+        mut self,
+        headers: Vec<(HeaderName, HeaderValue)>,
+    ) -> ResponseBuilder<'a, T> {
+        for h in headers {
+            self.headers.push(h);
+        }
+        self
+    }
+
+    pub fn finish(self) -> HttpResponse {
+        let mut response = HttpResponseBuilder::new(self.code);
+
+        for c in self.cookies {
+            response.cookie(c);
+        }
+
+        for (key, value) in self.headers {
+            response.append_header((key, value));
+        }
+
+        response.json(self.body)
+    }
+}
+
 /// Utility containing default methods for quickly converting a struct to an HTTP response
-pub trait Response
+pub trait Response<'a>
 where
     Self: Sized + Serialize,
 {
     /// Enables quickly converting a struct to an http response with a JSON body and the provided cookies and headers.
-    fn to_response(
-        self,
-        code: StatusCode,
-        cookies: Option<Vec<Cookie<'_>>>,
-        headers: Option<Vec<(HeaderName, HeaderValue)>>,
-    ) -> HttpResponse {
-        let mut response = HttpResponseBuilder::new(code);
-        if let Some(cookies) = cookies {
-            for c in cookies {
-                response.cookie(c);
-            }
+    fn to_response(self, code: StatusCode) -> ResponseBuilder<'a, Self> {
+        ResponseBuilder {
+            code,
+            body: self,
+            cookies: vec![],
+            headers: vec![],
         }
-        if let Some(headers) = headers {
-            for (key, value) in headers {
-                response.append_header((key, value));
-            }
-        }
-        response.json(self)
     }
 }
 
@@ -47,4 +79,4 @@ impl<'a> MessageResponse<'a> {
     }
 }
 
-impl<'a> Response for MessageResponse<'a> {}
+impl<'a> Response<'a> for MessageResponse<'a> {}

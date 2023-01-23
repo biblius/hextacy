@@ -104,7 +104,7 @@ RESPONSES
 pub(super) struct AuthenticationSuccessResponse {
     user: User,
 }
-impl Response for AuthenticationSuccessResponse {}
+impl Response<'_> for AuthenticationSuccessResponse {}
 
 /// Sent when the user successfully authenticates with credentials and has 2FA enabled
 #[derive(Debug, Serialize, new)]
@@ -113,7 +113,7 @@ pub(super) struct TwoFactorAuthResponse<'a> {
     token: &'a str,
     remember: bool,
 }
-impl<'a> Response for TwoFactorAuthResponse<'a> {}
+impl<'a> Response<'_> for TwoFactorAuthResponse<'a> {}
 
 /// Sent when the user exceeds the maximum invalid login attempts
 #[derive(Debug, Serialize, new)]
@@ -121,7 +121,7 @@ pub(super) struct FreezeAccountResponse<'a> {
     email: &'a str,
     message: &'a str,
 }
-impl<'a> Response for FreezeAccountResponse<'a> {}
+impl<'a> Response<'_> for FreezeAccountResponse<'a> {}
 
 /// Sent when a user registers for the very first time
 #[derive(Debug, Serialize, new)]
@@ -130,4 +130,4 @@ pub(super) struct RegistrationStartResponse<'a> {
     username: &'a str,
     email: &'a str,
 }
-impl<'a> Response for RegistrationStartResponse<'a> {}
+impl<'a> Response<'_> for RegistrationStartResponse<'a> {}
