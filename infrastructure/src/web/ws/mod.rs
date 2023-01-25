@@ -21,7 +21,7 @@ pub fn start<F>(
     populate_fn: F,
 ) -> Result<impl Responder, WsError>
 where
-    F: FnOnce(&mut WsSession) -> (),
+    F: FnOnce(&mut WsSession),
 {
     let mut session = WsSession {
         id: session_id.to_string(),

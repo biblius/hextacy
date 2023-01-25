@@ -2,7 +2,7 @@ use clients::redis::{Commands, FromRedisValue, RedisError, RedisPoolConnection, 
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
-// use tracing::debug;
+use tracing::debug;
 
 /// Implement on services that access the cache.
 ///
@@ -43,7 +43,7 @@ pub trait CacheAccess {
     ) -> Result<(), CacheError> {
         let mut conn = self.connection()?;
         let key = Self::construct_key(cache_id, key);
-        // debug!("Setting {}", key);
+        debug!("Setting {}", key);
         if let Some(ex) = ex {
             conn.set_ex::<&str, T, ()>(&key, val, ex)
                 .map_err(Into::into)
@@ -59,7 +59,7 @@ pub trait CacheAccess {
     ) -> Result<T, CacheError> {
         let mut conn = self.connection()?;
         let key = Self::construct_key(cache_id, key);
-        // debug!("Getting {}", key);
+        debug!("Getting {}", key);
         let result = conn.get::<&str, String>(&key)?;
         serde_json::from_str::<T>(&result).map_err(Into::into)
     }
@@ -73,7 +73,7 @@ pub trait CacheAccess {
     ) -> Result<(), CacheError> {
         let mut conn = self.connection()?;
         let key = Self::construct_key(cache_id, key);
-        // debug!("Setting {}", key);
+        debug!("Setting {}", key);
         let value = serde_json::to_string(&val)?;
         if let Some(ex) = ex {
             conn.set_ex::<&str, String, ()>(&key, value, ex)
@@ -87,7 +87,7 @@ pub trait CacheAccess {
     fn delete(&self, cache_id: impl CacheIdentifier, key: &str) -> Result<(), CacheError> {
         let mut conn = self.connection()?;
         let key = Self::construct_key(cache_id, key);
-        // debug!("Deleting {}", key);
+        debug!("Deleting {}", key);
         conn.del::<String, ()>(key).map_err(Into::into)
     }
 }

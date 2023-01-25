@@ -392,7 +392,7 @@ mod tests {
             / 30;
         let sec = USER_OTP.otp_secret.clone();
         let otp = thotp::otp(
-            &BASE32.decode(sec.clone().unwrap().as_bytes()).unwrap(),
+            &BASE32.decode(sec.unwrap().as_bytes()).unwrap(),
             time_step_now,
         )
         .unwrap();

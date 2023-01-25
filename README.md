@@ -1,8 +1,46 @@
-# Rust Web Starter
+# ⚗️ Alchemy
 
-This repo is deisgned to quick start web server development with [actix_web](https://actix.rs/) by providing out of the box basic user authentication flows, session middleware, a simple CLI tool for file managment and a bunch of utilities for the web.
+A repo designed to quick start web server development with [actix_web](https://actix.rs/) by providing an extensible infrastructure and a CLI tool to reduce manually writing boilerplate while maintaining best practices.
 
-This kind of project structure is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
+The kind of project structure this repo uses is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
+
+## **Get started**
+
+Create a real `.env` file filling out the example file with your desired parameters and create the database you entered in the file. You do not have to fill out fields you don't intend to use.
+
+For the Email part, use [this spec](https://support.google.com/mail/answer/7126229?hl=en#zippy=%2Cstep-change-smtp-other-settings-in-your-email-client) to set up the SMTP host(smtp.gmail.com) and port(465) and [follow these instructions](https://support.google.com/accounts/answer/185833?hl=en#zippy=%2Cwhy-you-may-need-an-app-password) to generate an app password. The password can then be used for the `SMTP_PASSWORD` variable. For the sender and username enter your email address.
+
+For the secrets, run
+
+```bash
+cargo run -p infrastructure --bin generate_secret <SECRET_NAME>
+```
+
+and replace them with the example ones.
+
+Install the CLI tool via
+
+```bash
+cargo install --path alx
+```
+
+Run migrations via
+
+```bash
+alx m run
+```
+
+Give yourself a pat on the back since you've made it this far and optionally check out all the commands with `alx -h`.
+
+Run the server with
+
+```bash
+cargo run -p server
+```
+
+and load the postman collection located in `misc` to interact with it.
+
+You now have a ready to go infrastructure, now go make your billion $ app!
 
 ## **Server**
 
@@ -258,10 +296,6 @@ The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracin
 ## **Infrastructure**
 
 Contains various utilities for working with http, email and websockets:
-
-- ### **Actors**
-  
-  An implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
   
 - ### **Crypto**
 
@@ -284,6 +318,8 @@ Contains various utilities for working with http, email and websockets:
       Domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS session actors will in turn publish them whenever they receive any from their respective clients.
 
       Registered data types are usually enums which are then matched in handlers of the receiving actors. Enums should always be untagged, so as to mitigate unnecessary nestings from the client sockets.
+
+      Uses an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
       Check out the `web::ws` module for more info and an example of how it works.
 
@@ -407,5 +443,7 @@ TODO:
 - [ ] Oauth stuff
 
 - [ ] Openssl with let's encrypt
+
+- [ ] Init project with `alx init`
 
 - [ ] Something probably

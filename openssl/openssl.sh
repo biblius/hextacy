@@ -8,7 +8,7 @@
 openssl genrsa -out 'ca-key.pem' 4096
 
 # (2) Generate the CA.
-openssl req -new -x509 -sha256 -days 365 -key 'ca-key.pem' -out 'ca.pem' -subj "/C=HR/ST=OS/L=Osijek/O=Myco/OU=Myco/CN=localhost"
+openssl req -new -x509 -sha256 -days 365 -key 'ca-key.pem' -out 'ca.pem' -subj "/C=HR/ST=OS/L=Osijek/O=Alx/OU=Alx/CN=localhost"
 
 # (3) Generate a private key for the certificate.
 openssl genrsa -out 'key.pem' 4096

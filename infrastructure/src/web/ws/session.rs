@@ -117,8 +117,10 @@ pub struct WsSession {
     /// Callback functions mapped to domain names. Messages received from the client
     /// with valid domain names will execute the provided functions, given their data is
     /// in the correct format
-    pub callbacks: HashMap<&'static str, Box<dyn Fn(&Self, String) -> Result<(), WsError>>>,
+    pub callbacks: HashMap<&'static str, WsMessageCallback>,
 }
+
+type WsMessageCallback = Box<dyn Fn(&WsSession, String) -> Result<(), WsError>>;
 
 impl WsSession {
     pub fn new(id: String, broker: Addr<Broker>) -> Self {
@@ -151,10 +153,10 @@ impl WsSession {
         let domain = &message["domain"];
         domain.as_str().map_or_else(
             || {
-                return Err(WsError::MalformedDomain(
+                Err(WsError::MalformedDomain(
                     "Domain malformed, make sure to specify it on the top level of the message"
                         .to_string(),
-                ));
+                ))
             },
             |val| Ok(val.to_string()),
         )
@@ -162,11 +164,7 @@ impl WsSession {
 
     /// Register a callback for messages received in the specified domain. The [ws_register]
     /// macro makes life easier and you should probably use that.
-    pub fn register_handler(
-        &mut self,
-        domain: &'static str,
-        cb: Box<dyn Fn(&Self, String) -> Result<(), WsError>>,
-    ) {
+    pub fn register_handler(&mut self, domain: &'static str, cb: WsMessageCallback) {
         self.callbacks.insert(domain, cb);
     }
 
@@ -178,7 +176,7 @@ impl WsSession {
         match self.callbacks.get(domain.as_str()) {
             Some(cb) => {
                 cb(self, json)?;
-                return Ok(());
+                Ok(())
             }
             None => Err(WsError::EventNotImplemented(domain.to_string())),
         }

@@ -21,7 +21,7 @@ pub(super) fn init(cfg: &mut ServiceConfig) {
     info!("Email client initialized");
 
     router::auth::setup::routes(pg.clone(), rd.clone(), email_client, cfg);
-    router::users::setup::routes(pg.clone(), rd.clone(), cfg);
+    router::users::setup::routes(pg, rd, cfg);
     router::health::route(cfg);
     router::resources::setup::routes(cfg);
 }

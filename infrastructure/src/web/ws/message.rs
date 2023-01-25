@@ -40,7 +40,7 @@ where
     }
 
     pub fn to_actor_message(id: &str, json: &str) -> Result<ActorMessage<T>, WsError> {
-        let data = serde_json::from_str::<WsMessage<T>>(&json.trim())?.data;
+        let data = serde_json::from_str::<WsMessage<T>>(json.trim())?.data;
         Ok(ActorMessage {
             sender_id: id.to_string(),
             data,
