@@ -305,7 +305,7 @@ Contains various utilities for working with http, email and websockets:
 
   Contains various helpers and utilities for HTTP and websockets.
 
-  - **Http**
+  - **http**
 
       The most notable here are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response.
 

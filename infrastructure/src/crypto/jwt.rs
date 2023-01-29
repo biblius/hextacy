@@ -64,6 +64,13 @@ pub fn parse<T: Serialize + DeserializeOwned>(token: &str) -> Result<T, CryptoEr
 
 #[cfg(test)]
 mod tests {
+    use rand::{rngs::StdRng, SeedableRng};
+    use rsa::{
+        pkcs1::EncodeRsaPrivateKey,
+        pkcs8::{self, EncodePublicKey},
+        RsaPrivateKey, RsaPublicKey,
+    };
+
     use crate::crypto::jwt::Claims;
 
     use super::*;
@@ -76,17 +83,27 @@ mod tests {
     #[test]
     fn encode_decode_jwt() {
         //Fetch the private key
-        let priv_key = fs::read(Path::new("../encryption/key_pair/priv_key.pem"))
-            .expect("Couldn't open private key");
-        //Fetch the public key
-        let pub_key = fs::read(Path::new("../encryption/key_pair/pub_key.pem"))
-            .expect("Couldn't open public key");
+        let mut rng = StdRng::from_entropy();
+        let bits = 2048;
+
+        let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("Failed to generate private key");
+        let pub_key = RsaPublicKey::from(&priv_key);
 
         //Transmogrify the key key par to the encoding and decoding keys as arrays of u8
-        let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(&priv_key)
-            .expect("Couldn't parse encoding key");
-        let decoding_key =
-            jsonwebtoken::DecodingKey::from_rsa_pem(&pub_key).expect("Couldn't parse decoding key");
+        let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(
+            priv_key
+                .to_pkcs1_pem(pkcs8::LineEnding::LF)
+                .unwrap()
+                .as_bytes(),
+        )
+        .expect("Couldn't parse encoding key");
+        let decoding_key = jsonwebtoken::DecodingKey::from_rsa_pem(
+            pub_key
+                .to_public_key_pem(pkcs8::LineEnding::LF)
+                .unwrap()
+                .as_bytes(),
+        )
+        .expect("Couldn't parse decoding key");
 
         //Issued at
         let now = jsonwebtoken::get_current_timestamp();

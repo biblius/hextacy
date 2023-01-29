@@ -31,6 +31,12 @@ validify = { version = "0.1.0" }
 
 async-trait = "0.1.42"
 derive-new = "0.5.9"
+diesel = { version = "2.0.1", features = [
+  "chrono",
+  "postgres",
+  "r2d2",
+  "serde_json",
+] }
 futures-util = "0.3.24"
 lazy_static = "1.4.0"
 logger = { version = "0.1.0", path = "../logger" }
