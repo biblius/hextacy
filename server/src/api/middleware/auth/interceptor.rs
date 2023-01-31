@@ -2,12 +2,14 @@ use super::contract::{AuthGuardContract, CacheContract};
 use super::domain::AuthenticationGuard;
 use super::infratructure::Cache;
 use crate::error::{AuthenticationError, Error};
+/* use ::alx_core::clients::postgres::Postgres;
+use ::alx_core::clients::redis::Redis; */
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
+use alx_core::clients::postgres::Postgres;
+use alx_core::clients::redis::Redis;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
-use infrastructure::clients::postgres::Postgres;
-use infrastructure::clients::redis::Redis;
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;

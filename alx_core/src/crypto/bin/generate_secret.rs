@@ -4,7 +4,7 @@ use data_encoding::{Encoding, BASE32, BASE64, BASE64URL};
 use rand::{rngs::StdRng, RngCore, SeedableRng};
 use std::{env, fmt::Write, fs, path::Path};
 
-/// cargo run -p infrastructure --bin generate_secret <KEY> <LENGTH> [<ENCODING> b32 | b64 | b64u]
+/// cargo run -p alx_core --bin generate_secret <KEY> <LENGTH> [<ENCODING> b32 | b64 | b64u]
 fn main() {
     let args = env::args().collect::<Vec<String>>();
 

@@ -1,5 +1,5 @@
+use alx_core::web::http::response::Response;
 use derive_new::new;
-use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use storage::models::user::{SortOptions, User};
 use validify::validify;

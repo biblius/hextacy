@@ -12,7 +12,7 @@ const ALPHABET: [char; 60] = [
 
 /// Generates a random password using the alphabet above and the provided length.
 /// Run the following from the ROOT DIRECTORY of the project.
-/// cargo run -p infrastructure --bin random_password <length>
+/// cargo run -p alx_core --bin random_password <length>
 #[allow(dead_code)]
 fn main() {
     let args = env::args().collect::<Vec<String>>();

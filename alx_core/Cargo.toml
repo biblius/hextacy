@@ -1,10 +1,10 @@
 [package]
 edition = "2021"
-name = "infrastructure"
+name = "alx_core"
 version = "0.1.0"
 
 [lib]
-name = "infrastructure"
+name = "alx_core"
 path = "src/lib.rs"
 
 [[bin]]

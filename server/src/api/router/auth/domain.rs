@@ -15,8 +15,7 @@ use crate::config::{
 };
 use crate::error::{AuthenticationError, Error};
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
-use data_encoding::{BASE32, BASE64URL};
-use infrastructure::{
+use alx_core::{
     crypto::{
         self,
         hmac::{generate_hmac, verify_hmac},
@@ -27,6 +26,7 @@ use infrastructure::{
         response::{MessageResponse, Response},
     },
 };
+use data_encoding::{BASE32, BASE64URL};
 use reqwest::{
     header::{self, HeaderName, HeaderValue},
     StatusCode,

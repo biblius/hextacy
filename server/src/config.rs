@@ -3,7 +3,7 @@ pub mod constants;
 
 use crate::api::router;
 use actix_web::web::ServiceConfig;
-use infrastructure::{
+use alx_core::{
     clients::{postgres::Postgres, redis::Redis},
     services::email,
 };

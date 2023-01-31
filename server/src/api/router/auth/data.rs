@@ -1,6 +1,6 @@
 use crate::helpers::validation::EMAIL_REGEX;
+use alx_core::web::http::response::Response;
 use derive_new::new;
-use infrastructure::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use storage::models::user::User;

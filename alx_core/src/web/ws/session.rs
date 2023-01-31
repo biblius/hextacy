@@ -25,7 +25,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 /// ### Example
 ///
 /// ```
-/// use infrastructure::{
+/// use alx_core::{
 ///     web::ws::broker::{Broker, IssueSync, Subscribe},
 ///     web::ws::message::ActorMessage,
 ///     ws_register,

@@ -5,7 +5,7 @@ use super::{
 };
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
-use infrastructure::{
+use alx_core::{
     clients::{postgres::Postgres, redis::Redis},
     services::email::lettre::SmtpTransport,
 };

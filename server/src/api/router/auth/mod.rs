@@ -22,10 +22,7 @@ mod tests {
         error::{AuthenticationError, Error},
     };
     use actix_web::body::to_bytes;
-    use chrono::NaiveDateTime;
-    use data_encoding::{BASE32, BASE64URL};
-    use derive_new::new;
-    use infrastructure::{
+    use alx_core::{
         crypto::{
             hmac::generate_hmac,
             utility::{bcrypt_hash, uuid},
@@ -33,6 +30,9 @@ mod tests {
         env,
         web::http::response::Response,
     };
+    use chrono::NaiveDateTime;
+    use data_encoding::{BASE32, BASE64URL};
+    use derive_new::new;
     use lazy_static::lazy_static;
     use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};

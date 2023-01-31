@@ -5,11 +5,11 @@ use crate::config::constants::{
     SESSION_CACHE_DURATION_SECONDS, WRONG_PASSWORD_CACHE_DURATION,
 };
 use crate::error::Error;
+use alx_core::cache::{CacheAccess, CacheError};
+use alx_core::clients::redis::{Commands, Redis, RedisPoolConnection};
+use alx_core::services::email;
+use alx_core::services::email::lettre::SmtpTransport;
 use chrono::Utc;
-use infrastructure::cache::{CacheAccess, CacheError};
-use infrastructure::clients::redis::{Commands, Redis, RedisPoolConnection};
-use infrastructure::services::email;
-use infrastructure::services::email::lettre::SmtpTransport;
 use std::sync::Arc;
 use storage::models::session::UserSession;
 use tracing::debug;
@@ -168,7 +168,7 @@ impl EmailContract for Email {
         email: &str,
     ) -> Result<(), Error> {
         debug!("Sending registration token email to {email}");
-        let domain = infrastructure::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,
@@ -198,7 +198,7 @@ impl EmailContract for Email {
 
     fn alert_password_change(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = infrastructure::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,
@@ -229,7 +229,7 @@ impl EmailContract for Email {
 
     fn send_freeze_account(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = infrastructure::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,

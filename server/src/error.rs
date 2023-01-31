@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use infrastructure::clients::redis;
+use alx_core::clients::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -13,17 +13,17 @@ pub(crate) enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
-    Client(#[from] infrastructure::clients::ClientError),
+    Client(#[from] alx_core::clients::ClientError),
     #[error("Service Error: {0}")]
-    Service(#[from] infrastructure::services::ServiceError),
+    Service(#[from] alx_core::services::ServiceError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] infrastructure::cache::CacheError),
+    Cache(#[from] alx_core::cache::CacheError),
     #[error("Adapter Error: {0}")]
     Adapter(#[from] storage::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
-    Crypto(#[from] infrastructure::crypto::CryptoError),
+    Crypto(#[from] alx_core::crypto::CryptoError),
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Reqwest Header Error: {0}")]
@@ -33,7 +33,7 @@ pub(crate) enum Error {
     #[error("Validation Error")]
     Validation(Vec<ValidationError>),
     #[error("Http Error")]
-    Http(#[from] infrastructure::web::http::HttpError),
+    Http(#[from] alx_core::web::http::HttpError),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]

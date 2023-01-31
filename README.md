@@ -63,13 +63,12 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
     A simple example for a very basic user service would look like:
   
     ```rust
-    #[async_trait]
     pub(super) trait ServiceContract {
-      async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
+      fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
     }
     ```
   
-    No implementation details are written here, only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
+    Here we wrtie only the signatures we want our endpoint service to have. By having an `HttpResponse` in the return signature we retain the flexibility of responding with different responses instead of having a concrete type to return from the service. This essentially allows us to return any struct that implements the `Response` trait.
   
   - **data.rs**
 
@@ -78,6 +77,7 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
     ```rust
     // We expect this in the query params
     #[derive(Debug, Deserialize)]
+    // Validify creates a GetUsersPaginatedPayload in the background
     #[validify]
     #[serde(rename_all = "camelCase")]
     pub(super) struct GetUsersPaginated {
@@ -100,38 +100,10 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
   
   - **infrastructure.rs**
   
-    Here we define the specific implementation of the aformentioned `RepositoryContract` for this service's repository.
-  
-    ```rust
-    use super::contract::RepositoryContract;
-  
-    pub(super) struct Repository<R>
-    where
-      R: UserRepository,
-    {
-      pub user_repo: R,
-    }
-  
-    #[async_trait]
-    impl<R> RepositoryContract for Repository<R>
-    where
-      R: UserRepository + Send + Sync,
-    {
-      async fn get_paginated(
-          &self,
-          page: u16,
-          per_page: u16,
-          sort_by: Option<SortOptions>,
-      ) -> Result<Vec<User>, Error> {
-          self.user_repo
-              .get_paginated(page, per_page, sort_by)
-              .await
-              .map_err(|e| AdapterError::Postgres(e).into())
-      }
-    }
-    ```
-  
-    Note that this is solely to demonstrate what an infrastructure file would look like. Normally, one would define the service to directly contain the user repository (as shown below in the domain) so this file, in the case of this example is unnecessary. Check out the `auth` endpoint from the server to see what it would actually look like.
+    Here we define the specific implementations of contracts intended to utilise alx_core services.
+    For simple services such as this, the file can be omitted (our adapters contain the implementations for communicating with the database, so no need to write it here as well). If we, for example, had some kind of caching functionality in the service, we would write the implementation here.
+
+    Check out the `auth` endpoint from the server to see what it would actually look like.
   
   - **domain.rs**
   
@@ -145,12 +117,11 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
       pub user_repo: R,
     }
   
-    #[async_trait]
     impl<R> ServiceContract for UserService<R>
     where
       R: UserRepository + Send + Sync,
     {
-      async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
+      fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
           let users = self
               .user_repo
               .get_paginated(
@@ -164,17 +135,17 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
     }
     ```
   
-     Notice how we didn't tie any implementation to the repository, it can take in anything as long as it implements the `RepositoryContract` from the `contract` module. This allows for easy mocking of the function and seperation of the business logic of the service from the implementation details of our repository adapters. In this service's implementation of the `get_paginated` function we just call our repository to get a list of users and return them in the `UserResponse` from our `data` module. Here the `to_response()` call converts the struct to an HTTP response with a 200 OK status code, no cookies and no additional headers.
+     Notice how we didn't tie any implementation to the repository, it can take in anything as long as it implements `UserRepository`. This allows for easy mocking of the function and seperation of the business logic of the service from the implementation details of our repository adapters. In this service's implementation of the `get_paginated` function we just call our repository to get a list of users and return them in the `UserResponse` from our `data` module. Here the `to_response()` call converts the struct to an HTTP response with a 200 OK status code, no cookies and no additional headers.
   
   - **handler.rs**
   
     Here we define our request handlers. These are the entry points for the domain of each endpoint.
   
     ```rust
-    use super::{contract::ServiceContract, data::GetUsersPaginated};
+    use super::{contract::ServiceContract, data::GetUsersPaginatedPayload};
   
     pub(super) async fn get_paginated<S: ServiceContract>(
-      data: web::Query<GetUsersPaginated>,
+      data: web::Query<GetUsersPaginatedPayload>,
       service: web::Data<S>,
     ) -> Result<impl Responder, Error> {
       data.0.validate().map_err(Error::new)?;
@@ -279,10 +250,6 @@ The storage crate is project specific which is why it's completely seperated fro
 
     Where application models are located.
 
-- **Cache**
-
-    Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
-
 The storage adapters utilize connections established from the clients module:
 
 ## **Clients**
@@ -293,7 +260,7 @@ The storage adapters utilize connections established from the clients module:
 
 The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits your needs better.
 
-## **Infrastructure**
+## **Core**
 
 Contains various utilities for working with http, email and websockets:
   
@@ -323,6 +290,10 @@ Contains various utilities for working with http, email and websockets:
 
       Check out the `web::ws` module for more info and an example of how it works.
 
+- **Cache**
+
+  Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
+
 - ### **Services**
 
   Starts out with a simple email service and is where system wide services should be located.
@@ -346,7 +317,7 @@ Mocking allows us to test the business logic of our domains. With this type of a
   Our mocks are located in the `mod.rs` file of an endpoint. Here we define what we *expect* to happen once an endpoint function triggers. For our simple paginated users function this would look like:
 
   ```rust
-  let mut repository = MockRepositoryContract::new();
+  let mut repository = MockUserRepository::new();
 
   repository.expect_get_paginated().return_once(|_,_| Ok(vec![MOCK_USER.clone()]));
 

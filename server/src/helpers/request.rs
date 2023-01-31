@@ -1,5 +1,5 @@
 use actix_web::{HttpMessage, HttpRequest};
-use infrastructure::web::http::HttpError;
+use alx_core::web::http::HttpError;
 use storage::models::session::UserSession;
 
 /// Utility for quickly dropping the request extensions reference and getting the

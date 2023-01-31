@@ -4,7 +4,7 @@ name = "server"
 version = "0.1.0"
 
 [dependencies]
-infrastructure = { path = "../infrastructure" }
+alx_core = { path = "../alx_core" }
 
 # Date and time
 

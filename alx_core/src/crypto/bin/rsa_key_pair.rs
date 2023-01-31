@@ -11,7 +11,7 @@ const KEY_PATH: &str = "./encryption/key_pair";
 #[allow(dead_code)]
 /// Generates an RSA key pair.
 /// Run the following from the ROOT DIRECTORY of the project.
-/// cargo run -p infrastructure --bin rsa_key_pair
+/// cargo run -p alx_core --bin rsa_key_pair
 fn main() {
     generate_rsa_key_pair().expect("Couldn't generate keypair");
 }

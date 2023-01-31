@@ -3,12 +3,12 @@ use crate::{
     config::{cache::AuthCache, constants::SESSION_CACHE_DURATION_SECONDS},
     error::Error,
 };
-use chrono::Utc;
-use infrastructure::{
+use alx_core::{
     cache::CacheError,
     clients::redis::{Commands, Redis, RedisPoolConnection},
     CacheAccess,
 };
+use chrono::Utc;
 use std::sync::Arc;
 use storage::models::session::UserSession;
 
