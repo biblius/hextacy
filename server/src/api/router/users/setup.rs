@@ -1,7 +1,7 @@
 use super::{domain::UserService, handler};
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
-use alx_core::clients::{postgres::Postgres, redis::Redis};
+use alx_core::clients::db::{postgres::Postgres, redis::Redis};
 use std::sync::Arc;
 use storage::adapters::postgres::user::PgUserAdapter;
 use storage::models::role::Role;

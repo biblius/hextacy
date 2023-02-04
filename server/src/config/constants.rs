@@ -27,4 +27,6 @@ pub const EMAIL_THROTTLE_DURATION_SECONDS: usize = 30;
 
 pub const EMAIL_DIRECTORY: &str = "resources/emails";
 
+pub const FAVICON_PATH: &str = "resources/favicon.ico";
+
 pub const COOKIE_S_ID: &str = "S_ID";

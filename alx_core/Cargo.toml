@@ -7,18 +7,6 @@ version = "0.1.0"
 name = "alx_core"
 path = "src/lib.rs"
 
-[[bin]]
-name = "random_password"
-path = "src/crypto/bin/random_password.rs"
-
-[[bin]]
-name = "rsa_key_pair"
-path = "src/crypto/bin/rsa_key_pair.rs"
-
-[[bin]]
-name = "generate_secret"
-path = "src/crypto/bin/generate_secret.rs"
-
 [dependencies]
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0.137", features = ["derive"] }
@@ -34,7 +22,6 @@ tracing-test = "0.2.3"
 
 # HTTP
 
-actix-cors = "0.6.3"
 actix-web = "4"
 cookie = { version = "0.16.1", features = ["secure"] }
 

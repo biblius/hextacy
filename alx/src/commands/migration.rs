@@ -122,8 +122,7 @@ fn get_absolute_migration_path() -> String {
     let current_dir = String::from_utf8(pwd).unwrap();
 
     print(&format!(
-        "Searching for migration directory in {}",
-        current_dir
+        "Searching for migration directory in {current_dir}",
     ));
 
     // Find the diesel toml file

@@ -72,13 +72,13 @@ pub fn handle(opts: AnalyzeOptions, api_path: &str) {
         routes: HashMap::new(),
         data: HashMap::new(),
     };
-    let path = format!("{}/router", api_path);
+    let path = format!("{api_path}/router");
     router_read_recursive(Path::new(&path), &mut scan, &analyze, None).unwrap();
 
     let mut pc = ProjectConfig::default();
     for ep_name in scan.routes.keys() {
         // Grab the endpoint name
-        let file_path = format!("{}/{}", path, ep_name);
+        let file_path = format!("{path}/{ep_name}");
         // Get the handlers under the current path
         let empty = vec![];
         let handlers = match scan.handlers.get(ep_name) {

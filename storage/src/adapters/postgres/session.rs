@@ -5,7 +5,7 @@ use crate::{
     repository::session::SessionRepository,
 };
 use chrono::{Duration, NaiveDateTime, Utc};
-use clients::postgres::Postgres;
+use clients::db::postgres::Postgres;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
 use std::sync::Arc;
@@ -85,7 +85,7 @@ impl SessionRepository for PgSessionAdapter {
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    fn purge<'a>(&self, usr_id: &str, skip: Option<&'a str>) -> Result<Vec<Session>, AdapterError> {
+    fn purge(&self, usr_id: &str, skip: Option<&str>) -> Result<Vec<Session>, AdapterError> {
         use super::schema::sessions::dsl::*;
 
         let mut query = diesel::update(sessions)

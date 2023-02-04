@@ -2,7 +2,7 @@ use crate::{
     boiler::{
         self,
         files::{handle_create_dir, write_to_mod_file},
-        plate::BoilerType,
+        BoilerType,
     },
     print, uppercase, MW_FILES, ROUTE_FILES,
 };
@@ -48,10 +48,10 @@ pub struct GenerateArgs {
 
 /// Generate route boilerplate
 pub fn handle_gen_route(args: GenerateArgs, router_path: &str) {
-    let mut ep_path = format!("{}/{}", router_path, args.name);
+    let mut ep_path = format!("{router_path}/{}", args.name);
     // If a path is given switch to it
-    if let Some(ref p) = args.path {
-        ep_path = format!("{}/{}", p, args.name)
+    if let Some(ref path) = args.path {
+        ep_path = format!("{path}/{}", args.name)
     }
     let ep_path = &ep_path;
 
@@ -69,39 +69,34 @@ pub fn handle_gen_route(args: GenerateArgs, router_path: &str) {
     }
 
     // Append the mod clause to the existing router.mod file
-    let router_mod = format!("{}/mod.rs", router_path);
+    let router_mod = format!("{router_path}/mod.rs");
     write_to_mod_file(&router_mod, &args.name);
 
     for file in ROUTE_FILES {
-        print(&format!("{} Writing {}.rs", "\u{270E}".blue(), file));
+        print(&format!("{} Writing {file}.rs", "\u{270E}".blue()));
         let mut contents = String::new();
         match file {
-            "contract" => boiler::plate::contracts(&mut contents, &contracts, BoilerType::Route),
-            "domain" => boiler::plate::domain(&mut contents, &service_name, &contracts),
+            "contract" => boiler::contracts(&mut contents, &contracts, BoilerType::Route),
+            "domain" => boiler::domain(&mut contents, &service_name, &contracts),
             "infrastructure" if !contracts.is_empty() => {
-                boiler::plate::infrastructure(&mut contents, &contracts)
+                boiler::infrastructure(&mut contents, &contracts)
             }
-            "setup" => boiler::plate::setup(&mut contents, &service_name, &contracts),
-            "mod" => boiler::plate::r#mod(&mut contents, BoilerType::Route),
+            "setup" => boiler::router::setup(&mut contents, &service_name, &contracts),
+            "mod" => boiler::r#mod(&mut contents, BoilerType::Route),
             _ => {}
         }
-        fs::write(format!("{}/{}.rs", ep_path, file), contents.clone())
-            .expect("Could't write to file");
+        fs::write(format!("{ep_path}/{file}.rs"), contents.clone()).expect("Could't write to file");
         contents.clear();
     }
-    print(&format!(
-        "{}{}",
-        "Successfully wrote route ".green(),
-        ep_path
-    ))
+    print(&format!("{}{ep_path}", "Successfully wrote route ".green(),))
 }
 
 /// Generate middleware boilerplate
 pub fn handle_gen_mw(args: GenerateArgs, mw_path: &str) {
-    let mut ep_path = format!("{}/{}", mw_path, args.name);
+    let mut ep_path = format!("{mw_path}/{}", args.name);
     // If a path is given switch to it
-    if let Some(ref p) = args.path {
-        ep_path = format!("{}/{}", p, args.name)
+    if let Some(ref path) = args.path {
+        ep_path = format!("{path}/{}", args.name)
     }
     let ep_path = &ep_path;
 
@@ -119,31 +114,29 @@ pub fn handle_gen_mw(args: GenerateArgs, mw_path: &str) {
     }
 
     // Append the mod clause to the existing router.mod file
-    let mw_mod = format!("{}/mod.rs", mw_path);
+    let mw_mod = format!("{mw_path}/mod.rs");
     write_to_mod_file(&mw_mod, &args.name);
 
     for file in MW_FILES {
-        print(&format!("{} Writing {}.rs", "\u{270E}".blue(), file));
+        print(&format!("{} Writing {file}.rs", "\u{270E}".blue()));
         let mut contents = String::new();
         match file {
-            "contract" => boiler::plate::contracts(&mut contents, &contracts, BoilerType::MW),
-            "domain" => boiler::plate::domain(&mut contents, &service_name, &contracts),
+            "contract" => boiler::contracts(&mut contents, &contracts, BoilerType::MW),
+            "domain" => boiler::domain(&mut contents, &service_name, &contracts),
             "infrastructure" if !contracts.is_empty() => {
-                boiler::plate::infrastructure(&mut contents, &contracts)
+                boiler::infrastructure(&mut contents, &contracts)
             }
             "interceptor" => {
-                boiler::plate::mw_interceptor(&mut contents, &service_name, &contracts)
+                boiler::middleware::mw_interceptor(&mut contents, &service_name, &contracts)
             }
-            "mod" => boiler::plate::r#mod(&mut contents, BoilerType::MW),
+            "mod" => boiler::r#mod(&mut contents, BoilerType::MW),
             _ => {}
         }
-        fs::write(format!("{}/{}.rs", ep_path, file), contents.clone())
-            .expect("Could't write to file");
+        fs::write(format!("{ep_path}/{file}.rs"), contents.clone()).expect("Could't write to file");
         contents.clear();
     }
     print(&format!(
-        "{}{}",
+        "{}{ep_path}",
         "Successfully wrote middleware ".green(),
-        ep_path
     ))
 }

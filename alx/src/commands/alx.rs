@@ -1,4 +1,4 @@
-use super::{envex::EnvExOptions, generate::GenerateSubject, migration::Migration};
+use super::{crypto::Crypto, envex::EnvExOptions, generate::GenerateSubject, migration::Migration};
 use crate::analyzer::analyze::AnalyzeOptions;
 use clap::{Parser, Subcommand};
 use std::fmt::Display;
@@ -20,6 +20,7 @@ pub enum Command {
     // analyzer
     Analyze(AnalyzeOptions),
     Anal(AnalyzeOptions),
+    A(AnalyzeOptions),
 
     // .env.example
     Envex(EnvExOptions),
@@ -28,6 +29,9 @@ pub enum Command {
     Migration(Migration),
     Mig(Migration),
     M(Migration),
+
+    Crypto(Crypto),
+    C(Crypto),
 }
 
 impl Display for Command {
@@ -43,7 +47,7 @@ impl Display for Command {
                     write!(f, "Generating middleware")
                 }
             },
-            Command::Analyze(_) | Command::Anal(_) => write!(f, "Analyzing"),
+            Command::Analyze(_) | Command::Anal(_) | Command::A(_) => write!(f, "Analyzing"),
             Command::Envex(_) => write!(f, "Generating .env.example"),
             Command::Migration(c) | Command::Mig(c) | Command::M(c) => match c.action {
                 super::migration::MigrationSubcommand::Gen(_) => write!(f, "Generating migration"),
@@ -51,6 +55,7 @@ impl Display for Command {
                 super::migration::MigrationSubcommand::Rev => write!(f, "Reversing migration"),
                 super::migration::MigrationSubcommand::Redo(_) => write!(f, "Restarting migration"),
             },
+            Command::C(_) | Command::Crypto(_) => write!(f, "Cryptographying"),
         }
     }
 }

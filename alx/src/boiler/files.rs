@@ -15,10 +15,9 @@ pub fn handle_create_dir(path: &str) -> bool {
                 "An error occurred: {:?}\n\
                 Would you like to continue anyway?\
                 \n\u{26A0} {} \u{26A0}\n\
-                This will completely overwrite {}",
+                This will completely overwrite {path}",
                 e.kind(),
                 "WARNING".red(),
-                path
             );
             let mut buf = String::new();
             loop {
@@ -26,7 +25,7 @@ pub fn handle_create_dir(path: &str) -> bool {
                 stdin().read_line(&mut buf).expect("Couldn't parse input");
                 match buf.trim() {
                     "y" | "yes" => {
-                        println!("Overwriting {}", path);
+                        println!("Overwriting {path}");
                         fs::remove_dir_all(path).expect("Couldn't remove directory");
                         fs::create_dir(path).expect("Couldn't create directory");
                         break;
@@ -47,13 +46,11 @@ pub fn handle_create_dir(path: &str) -> bool {
 
 pub fn write_to_mod_file(file_path: &str, mod_name: &str) {
     print(&format!(
-        "{} Adding {} to {}",
-        "\u{270E}".green(),
-        mod_name,
-        file_path
+        "{} Adding {mod_name} to {file_path}",
+        "\u{270E}".green()
     ));
     let f = fs::read_to_string(file_path).unwrap();
-    let mut new_file_contents = format!("pub(crate) mod {};\n", mod_name);
+    let mut new_file_contents = format!("pub(crate) mod {mod_name};\n");
     if !f.contains(&new_file_contents) {
         new_file_contents.push_str(&f);
         fs::remove_file(file_path).expect("Couldn't remove old mod.rs file");

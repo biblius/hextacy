@@ -178,7 +178,7 @@ The `main.rs` is where the server gets instantiated. The `configure` file is use
   
     ```
   
-    This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository. Also note that this is the only file we specify the exact adapter to plug in to the service.
+    This function needs to be `pub(crate)` as it gets used by the router module. Here we pass in the Arcs to the connection pools we want to use and actix's `ServiceConfig`. We then construct the service with the specific adapter we want to use for the user repository, pass it the connection pool, wrap the service in actix's `Data` wrapper and configure the server to use it, set the '/users' resource to call the handler we specified for this route and inject the `PgUserAdapter` as our repository. Also note that this is the only file in which we specify the exact adapter to plug in to the service.
   
 - ### **Middleware**
   
@@ -189,37 +189,37 @@ If you take an even closer look at what happens in `wrap` you'll see that it tri
 
   The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
 
-### **Configure**
+- ### **config**
 
-We tie all our handlers together in the `configure.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
+  We tie all our handlers together in the `config.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
 
-```rust
-pub(super) fn configure(cfg: &mut ServiceConfig) {
-    let pg = Arc::new(Postgres::new());
+  ```rust
+  pub(super) fn init(cfg: &mut ServiceConfig) {
+      let pg = Arc::new(Postgres::new());
 
-    users::setup::routes(pg, cfg);
-}
+      users::setup::routes(pg, cfg);
+  }
 
-```
+  ```
 
-We would then pass this function to our server setup.
+  We would then pass this function to our server setup.
 
-```rust
-    HttpServer::new(move || {
-        App::new()
-            .configure(configure::configure)
-            .wrap(Logger::default())
-    })
-    .bind_openssl(addr, builder)?
-    .run()
-    .await
-```
+  ```rust
+      HttpServer::new(move || {
+          App::new()
+              .configure(config::init)
+              .wrap(Logger::default())
+      })
+      .bind_openssl(addr, builder)?
+      .run()
+      .await
+  ```
 
 The helpers module contains various helper functions usable throughout the server.
 
 The benefits of having this kind of architecture start to become clear once your application gets more complex. With only one user repository it might seem like overkill at first, but imagine you have some kind of service that communicates with multiple repositories, the cache and email (e.g. the authentication module from this starter kit). Things would quickly get out of hand. This kind of structure allows for maximum flexibility in case of changes and provides a readable file of all the business logic (`contract.rs`) and the data we expect to manipulate (`data.rs`).
 
-If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this. It's best to keep everything scoped at the endpoint level except for `setup.rs`, which should be scoped at `api` level since we need it in `configure.rs`.
+If your logic gets complex, you can split the necessary files to directories and seperate the logic there. The rust compiler will warn you that you need to change the visibilites of the data if you do this. It's best to keep everything scoped at the endpoint level except for `setup.rs`, which should be scoped at `api` level since we need it in `config.rs`.
 
 ## **Storage**
 
@@ -290,13 +290,9 @@ Contains various utilities for working with http, email and websockets:
 
       Check out the `web::ws` module for more info and an example of how it works.
 
-- **Cache**
+- ### **Cache**
 
   Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation.
-
-- ### **Services**
-
-  Starts out with a simple email service and is where system wide services should be located.
 
 ## **Mocking**
 

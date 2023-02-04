@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use alx_core::clients::redis;
+use alx_core::clients::db::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -14,8 +14,6 @@ pub(crate) enum Error {
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
     Client(#[from] alx_core::clients::ClientError),
-    #[error("Service Error: {0}")]
-    Service(#[from] alx_core::services::ServiceError),
     #[error("Cache Error: {0}")]
     Cache(#[from] alx_core::cache::CacheError),
     #[error("Adapter Error: {0}")]

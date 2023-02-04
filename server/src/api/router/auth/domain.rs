@@ -19,7 +19,7 @@ use alx_core::{
     crypto::{
         self,
         hmac::{generate_hmac, verify_hmac},
-        utility::{bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
+        {bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
     web::http::{
         cookie,

@@ -25,7 +25,7 @@ mod tests {
     use alx_core::{
         crypto::{
             hmac::generate_hmac,
-            utility::{bcrypt_hash, uuid},
+            {bcrypt_hash, uuid},
         },
         env,
         web::http::response::Response,
@@ -102,7 +102,7 @@ mod tests {
 
     #[test]
     fn registration() {
-        env::load_from_file("../.env").unwrap();
+        env::set("REG_TOKEN_SECRET", "supersecret");
         /*
          * Good to go
          */
@@ -163,7 +163,6 @@ mod tests {
 
     #[test]
     fn verify_registration_token() {
-        env::load_from_file("../.env").unwrap();
         /*
          * Good to go
          */
@@ -219,6 +218,7 @@ mod tests {
 
     #[test]
     fn resend_reg_token() {
+        env::set("REG_TOKEN_SECRET", "supersecret");
         /*
          * Good to go
          */
@@ -288,7 +288,6 @@ mod tests {
 
     #[test]
     fn credentials_no_otp() {
-        env::load_from_file("../.env").unwrap();
         let mut service = MockServiceContract::new();
         let mut user_repo = MockUserRepository::new();
         let mut session_repo = MockSessionRepository::new();
@@ -326,7 +325,6 @@ mod tests {
     #[actix_web::main]
     #[test]
     async fn credentials_and_otp() {
-        env::load_from_file("../.env").unwrap();
         let mut user_repo = MockUserRepository::new();
         let session_repo = MockSessionRepository::new();
         let mut cache = MockCacheContract::new();

@@ -37,7 +37,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         App::new()
             .configure(config::init)
-            .wrap(http::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
+            .wrap(config::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
             .wrap(http::security_headers::default())
             .wrap(Logger::default())
     })

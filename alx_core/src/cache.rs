@@ -1,4 +1,4 @@
-use clients::redis::{Commands, FromRedisValue, RedisError, RedisPoolConnection, ToRedisArgs};
+use clients::db::redis::{Commands, FromRedisValue, RedisError, RedisPoolConnection, ToRedisArgs};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
 use thiserror::Error;

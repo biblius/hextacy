@@ -5,7 +5,7 @@ use crate::{
 };
 use alx_core::{
     cache::CacheError,
-    clients::redis::{Commands, Redis, RedisPoolConnection},
+    clients::db::redis::{Commands, Redis, RedisPoolConnection},
     CacheAccess,
 };
 use chrono::Utc;

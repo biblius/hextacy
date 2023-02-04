@@ -6,8 +6,8 @@ use crate::error::{AuthenticationError, Error};
 use ::alx_core::clients::redis::Redis; */
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
-use alx_core::clients::postgres::Postgres;
-use alx_core::clients::redis::Redis;
+use alx_core::clients::db::postgres::Postgres;
+use alx_core::clients::db::redis::Redis;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
 use std::future::{ready, Ready};

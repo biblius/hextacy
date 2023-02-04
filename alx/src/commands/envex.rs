@@ -17,19 +17,19 @@ pub fn envex(path: Option<String>) {
     };
 
     let env_file = std::fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Couldn't load .env file at {}", path));
+        .unwrap_or_else(|_| panic!("Couldn't load .env file at {path}"));
 
     let mut example = String::new();
 
-    for l in env_file.lines() {
-        if let Some(i) = l.find('=') {
-            if l.contains("_URL") {
-                writeln!(example, "{}", l).unwrap();
+    for line in env_file.lines() {
+        if let Some(i) = line.find('=') {
+            if line.contains("_URL") {
+                writeln!(example, "{line}").unwrap();
             } else {
-                writeln!(example, "{}", l.split_at(i + 1).0).unwrap();
+                writeln!(example, "{}", line.split_at(i + 1).0).unwrap();
             }
         } else {
-            writeln!(example, "{}", l).unwrap();
+            writeln!(example, "{line}").unwrap();
         }
     }
 

@@ -1,4 +1,4 @@
-use super::ClientError;
+use crate::ClientError;
 use diesel::r2d2::State;
 use r2d2_redis::{
     r2d2::{Pool, PooledConnection},
@@ -32,7 +32,7 @@ pub fn build_pool() -> RedisPool {
     Pool::builder()
         .max_size(pool_size)
         .build(manager)
-        .unwrap_or_else(|e| panic!("Failed to create redis pool: {}", e))
+        .unwrap_or_else(|e| panic!("Failed to create redis pool: {e}"))
 }
 
 /// Generates a `ConnectionInfo` struct using the following environment variables:
@@ -46,21 +46,18 @@ pub fn build_pool() -> RedisPool {
 fn connection_info() -> ConnectionInfo {
     let mut params = env::get_multiple(&["REDIS_URL", "RD_USER", "RD_PASSWORD", "RD_DATABASE"]);
 
-    let db = params.pop().map_or_else(
-        || {
-            trace!("RD_DATABASE parameter not set, defaulting to 0");
-            0
-        },
-        |s| {
+    let db = params
+        .pop()
+        .map(|s| {
             s.parse::<i64>()
-                .expect("Invalid RD_DATABASE, make sure it's a valid integer")
-        },
-    );
+                .expect("Unable to parse RD_DATABASE, make sure it's a valid integer")
+        })
+        .expect("RD_DATABASE must be set");
     let password = params.pop().expect("RD_PASSWORD must be set");
     let username = params.pop().expect("RD_USER must be set");
     let db_url = params.pop().expect("REDIS_URL must be set");
 
-    trace!("Buildig Redis connection info with {}", db_url);
+    trace!("Buildig Redis connection info with {db_url}");
 
     let mut conn_info = db_url.into_connection_info().unwrap();
     conn_info.username = Some(username);

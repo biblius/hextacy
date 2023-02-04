@@ -148,11 +148,7 @@ pub(super) fn scan_handlers(functions: Vec<syn::ItemFn>) -> Vec<Handler> {
                     if let Some(bound) = ty.bounds.first() {
                         match bound {
                             syn::TypeParamBound::Trait(tb) => {
-                                typ = format!(
-                                    "{}: {}",
-                                    typ,
-                                    tb.path.segments.first().unwrap().ident,
-                                );
+                                typ = format!("{typ}: {}", tb.path.segments.first().unwrap().ident);
                                 Some(typ)
                             }
                             syn::TypeParamBound::Lifetime(_) => todo!(),

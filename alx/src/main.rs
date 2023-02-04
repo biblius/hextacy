@@ -3,9 +3,11 @@ mod boiler;
 mod commands;
 mod config;
 mod error;
+mod repos;
 
 use crate::analyzer::analyze;
 use crate::commands::alx::{Alx, Command};
+use crate::commands::crypto::{generate_rsa_key_pair, write_pw, write_secret};
 use crate::commands::generate::{handle_gen_mw, handle_gen_route};
 use crate::commands::migration::{
     migration_generate, migration_redo_all, migration_rev, migration_run,
@@ -51,7 +53,7 @@ pub fn main() {
                 handle_gen_mw(args, &path);
             }
         },
-        Command::Analyze(args) | Command::Anal(args) => {
+        Command::Analyze(args) | Command::Anal(args) | Command::A(args) => {
             verbose(args.verbose);
             let path = match args.path {
                 Some(ref p) => p.to_string(),
@@ -62,11 +64,18 @@ pub fn main() {
         Command::Envex(args) => {
             commands::envex::envex(args.path);
         }
-        Command::Migration(c) | Command::Mig(c) | Command::M(c) => match c.action {
-            commands::migration::MigrationSubcommand::Gen(args) => migration_generate(args),
+        Command::Migration(sc) | Command::Mig(sc) | Command::M(sc) => match sc.action {
+            commands::migration::MigrationSubcommand::Gen(opts) => migration_generate(opts),
             commands::migration::MigrationSubcommand::Run => migration_run(),
             commands::migration::MigrationSubcommand::Rev => migration_rev(),
-            commands::migration::MigrationSubcommand::Redo(args) => migration_redo_all(args),
+            commands::migration::MigrationSubcommand::Redo(opts) => migration_redo_all(opts),
+        },
+        Command::Crypto(sc) | Command::C(sc) => match sc.action {
+            commands::crypto::CryptoSubcommand::PW(opts) => write_pw(opts),
+            commands::crypto::CryptoSubcommand::Rsa => {
+                generate_rsa_key_pair().expect("RSA Generation error")
+            }
+            commands::crypto::CryptoSubcommand::Secret(opts) => write_secret(opts),
         },
     }
 }
@@ -77,7 +86,7 @@ fn uppercase(s: &str) -> String {
 
 #[inline]
 pub fn print(s: &str) {
-    if VERBOSE.fetch_and(true, std::sync::atomic::Ordering::SeqCst) {
+    if VERBOSE.load(std::sync::atomic::Ordering::SeqCst) {
         println!("{s}");
     }
 }

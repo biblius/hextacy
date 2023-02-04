@@ -3,12 +3,10 @@ use super::{
     handler,
     infrastructure::{Cache, Email},
 };
+
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
-use alx_core::{
-    clients::{postgres::Postgres, redis::Redis},
-    services::email::lettre::SmtpTransport,
-};
+use alx_core::clients::{db::postgres::Postgres, db::redis::Redis, email::Email as EmailClient};
 use std::sync::Arc;
 use storage::adapters::postgres::{session::PgSessionAdapter, user::PgUserAdapter};
 use storage::models::role::Role;
@@ -16,7 +14,7 @@ use storage::models::role::Role;
 pub(crate) fn routes(
     pg: Arc<Postgres>,
     rd: Arc<Redis>,
-    email: Arc<SmtpTransport>,
+    email: Arc<EmailClient>,
     cfg: &mut web::ServiceConfig,
 ) {
     let service = Authentication {

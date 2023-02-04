@@ -1,8 +1,4 @@
-use std::{
-    env::{self, VarError},
-    path::Path,
-};
-
+use std::env::{self, VarError};
 use thiserror::Error;
 
 /// Gets an environment variable for the given key
@@ -29,7 +25,7 @@ pub fn get_multiple(keys: &[&str]) -> Vec<String> {
             Ok(value) => {
                 results.push(value);
             }
-            Err(e) => panic!("Error at key {}, {}", key, e),
+            Err(e) => panic!("Error at key {key}, {e}"),
         };
     }
     results
@@ -52,7 +48,7 @@ pub fn get_or_default_multiple(keys: &[(&str, &str)]) -> Vec<String> {
 
 /// Reads a file and sets all of its declared variables in the shell environment
 pub fn load_from_file(path: &str) -> Result<(), ConfigError> {
-    dotenv::from_path(Path::new(path)).map_err(ConfigError::DotEnv)
+    dotenv::from_path(path).map_err(ConfigError::DotEnv)
 }
 
 #[derive(Debug, Error)]

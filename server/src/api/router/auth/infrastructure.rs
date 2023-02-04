@@ -6,9 +6,8 @@ use crate::config::constants::{
 };
 use crate::error::Error;
 use alx_core::cache::{CacheAccess, CacheError};
-use alx_core::clients::redis::{Commands, Redis, RedisPoolConnection};
-use alx_core::services::email;
-use alx_core::services::email::lettre::SmtpTransport;
+use alx_core::clients::db::redis::{Commands, Redis, RedisPoolConnection};
+use alx_core::clients::email;
 use chrono::Utc;
 use std::sync::Arc;
 use storage::models::session::UserSession;
@@ -157,7 +156,7 @@ impl CacheContract for Cache {
 }
 
 pub(super) struct Email {
-    pub client: Arc<SmtpTransport>,
+    pub client: Arc<email::Email>,
 }
 
 impl EmailContract for Email {
@@ -175,15 +174,9 @@ impl EmailContract for Email {
             "registration_token",
             &[("username", username), ("registration_uri", &uri)],
         );
-        email::send(
-            None,
-            username,
-            email,
-            "Finish registration",
-            mail,
-            &self.client,
-        )
-        .map_err(Error::new)
+        self.client
+            .send(None, username, email, "Finish registration", mail)
+            .map_err(Error::new)
     }
 
     fn send_reset_password(&self, username: &str, email: &str, temp_pw: &str) -> Result<(), Error> {
@@ -193,7 +186,9 @@ impl EmailContract for Email {
             "reset_password",
             &[("username", username), ("temp_password", temp_pw)],
         );
-        email::send(None, username, email, "Reset password", mail, &self.client).map_err(Error::new)
+        self.client
+            .send(None, username, email, "Reset password", mail)
+            .map_err(Error::new)
     }
 
     fn alert_password_change(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
@@ -205,7 +200,8 @@ impl EmailContract for Email {
             "change_password",
             &[("username", username), ("reset_password_uri", &uri)],
         );
-        email::send(None, username, email, "Password change", mail, &self.client)
+        self.client
+            .send(None, username, email, "Password change", mail)
             .map_err(Error::new)
     }
 
@@ -216,15 +212,9 @@ impl EmailContract for Email {
             "forgot_password",
             &[("username", username), ("forgot_pw_token", token)],
         );
-        email::send(
-            None,
-            username,
-            email,
-            "Forgot your password?",
-            mail,
-            &self.client,
-        )
-        .map_err(Error::new)
+        self.client
+            .send(None, username, email, "Forgot your password?", mail)
+            .map_err(Error::new)
     }
 
     fn send_freeze_account(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
@@ -236,14 +226,8 @@ impl EmailContract for Email {
             "account_frozen",
             &[("username", username), ("reset_password_uri", &uri)],
         );
-        email::send(
-            None,
-            username,
-            email,
-            "Account suspended",
-            mail,
-            &self.client,
-        )
-        .map_err(Error::new)
+        self.client
+            .send(None, username, email, "Account suspended", mail)
+            .map_err(Error::new)
     }
 }
