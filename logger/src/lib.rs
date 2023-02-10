@@ -8,18 +8,7 @@ use log4rs::{
 use std::{env, io::Write};
 use tracing::log::{Level, LevelFilter};
 
-/// Represents the logging level:
-///
-/// 0 => OFF
-///
-/// 1 => INFO
-///
-/// 2 => DEBUG
-///
-/// 3 => TRACE
-///
 /// Errors and warns are always logged.
-
 pub fn init(level: &str) {
     // Set to trace since we filter out everything with our custom log level
     match level {

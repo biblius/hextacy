@@ -72,12 +72,12 @@ pub fn mw_interceptor(buf: &mut String, service_name: &str, contracts: &[&str]) 
     writeln!(transform_impl, "\nwhere").unwrap();
     writeln!(transform_impl, "{INDENT}S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,").unwrap();
     writeln!(transform_impl, "{INDENT}S::Future: 'static,").unwrap();
-    for c in contracts {
+    for contract in contracts {
         writeln!(
             transform_impl,
             "{INDENT}{}: {}Contract + Send + Sync + 'static,",
-            &uppercase(c)[..1],
-            &uppercase(c)
+            &uppercase(contract)[..1],
+            &uppercase(contract)
         )
         .unwrap();
     }

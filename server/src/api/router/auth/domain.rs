@@ -148,41 +148,41 @@ where
 
         let user = self.user_repo.get_by_id(&user_id)?;
 
-        if let Some(ref secret) = user.otp_secret {
-            // Check if there's an active throttle
-            let attempts = self
+        let Some(ref secret) = user.otp_secret else {
+            return Err(AuthenticationError::InvalidOTP.into());
+        };
+
+        // Check if there's an active throttle
+        let attempts = self
+            .cache
+            .get_otp_throttle(AuthCache::OTPAttempts, &user.id)
+            .ok();
+
+        // Check whether it's ok to attempt to verify it
+        if let Some(attempts) = attempts {
+            let throttle = self
                 .cache
-                .get_otp_throttle(AuthCache::OTPAttempts, &user.id)
-                .ok();
-
-            // Check whether it's ok to attempt to verify it
-            if let Some(attempts) = attempts {
-                let throttle = self
-                    .cache
-                    .get_otp_throttle(AuthCache::OTPThrottle, &user.id)?;
-                let now = chrono::Utc::now().timestamp();
-                if now - throttle <= OTP_THROTTLE_INCREMENT * attempts {
-                    return Err(AuthenticationError::AuthBlocked.into());
-                }
+                .get_otp_throttle(AuthCache::OTPThrottle, &user.id)?;
+            let now = chrono::Utc::now().timestamp();
+            if now - throttle <= OTP_THROTTLE_INCREMENT * attempts {
+                return Err(AuthenticationError::AuthBlocked.into());
             }
-            let result = crypto::otp::verify_otp(password, secret)?;
-
-            // If it's wrong increment the throttle and error
-            if !result {
-                self.cache.cache_otp_throttle(&user.id)?;
-                return Err(AuthenticationError::InvalidOTP.into());
-            }
-
-            self.cache.delete_token(AuthCache::OTPToken, token)?;
-
-            if attempts.is_some() {
-                self.cache.delete_otp_throttle(&user.id)?;
-            }
-
-            self.session_response(user, remember)
-        } else {
-            Err(AuthenticationError::InvalidOTP.into())
         }
+        let result = crypto::otp::verify_otp(password, secret)?;
+
+        // If it's wrong increment the throttle and error
+        if !result {
+            self.cache.cache_otp_throttle(&user.id)?;
+            return Err(AuthenticationError::InvalidOTP.into());
+        }
+
+        self.cache.delete_token(AuthCache::OTPToken, token)?;
+
+        if attempts.is_some() {
+            self.cache.delete_otp_throttle(&user.id)?;
+        }
+
+        self.session_response(user, remember)
     }
 
     /// Stores the initial data in the users table and sends an email to the user with the registration token.

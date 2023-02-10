@@ -17,14 +17,18 @@ pub fn contracts(buf: &mut String, contracts: &[&str], ty: BoilerType) {
         BoilerType::Route => "super",
         BoilerType::MW => "crate",
     };
-    writeln!(buf, "use async_trait::async_trait;\n").unwrap();
-    writeln!(buf, "#[cfg_attr(test, mockall::automock)]\n#[async_trait]\npub({vis}) trait ServiceContract {{}}").unwrap();
-    for c in contracts {
+    writeln!(
+        buf,
+        "#[cfg_attr(test, mockall::automock)]\npub({vis}) trait ServiceContract {{}}"
+    )
+    .unwrap();
+    for contract in contracts {
         writeln!(
             buf,
-            "\n#[cfg_attr(test, mockall::automock)]\n#[async_trait]\npub({vis}) trait {}Contract {{}}",
-            uppercase(c)
-        ).unwrap();
+            "\n#[cfg_attr(test, mockall::automock)]\npub({vis}) trait {}Contract {{}}",
+            uppercase(contract)
+        )
+        .unwrap();
     }
 }
 
@@ -36,7 +40,7 @@ pub fn infrastructure(buf: &mut String, contracts: &[&str]) {
         writeln!(use_stmt, "{}Contract;", uppercase(contracts[0])).unwrap();
         writeln!(
             struct_stmt,
-            "pub(super) struct {} {{}}\n\n#[async_trait]\nimpl {}Contract for {} {{}}",
+            "pub(super) struct {} {{}}\n\nimpl {}Contract for {} {{}}",
             uppercase(contracts[0]),
             uppercase(contracts[0]),
             uppercase(contracts[0]),
@@ -44,23 +48,22 @@ pub fn infrastructure(buf: &mut String, contracts: &[&str]) {
         .unwrap();
     } else {
         write!(use_stmt, "{{").unwrap();
-        for (i, c) in contracts.iter().enumerate() {
+        for (i, contract) in contracts.iter().enumerate() {
             if i == contracts.len() - 1 {
-                writeln!(use_stmt, "{}Contract}};", uppercase(c)).unwrap();
+                writeln!(use_stmt, "{}Contract}};", uppercase(contract)).unwrap();
             } else {
-                write!(use_stmt, "{}Contract, ", uppercase(c)).unwrap();
+                write!(use_stmt, "{}Contract, ", uppercase(contract)).unwrap();
             }
             writeln!(
                 struct_stmt,
-                "pub(super) struct {} {{}}\n\n#[async_trait]\nimpl {}Contract for {} {{}}\n",
-                uppercase(c),
-                uppercase(c),
-                uppercase(c),
+                "pub(super) struct {} {{}}\n\nimpl {}Contract for {} {{}}\n",
+                uppercase(contract),
+                uppercase(contract),
+                uppercase(contract),
             )
             .unwrap();
         }
     }
-    writeln!(use_stmt, "use async_trait::async_trait;\n").unwrap();
     write!(buf, "{use_stmt}{struct_stmt}").unwrap();
 }
 
@@ -76,7 +79,7 @@ pub fn r#mod(buf: &mut String, ty: BoilerType) {
                     }
                 }
             }
-            write!(buf, "\n#[cfg(test)]\nmod tests {{\n\n{INDENT}#[test]\n{INDENT}fn test() {{\n{INDENT}{INDENT}assert!(true)\n{INDENT}}}\n}}").unwrap();
+            write!(buf, "\n#[cfg(test)]\nmod tests {{\n\n{INDENT}#[test]\n{INDENT}fn test() {{\n{INDENT}{INDENT}assert_eq!(2 + 2, 4)\n{INDENT}}}\n}}").unwrap();
         }
         BoilerType::MW => {
             for file in MW_FILES {
@@ -88,7 +91,7 @@ pub fn r#mod(buf: &mut String, ty: BoilerType) {
                     }
                 }
             }
-            write!(buf, "\n#[cfg(test)]\nmod tests {{\n\n{INDENT}#[test]\n{INDENT}fn test() {{\n{INDENT}{INDENT}assert!(true)\n{INDENT}}}\n}}").unwrap();
+            write!(buf, "\n#[cfg(test)]\nmod tests {{\n\n{INDENT}#[test]\n{INDENT}fn test() {{\n{INDENT}{INDENT}assert_eq!(2 + 2, 4)\n{INDENT}}}\n}}").unwrap();
         }
     }
 }
@@ -135,9 +138,8 @@ pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
         write!(use_stmt, "{{ServiceContract, ").unwrap();
         write_contracts_use(&mut use_stmt, contracts);
     } else {
-        writeln!(use_stmt, "ServiceContract;").unwrap();
+        writeln!(use_stmt, "ServiceContract {{}}").unwrap();
     }
-    writeln!(use_stmt, "use async_trait::async_trait;\n").unwrap();
 
     // Struct statement
     let mut struct_stmt = format!("#[derive(Debug)]\npub(super) struct {service_name}");
@@ -168,7 +170,7 @@ pub fn domain(buf: &mut String, service_name: &str, contracts: &[&str]) {
     }
 
     // Impl statement
-    let mut impl_stmt = String::from("#[async_trait]\nimpl");
+    let mut impl_stmt = String::from("impl");
     if !contracts.is_empty() {
         write_letter_bounds(&mut impl_stmt, contracts, &[]);
     }

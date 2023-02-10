@@ -1,0 +1,33 @@
+[package]
+edition = "2021"
+name = "alx_clients"
+version = "0.1.0"
+
+[dependencies]
+diesel = { version = "2.0.1", features = [
+  "chrono",
+  "postgres",
+  "r2d2",
+  "serde_json",
+], optional = true }
+
+lettre = { version = "0.10.2", optional = true }
+
+mongodb = { version = "2.3.1", features = [
+  "tokio-runtime",
+  "tokio-sync",
+], optional = true }
+
+r2d2_redis = { version = "0.14.0", optional = true }
+
+r2d2 = "0.8.10"
+thiserror = "1.0.38"
+tracing = "0.1.37"
+utils = { version = "0.1.0", path = "../utils" }
+uuid = { version = "1.1.2", features = ["v4"] }
+
+[features]
+email = ["lettre"]
+mongo = ["mongodb"]
+postgres = ["diesel"]
+redis = ["r2d2_redis"]

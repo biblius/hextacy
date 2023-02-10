@@ -4,7 +4,7 @@ use crate::{
     models::user::{SortOptions, User},
     repository::user::UserRepository,
 };
-use clients::db::postgres::Postgres;
+use alx_clients::db::postgres::Postgres;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

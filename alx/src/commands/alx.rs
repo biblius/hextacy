@@ -30,8 +30,13 @@ pub enum Command {
     Mig(Migration),
     M(Migration),
 
+    // crypto utils
     Crypto(Crypto),
     C(Crypto),
+
+    // start interactive
+    Interactive,
+    I,
 }
 
 impl Display for Command {
@@ -56,6 +61,7 @@ impl Display for Command {
                 super::migration::MigrationSubcommand::Redo(_) => write!(f, "Restarting migration"),
             },
             Command::C(_) | Command::Crypto(_) => write!(f, "Cryptographying"),
+            Command::Interactive | Command::I => write!(f, "Initiating interactive session"),
         }
     }
 }

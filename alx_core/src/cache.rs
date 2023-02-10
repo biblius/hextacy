@@ -1,4 +1,6 @@
-use clients::db::redis::{Commands, FromRedisValue, RedisError, RedisPoolConnection, ToRedisArgs};
+use alx_clients::db::redis::{
+    Commands, FromRedisValue, RedisError, RedisPoolConnection, ToRedisArgs,
+};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
 use thiserror::Error;
@@ -101,7 +103,7 @@ pub trait CacheIdentifier {
 #[derive(Debug, Error)]
 pub enum CacheError {
     #[error("Client error {0}")]
-    Client(#[from] clients::ClientError),
+    Client(#[from] alx_clients::ClientError),
     #[error("Redis error {0}")]
     Redis(#[from] RedisError),
     #[error("Serde error {0}")]

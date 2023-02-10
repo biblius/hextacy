@@ -10,19 +10,19 @@ Create a real `.env` file filling out the example file with your desired paramet
 
 For the Email part, use [this spec](https://support.google.com/mail/answer/7126229?hl=en#zippy=%2Cstep-change-smtp-other-settings-in-your-email-client) to set up the SMTP host(smtp.gmail.com) and port(465) and [follow these instructions](https://support.google.com/accounts/answer/185833?hl=en#zippy=%2Cwhy-you-may-need-an-app-password) to generate an app password. The password can then be used for the `SMTP_PASSWORD` variable. For the sender and username enter your email address.
 
-For the secrets, run
-
-```bash
-cargo run -p infrastructure --bin generate_secret <SECRET_NAME>
-```
-
-and replace them with the example ones.
-
 Install the CLI tool via
 
 ```bash
 cargo install --path alx
 ```
+
+For the secrets, (namely REG_TOKEN_SECRET and COOKIE_SECRET) run
+
+```bash
+alx c secret <SECRET_NAME> [-n <NAME>] [-l <LENGTH>]
+```
+
+and replace them with the example ones.
 
 Run migrations via
 

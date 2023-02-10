@@ -31,7 +31,7 @@ pub enum GenerateSubcommand {
 }
 
 /// Generate arguments
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default, Clone)]
 pub struct GenerateArgs {
     /// The name of the route of middleware.
     pub name: String,

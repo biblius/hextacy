@@ -24,15 +24,15 @@ pub enum MigrationSubcommand {
     Redo(RedoMigration),
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default, Clone)]
 /// Migration arguments
 pub struct RedoMigration {
     /// If given this will redo all migrations
     #[arg(long, short, action)]
-    all: bool,
+    pub all: bool,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default, Clone)]
 /// Migration arguments
 pub struct GenMigration {
     /// Migration name
@@ -75,7 +75,7 @@ pub fn migration_rev() {
     println!("Successfully reverted migration")
 }
 
-pub fn migration_redo_all(redo: RedoMigration) {
+pub fn migration_redo(redo: RedoMigration) {
     handle_db_url();
     let abs = get_absolute_migration_path();
     std::env::set_current_dir(abs).expect("Couldn't set env");

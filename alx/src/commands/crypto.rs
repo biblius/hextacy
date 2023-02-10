@@ -7,6 +7,9 @@ use rsa::{pkcs8, RsaPrivateKey, RsaPublicKey};
 use std::fmt::Write;
 use std::fs;
 
+pub const DEFAULT_SECRET_LENGTH: &str = "256";
+pub const DEFAULT_PW_LENGTH: &str = "64";
+
 #[derive(Debug, Args)]
 /// Cryptography related actions.
 pub struct Crypto {
@@ -18,31 +21,30 @@ pub struct Crypto {
 pub enum CryptoSubcommand {
     /// Generate a password and store it in './encryption/pw-<NAME>'
     PW(PWOpts),
+    /// Create an RSA keypair and store it in './encryption/keypair'
     Rsa,
     /// Write a secret with the given key to the '.env' file
     Secret(SecretOpts),
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default, Clone)]
 /// Password options
 pub struct PWOpts {
     /// Password name
-    #[arg(long, short)]
-    name: String,
+    pub name: String,
     /// Password length
-    #[arg(long, short)]
-    length: u8,
+    #[arg(long, short, default_value = DEFAULT_PW_LENGTH)]
+    pub length: u8,
 }
 
-#[derive(Debug, Args)]
+#[derive(Debug, Args, Default, Clone)]
 /// Secret options
 pub struct SecretOpts {
     /// The key in the .env
-    #[arg(long, short)]
-    pub name: Option<String>,
+    pub name: String,
     /// Length of the secret
-    #[arg(long, short)]
-    pub length: Option<u16>,
+    #[arg(long, short, default_value = DEFAULT_SECRET_LENGTH)]
+    pub length: u16,
     /// Secret encoding
     #[arg(long, short)]
     pub encoding: Option<String>,
@@ -73,9 +75,9 @@ pub fn write_pw(opts: PWOpts) {
         pw.push(ALPHABET[rng.gen_range(0..ALPHABET.len())]);
     }
 
-    file.extend(format!("{name} = {pw}").chars());
+    file.extend(format!("{name} = {pw}\n").chars());
 
-    std::fs::write(PW_PATH, pw).unwrap();
+    std::fs::write(PW_PATH, file).unwrap();
 }
 
 pub fn write_secret(opts: SecretOpts) {
@@ -87,14 +89,14 @@ pub fn write_secret(opts: SecretOpts) {
 
     let mut env_file = fs::read_to_string("./.env").expect("No .env file in root!");
 
-    let name = name.unwrap_or_else(|| {
+    let name = if name.trim().is_empty() {
         let mut buf = String::new();
         println!("Enter the key for the secret to store in the .env file:");
         std::io::stdin().read_line(&mut buf).unwrap();
         buf.trim().to_string()
-    });
-
-    let length = length.unwrap_or(256);
+    } else {
+        name
+    };
 
     let secret = secret(
         match encoding {

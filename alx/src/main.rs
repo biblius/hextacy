@@ -3,14 +3,14 @@ mod boiler;
 mod commands;
 mod config;
 mod error;
-mod repos;
 
 use crate::analyzer::analyze;
 use crate::commands::alx::{Alx, Command};
 use crate::commands::crypto::{generate_rsa_key_pair, write_pw, write_secret};
 use crate::commands::generate::{handle_gen_mw, handle_gen_route};
+use crate::commands::interactive::init_interactive;
 use crate::commands::migration::{
-    migration_generate, migration_redo_all, migration_rev, migration_run,
+    migration_generate, migration_redo, migration_rev, migration_run,
 };
 use clap::Parser;
 use commands::generate::GenerateSubcommand;
@@ -20,13 +20,14 @@ pub const INDENT: &str = "    ";
 pub const DEFAULT_API_PATH: &str = "server/src/api";
 pub const DEFAULT_MIDDLEWARE_PATH: &str = "server/src/api/middleware";
 pub const DEFAULT_ROUTER_PATH: &str = "server/src/api/router";
-pub const ROUTE_FILES: [&str; 6] = [
+pub const ROUTE_FILES: [&str; 7] = [
     "contract",
     "data",
     "domain",
     "handler",
     "infrastructure",
     "setup",
+    "mod",
 ];
 pub const MW_FILES: [&str; 5] = ["contract", "domain", "infrastructure", "interceptor", "mod"];
 static VERBOSE: AtomicBool = AtomicBool::new(false);
@@ -68,7 +69,7 @@ pub fn main() {
             commands::migration::MigrationSubcommand::Gen(opts) => migration_generate(opts),
             commands::migration::MigrationSubcommand::Run => migration_run(),
             commands::migration::MigrationSubcommand::Rev => migration_rev(),
-            commands::migration::MigrationSubcommand::Redo(opts) => migration_redo_all(opts),
+            commands::migration::MigrationSubcommand::Redo(opts) => migration_redo(opts),
         },
         Command::Crypto(sc) | Command::C(sc) => match sc.action {
             commands::crypto::CryptoSubcommand::PW(opts) => write_pw(opts),
@@ -77,6 +78,9 @@ pub fn main() {
             }
             commands::crypto::CryptoSubcommand::Secret(opts) => write_secret(opts),
         },
+        Command::Interactive | Command::I => {
+            init_interactive().expect("Error occurred in interactive session")
+        }
     }
 }
 
@@ -84,7 +88,6 @@ fn uppercase(s: &str) -> String {
     format!("{}{}", &s[..1].to_string().to_uppercase(), &s[1..])
 }
 
-#[inline]
 pub fn print(s: &str) {
     if VERBOSE.load(std::sync::atomic::Ordering::SeqCst) {
         println!("{s}");

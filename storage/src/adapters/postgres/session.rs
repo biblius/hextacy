@@ -4,8 +4,8 @@ use crate::{
     models::{role::Role, session::Session, user::User},
     repository::session::SessionRepository,
 };
+use alx_clients::db::postgres::Postgres;
 use chrono::{Duration, NaiveDateTime, Utc};
-use clients::db::postgres::Postgres;
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
 use std::sync::Arc;
