@@ -6,8 +6,6 @@ use std::fmt::Display;
 use thiserror::{self, Error};
 use validify::{ValidationError, ValidationErrors};
 
-use crate::config::cache::AuthCache;
-
 #[derive(Debug, Error)]
 pub(crate) enum Error {
     #[error("Authentication Error: {0}")]
@@ -22,6 +20,8 @@ pub(crate) enum Error {
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
     Crypto(#[from] alx_core::crypto::CryptoError),
+    #[error("Diesel Error: {0}")]
+    Diesel(#[from] diesel::result::Error),
     #[error("Serde Error: {0}")]
     Serde(#[from] serde_json::Error),
     #[error("Reqwest Header Error: {0}")]
@@ -32,6 +32,8 @@ pub(crate) enum Error {
     Validation(Vec<ValidationError>),
     #[error("Http Error")]
     Http(#[from] alx_core::web::http::HttpError),
+    #[error("OAuth Provider Error")]
+    OAuthProvider(#[from] alx_core::clients::oauth::OAuthProviderError),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]
@@ -52,59 +54,10 @@ impl Error {
     /// Returns error message and description
     pub fn message_and_description(&self) -> (&'static str, String) {
         match self {
-            /*
-             * Authentication
-             */
-            Self::Authentication(e) => match e {
-                AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session".to_string()),
-                AuthenticationError::InvalidCsrfHeader => {
-                    ("UNAUTHORIZED", "Invalid CSRF header".to_string())
-                }
-                AuthenticationError::InvalidCredentials => {
-                    ("UNAUTHORIZED", "Invalid credentials".to_string())
-                }
-                AuthenticationError::InvalidOTP => {
-                    ("UNAUTHORIZED", "Invalid OTP provided".to_string())
-                }
-                AuthenticationError::AccountFrozen => {
-                    ("SUSPENDED", "Account suspended".to_string())
-                }
-                AuthenticationError::EmailTaken => {
-                    ("EMAIL_TAKEN", "Cannot use provided email".to_string())
-                }
-                AuthenticationError::EmailUnverified => {
-                    ("UNVERIFIED", "Email not verified".to_string())
-                }
-                AuthenticationError::AuthBlocked => {
-                    ("BLOCKED", "Authentication currently blocked".to_string())
-                }
-                AuthenticationError::AlreadyVerified => {
-                    ("VERIFIED", "Account already verified".to_string())
-                }
-                AuthenticationError::InsufficientRights => {
-                    ("FORBIDDEN", "Insufficient rights".to_string())
-                }
-                AuthenticationError::InvalidToken(id) => match id {
-                    AuthCache::OTPToken => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
-                    AuthCache::RegToken => {
-                        ("INVALID_TOKEN", "Invalid registration token".to_string())
-                    }
-                    AuthCache::PWToken => {
-                        ("INVALID_TOKEN", "Invalid password change token".to_string())
-                    }
-                    _ => ("INVALID_TOKEN", "Token not found".to_string()),
-                },
-            },
-            /*
-             * Adapter
-             */
-            Self::Adapter(storage::adapters::AdapterError::DoesNotExist(r)) => {
-                ("NOT_FOUND", format!("Resource does not exist: {}", r))
+            Self::Authentication(e) => e.describe(),
+            Self::Adapter(storage::adapters::AdapterError::DoesNotExist) => {
+                ("NOT_FOUND", format!("Resource does not exist"))
             }
-
-            /*
-             * Validation
-             */
             Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),
             _ => ("INTERNAL_SERVER_ERROR", "Internal server error".to_string()),
         }
@@ -180,7 +133,7 @@ pub(crate) enum AuthenticationError {
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Invalid token")]
-    InvalidToken(AuthCache),
+    InvalidToken(&'static str),
     #[error("Invalid OTP")]
     InvalidOTP,
     #[error("Invalid CSRF header")]
@@ -201,18 +154,55 @@ pub(crate) enum AuthenticationError {
 
 impl AuthenticationError {
     pub fn status_code(&self) -> StatusCode {
+        use AuthenticationError::*;
         match self {
-            Self::Unauthenticated => StatusCode::UNAUTHORIZED,
-            Self::InvalidCredentials => StatusCode::UNAUTHORIZED,
-            Self::InvalidToken(_) => StatusCode::UNAUTHORIZED,
-            Self::InsufficientRights => StatusCode::FORBIDDEN,
-            Self::InvalidOTP => StatusCode::UNAUTHORIZED,
-            Self::InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
-            Self::AccountFrozen => StatusCode::UNAUTHORIZED,
-            Self::EmailTaken => StatusCode::CONFLICT,
-            Self::EmailUnverified => StatusCode::UNAUTHORIZED,
-            Self::AlreadyVerified => StatusCode::CONFLICT,
-            Self::AuthBlocked => StatusCode::UNAUTHORIZED,
+            Unauthenticated => StatusCode::UNAUTHORIZED,
+            InvalidCredentials => StatusCode::UNAUTHORIZED,
+            InvalidToken(_) => StatusCode::UNAUTHORIZED,
+            InsufficientRights => StatusCode::FORBIDDEN,
+            InvalidOTP => StatusCode::UNAUTHORIZED,
+            InvalidCsrfHeader => StatusCode::UNAUTHORIZED,
+            AccountFrozen => StatusCode::UNAUTHORIZED,
+            EmailTaken => StatusCode::CONFLICT,
+            EmailUnverified => StatusCode::UNAUTHORIZED,
+            AlreadyVerified => StatusCode::CONFLICT,
+            AuthBlocked => StatusCode::UNAUTHORIZED,
+        }
+    }
+
+    pub fn describe(&self) -> (&'static str, String) {
+        match self {
+            AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session".to_string()),
+            AuthenticationError::InvalidCsrfHeader => {
+                ("UNAUTHORIZED", "Invalid CSRF header".to_string())
+            }
+            AuthenticationError::InvalidCredentials => {
+                ("UNAUTHORIZED", "Invalid credentials".to_string())
+            }
+            AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided".to_string()),
+            AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended".to_string()),
+            AuthenticationError::EmailTaken => {
+                ("EMAIL_TAKEN", "Cannot use provided email".to_string())
+            }
+            AuthenticationError::EmailUnverified => {
+                ("UNVERIFIED", "Email not verified".to_string())
+            }
+            AuthenticationError::AuthBlocked => {
+                ("BLOCKED", "Authentication currently blocked".to_string())
+            }
+            AuthenticationError::AlreadyVerified => {
+                ("VERIFIED", "Account already verified".to_string())
+            }
+            AuthenticationError::InsufficientRights => {
+                ("FORBIDDEN", "Insufficient rights".to_string())
+            }
+            AuthenticationError::InvalidToken(id) => match *id {
+                "OTP" => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
+                "Registration" => ("INVALID_TOKEN", "Invalid registration token".to_string()),
+                "Password" => ("INVALID_TOKEN", "Invalid password change token".to_string()),
+                "OAuth" => ("INVALID_TOKEN", "Invalid OAuth access token".to_string()),
+                _ => ("INVALID_TOKEN", "Token not found".to_string()),
+            },
         }
     }
 }

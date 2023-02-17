@@ -1,6 +1,6 @@
 # ALX Clients
 
-Contains clients for communicating with database servers. Intended to be used with the ALX storage module.
+Contains clients for communicating with database servers and more. DB clients are intended to be used with the ALX storage module.
 Provides basic functionality for building connection pools and establishing direct connections.
 
 ## Feature flags
@@ -8,6 +8,8 @@ Provides basic functionality for building connection pools and establishing dire
 - postgres
 - redis
 - mongo
+- oauth
+- email
 
 ## Setup
 

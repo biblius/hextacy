@@ -1,15 +1,22 @@
 pub mod postgres;
-use self::postgres::PgAdapterError;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum AdapterError {
-    #[error("Postgres Adapter Error {0}")]
-    Postgres(#[from] PgAdapterError),
-    #[error("Does not exist: {0}")]
-    DoesNotExist(String),
+    #[error("Entry does not exist")]
+    DoesNotExist,
     #[error("Client: {0}")]
     Client(#[from] alx_clients::ClientError),
     #[error("Diesel: {0}")]
-    Diesel(#[from] diesel::result::Error),
+    Diesel(diesel::result::Error),
+}
+
+impl From<diesel::result::Error> for AdapterError {
+    fn from(value: diesel::result::Error) -> Self {
+        match value {
+            diesel::result::Error::NotFound => Self::DoesNotExist,
+            e => Self::Diesel(e),
+        }
+    }
 }

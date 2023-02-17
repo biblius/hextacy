@@ -1,17 +1,32 @@
 use super::contract::{CacheContract, EmailContract};
 use crate::config::cache::AuthCache;
 use crate::config::constants::{
-    EMAIL_DIRECTORY, EMAIL_THROTTLE_DURATION_SECONDS, OTP_THROTTLE_DURATION_SECONDS,
-    SESSION_CACHE_DURATION_SECONDS, WRONG_PASSWORD_CACHE_DURATION,
+    EMAIL_DIRECTORY, EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, SESSION_CACHE_DURATION,
+    WRONG_PASSWORD_CACHE_DURATION,
 };
 use crate::error::Error;
 use alx_core::cache::{CacheAccess, CacheError};
 use alx_core::clients::db::redis::{Commands, Redis, RedisPoolConnection};
 use alx_core::clients::email;
 use chrono::Utc;
+use diesel::PgConnection;
 use std::sync::Arc;
-use storage::models::session::UserSession;
+use storage::models::session::Session;
+use storage::repository::oauth::OAuthRepository;
+use storage::repository::session::SessionRepository;
+use storage::repository::user::UserRepository;
 use tracing::debug;
+
+pub(super) struct Repository<UR, SR, OR>
+where
+    UR: UserRepository<PgConnection>,
+    SR: SessionRepository,
+    OR: OAuthRepository<PgConnection>,
+{
+    pub user: UR,
+    pub session: SR,
+    pub oauth: OR,
+}
 
 pub(super) struct Cache {
     pub client: Arc<Redis>,
@@ -29,13 +44,13 @@ impl CacheAccess for Cache {
 
 impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
-    fn set_session(&self, session_id: &str, session: &UserSession) -> Result<(), Error> {
+    fn set_session(&self, session_id: &str, session: &Session) -> Result<(), Error> {
         debug!("Caching session with ID {}", session.id);
         self.set_json(
             AuthCache::Session,
             session_id,
             session,
-            Some(SESSION_CACHE_DURATION_SECONDS),
+            Some(SESSION_CACHE_DURATION),
         )
         .map_err(Error::new)
     }
@@ -103,17 +118,13 @@ impl CacheContract for Cache {
                     .set_ex::<&str, i64, _>(
                         &throttle_key,
                         Utc::now().timestamp(),
-                        OTP_THROTTLE_DURATION_SECONDS,
+                        OTP_THROTTLE_DURATION,
                     )
                     .map_err(Error::new)?;
 
                 // Increment the number of failed attempts
                 connection
-                    .set_ex::<&str, i64, _>(
-                        &attempt_key,
-                        attempts + 1,
-                        OTP_THROTTLE_DURATION_SECONDS,
-                    )
+                    .set_ex::<&str, i64, _>(&attempt_key, attempts + 1, OTP_THROTTLE_DURATION)
                     .map_err(Error::new)?;
                 Ok(attempts)
             }
@@ -123,11 +134,11 @@ impl CacheContract for Cache {
                     .set_ex::<&str, i64, _>(
                         &throttle_key,
                         Utc::now().timestamp(),
-                        OTP_THROTTLE_DURATION_SECONDS,
+                        OTP_THROTTLE_DURATION,
                     )
                     .map_err(Error::new)?;
                 connection
-                    .set_ex::<&str, i64, _>(&attempt_key, 1, OTP_THROTTLE_DURATION_SECONDS)
+                    .set_ex::<&str, i64, _>(&attempt_key, 1, OTP_THROTTLE_DURATION)
                     .map_err(Error::new)
             }
         }
@@ -144,7 +155,7 @@ impl CacheContract for Cache {
             AuthCache::EmailThrottle,
             user_id,
             1,
-            Some(EMAIL_THROTTLE_DURATION_SECONDS),
+            Some(EMAIL_THROTTLE_DURATION),
         )
         .map_err(|e| e.into())
     }

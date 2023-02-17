@@ -14,7 +14,7 @@ impl RawJson {
         self.0
     }
 
-    pub fn get_inner(&self) -> &str {
+    pub fn inner(&self) -> &str {
         &self.0
     }
 }

@@ -9,6 +9,7 @@ use rand::{rngs::StdRng, RngCore, SeedableRng};
 use thiserror::Error;
 use tracing::debug;
 
+#[inline]
 pub fn uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }

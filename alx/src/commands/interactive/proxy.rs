@@ -147,10 +147,6 @@ impl CommandInfo for SubcommandProxy {
             },
         }
     }
-    /*
-    fn description(&self) -> &'static str {
-        "Hello world, this is a description, hope you like it so lajkujte sherujte subskrajbujte"
-    } */
 
     fn command_repr(&self) -> String {
         match self {

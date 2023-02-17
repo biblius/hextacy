@@ -1,9 +1,9 @@
-use thiserror::Error;
-
 pub mod db;
-
 #[cfg(feature = "email")]
 pub mod email;
+pub mod oauth;
+
+use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum ClientError {

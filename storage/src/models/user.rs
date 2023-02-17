@@ -8,14 +8,19 @@ pub struct User {
     pub id: String,
     pub email: String,
     pub username: String,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
     pub role: Role,
+    pub phone: Option<String>,
     #[serde(skip_serializing)]
-    pub password: String,
+    pub password: Option<String>,
     #[serde(skip_serializing)]
     pub otp_secret: Option<String>,
-    pub phone: Option<String>,
+    #[serde(skip_serializing)]
     pub google_id: Option<String>,
+    #[serde(skip_serializing)]
     pub github_id: Option<String>,
+    #[serde(skip_serializing)]
     pub frozen: bool,
     #[serde(skip_serializing)]
     pub email_verified_at: Option<NaiveDateTime>,
@@ -25,7 +30,7 @@ pub struct User {
 
 impl User {
     /// Checks if the user is suspended and if their email is verified.
-    pub fn check_valid(&self) -> bool {
+    pub fn is_verified(&self) -> bool {
         !self.frozen && self.email_verified_at.is_some()
     }
 
@@ -33,7 +38,7 @@ impl User {
         id: String,
         email: &str,
         username: &str,
-        password: String,
+        password: Option<String>,
         with_otp: bool,
         verified: bool,
         frozen: bool,
@@ -42,6 +47,8 @@ impl User {
             id,
             email: email.to_string(),
             username: username.to_string(),
+            first_name: Some("Biblius".to_string()),
+            last_name: Some("Khan".to_string()),
             role: Role::User,
             password,
             otp_secret: if with_otp {

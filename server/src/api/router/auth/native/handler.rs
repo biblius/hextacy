@@ -63,7 +63,7 @@ pub(super) async fn set_otp_secret<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let session = extract_session(req)?;
     info!("Registering OTP secret for: {}", session.user_id);
-    service.set_otp_secret(&session.user_id)
+    service.set_otp_secret(session)
 }
 
 /// Verifies the user's OTP if they have 2FA enabled

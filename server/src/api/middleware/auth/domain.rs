@@ -7,49 +7,43 @@ use alx_core::clients::db::postgres::Postgres;
 use alx_core::clients::db::redis::Redis;
 use std::sync::Arc;
 use storage::adapters::postgres::session::PgSessionAdapter;
-use storage::adapters::postgres::user::PgUserAdapter;
 use storage::models::role::Role;
-use storage::models::session::UserSession;
+use storage::models::session::Session;
 use storage::repository::session::SessionRepository;
-use storage::repository::user::UserRepository;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]
-pub(super) struct AuthenticationGuard<UR, SR, C>
+pub(super) struct AuthenticationGuard<SR, C>
 where
-    UR: UserRepository,
     SR: SessionRepository,
     C: CacheContract,
 {
-    pub user_repo: UR,
     pub session_repo: SR,
     pub cache: C,
     pub auth_level: Role,
 }
 
-impl AuthenticationGuard<PgUserAdapter, PgSessionAdapter, Cache> {
+impl AuthenticationGuard<PgSessionAdapter, Cache> {
     pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
         Self {
             session_repo: PgSessionAdapter {
                 client: pg_client.clone(),
             },
-            user_repo: PgUserAdapter { client: pg_client },
             cache: Cache { client: rd_client },
             auth_level: role,
         }
     }
 }
 
-impl<UR, SR, C> AuthGuardContract for AuthenticationGuard<UR, SR, C>
+impl<SR, C> AuthGuardContract for AuthenticationGuard<SR, C>
 where
-    UR: UserRepository + Send + Sync,
     SR: SessionRepository + Send + Sync,
     C: CacheContract + Send + Sync,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
     /// If it can't find a session returns an `Unauthenticated` error.
-    fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<UserSession, Error> {
+    fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error> {
         // Check cache
         match self.cache.get_session_by_id(session_id) {
             Ok(session) => {
@@ -106,9 +100,9 @@ where
         role >= &self.auth_level
     }
 
-    fn extract_user_session(&self, id: &str, csrf: &str) -> Result<UserSession, Error> {
-        let session = self.session_repo.get_valid_by_id(id, csrf)?;
-        let user = self.user_repo.get_by_id(&session.user_id)?;
-        Ok(UserSession::new(user, session))
+    fn extract_user_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
+        self.session_repo
+            .get_valid_by_id(id, csrf)
+            .map_err(|e| e.into())
     }
 }

@@ -6,17 +6,18 @@ use crate::error::Error;
 use actix_web::HttpResponse;
 use alx_core::web::http::response::Response;
 use async_trait::async_trait;
+use diesel::PgConnection;
 use reqwest::StatusCode;
 use storage::repository::user::UserRepository;
 
-pub(super) struct UserService<R: UserRepository> {
+pub(super) struct UserService<R: UserRepository<PgConnection>> {
     pub repository: R,
 }
 
 #[async_trait]
 impl<R> ServiceContract for UserService<R>
 where
-    R: UserRepository + Send + Sync,
+    R: UserRepository<PgConnection> + Send + Sync,
 {
     fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
         let users = self.repository.get_paginated(

@@ -27,6 +27,8 @@ pub fn build_pool() -> PgPool {
         .unwrap_or_else(|e| panic!("Failed to create postgres pool: {e}"))
 }
 
+/// Contains a connection pool for postgres. An instance of this
+/// should be shared through the app with Arcs
 #[derive(Debug, Clone)]
 pub struct Postgres {
     pool: PgPool,
@@ -55,7 +57,7 @@ impl Postgres {
 
     /// Attempts to establish a direct connection to the postgres server. Panics if `POSTGRES_URL` is not set
     /// in the environment.
-    pub fn connect_direct() -> Result<PgConnection, ClientError> {
+    pub fn connect_direct(&self) -> Result<PgConnection, ClientError> {
         let db_url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
 
         PgConnection::establish(&db_url).map_err(Into::into)

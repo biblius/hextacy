@@ -1,6 +1,6 @@
 use super::contract::CacheContract;
 use crate::{
-    config::{cache::AuthCache, constants::SESSION_CACHE_DURATION_SECONDS},
+    config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
     error::Error,
 };
 use alx_core::{
@@ -10,7 +10,7 @@ use alx_core::{
 };
 use chrono::Utc;
 use std::sync::Arc;
-use storage::models::session::UserSession;
+use storage::models::session::Session;
 
 #[derive(Debug, Clone)]
 pub struct Cache {
@@ -28,16 +28,16 @@ impl CacheAccess for Cache {
 }
 
 impl CacheContract for Cache {
-    fn get_session_by_id(&self, id: &str) -> Result<UserSession, Error> {
+    fn get_session_by_id(&self, id: &str) -> Result<Session, Error> {
         self.get_json(AuthCache::Session, id).map_err(Error::new)
     }
 
-    fn cache_session(&self, id: &str, session: &UserSession) -> Result<(), Error> {
+    fn cache_session(&self, id: &str, session: &Session) -> Result<(), Error> {
         self.set_json(
             AuthCache::Session,
             id,
             session,
-            Some(SESSION_CACHE_DURATION_SECONDS),
+            Some(SESSION_CACHE_DURATION),
         )
         .map_err(Error::new)
     }
@@ -46,7 +46,7 @@ impl CacheContract for Cache {
         let mut conn = self.client.connect()?;
         conn.expire_at(
             session_id,
-            ((Utc::now().timestamp() + SESSION_CACHE_DURATION_SECONDS as i64) % i64::MAX) as usize,
+            ((Utc::now().timestamp() + SESSION_CACHE_DURATION as i64) % i64::MAX) as usize,
         )?;
         Ok(())
     }

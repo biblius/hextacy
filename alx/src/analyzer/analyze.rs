@@ -34,7 +34,7 @@ pub enum FileScanResult {
     Data(Vec<Data>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlxFileType {
     Setup,
     Handler,
@@ -67,15 +67,21 @@ pub fn handle(opts: AnalyzeOptions, api_path: &str) {
         },
         None => ConfigFormat::Both,
     };
+
     let mut scan = ScanResult {
         handlers: HashMap::new(),
         routes: HashMap::new(),
         data: HashMap::new(),
     };
+
     let path = format!("{api_path}/router");
+
     router_read_recursive(Path::new(&path), &mut scan, &analyze, None).unwrap();
 
+    // println!("MY CURRENT CONFIG {:?}", scan);
+
     let mut pc = ProjectConfig::default();
+
     for ep_name in scan.routes.keys() {
         // Grab the endpoint name
         let file_path = format!("{path}/{ep_name}");
@@ -155,6 +161,7 @@ pub fn router_read_recursive(
         "\u{1F4D6} Reading {} \u{1F4D6}",
         dir.to_str().expect("Couldn't read directory name")
     ));
+
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
 
@@ -208,7 +215,9 @@ pub fn router_read_recursive(
                 continue;
             }
 
-            if file_name.contains("setup") {
+            let in_setup = dir_type.is_some() && dir_type.unwrap() == AlxFileType::Setup;
+
+            if file_name.contains("setup") || in_setup {
                 let routes = callback(&entry, AlxFileType::Setup)?;
                 if let FileScanResult::Routes(routes) = routes {
                     scan.routes.insert(ep_name.to_string(), routes);

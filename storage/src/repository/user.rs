@@ -1,15 +1,29 @@
 use crate::{
     adapters::AdapterError,
     models::user::{SortOptions, User},
+    Transaction,
 };
+use alx_clients::oauth::OAuthProvider;
 
-#[mockall::automock]
-pub trait UserRepository {
+/* #[mockall::automock] */
+pub trait UserRepository<Conn> {
     /// Create a user entry
     fn create(&self, email: &str, username: &str, password: &str) -> Result<User, AdapterError>;
 
+    fn create_from_oauth(
+        &self,
+        account_id: &str,
+        email: &str,
+        username: &str,
+        provider: OAuthProvider,
+        trx: Option<&mut Transaction<Conn>>,
+    ) -> Result<User, AdapterError>;
+
     /// Get a user by their ID
     fn get_by_id(&self, id: &str) -> Result<User, AdapterError>;
+
+    /// Get a user by their oauth ID
+    fn get_by_oauth_id(&self, id: &str, provider: OAuthProvider) -> Result<User, AdapterError>;
 
     /// Get a user by their email
     fn get_by_email(&self, email: &str) -> Result<User, AdapterError>;
@@ -22,6 +36,14 @@ pub trait UserRepository {
 
     /// Update the user's `email_verified_at` field to now
     fn update_email_verified_at(&self, id: &str) -> Result<User, AdapterError>;
+
+    /// Update one of the user's oauth IDs
+    fn update_oauth_id(
+        &self,
+        id: &str,
+        oauth_id: &str,
+        provider: OAuthProvider,
+    ) -> Result<User, AdapterError>;
 
     /// Set the user's frozen flag to true
     fn freeze(&self, id: &str) -> Result<User, AdapterError>;

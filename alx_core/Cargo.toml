@@ -57,6 +57,7 @@ async-trait = "0.1.42"
 colored = "2.0.0"
 lazy_static = "1.4.0"
 mockall = "0.11.3"
+reqwest = { version = "0.11.14", features = ["json"] }
 syn = { version = "1.0.107", features = ["full"] }
 thiserror = "1.0.37"
 tokio = "1.24.2"

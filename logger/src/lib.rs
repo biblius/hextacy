@@ -42,7 +42,7 @@ pub fn init(level: &str) {
                 "{} | {} | {} | {}",
                 &chrono::Utc::now().to_string().replace('T', " ")[11..23],
                 format_args!("{:^5}", style.value(record.level())),
-                format_args!("{:^30}", record.target()),
+                format_args!("{:^50}", record.target()),
                 record.args(),
             )
         })
