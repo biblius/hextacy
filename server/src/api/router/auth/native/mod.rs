@@ -3,7 +3,7 @@ pub(super) mod data;
 pub(super) mod domain;
 pub(super) mod handler;
 pub(crate) mod setup;
-/*
+
 #[cfg(test)]
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -18,7 +18,7 @@ mod tests {
     };
     use crate::{
         api::router::auth::{
-            contract::{MockCacheContract, MockEmailContract},
+            contract::{MockCacheContract, MockEmailContract, MockRepoContract},
             data::AuthenticationSuccessResponse,
         },
         error::{AuthenticationError, Error},
@@ -40,7 +40,6 @@ mod tests {
     use storage::{
         adapters::AdapterError,
         models::{session::Session, user::User},
-        repository::{session::MockSessionRepository, user::MockUserRepository},
     };
 
     /// Mock this one here so we don't clog the code with unnecessary implementations
@@ -89,17 +88,14 @@ mod tests {
         /*
          * Good to go
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         // The service will first attempt to find an existing user
-        user_repo
-            .expect_get_by_email()
-            .return_once_st(move |_| Err(AdapterError::DoesNotExist));
+        repo.expect_get_user_by_email()
+            .return_once_st(move |_| Err(AdapterError::DoesNotExist.into()));
         // Then create one
-        user_repo
-            .expect_create()
+        repo.expect_create_user()
             .return_once(move |_, _, _| Ok(USER_NO_OTP.clone()));
         // Cache their registration token
         cache
@@ -109,31 +105,20 @@ mod tests {
         email
             .expect_send_registration_token()
             .return_once_st(move |_, _, _| Ok(()));
-        let auth_service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth_service = Authentication { repo, cache, email };
         auth_service
             .start_registration(REGISTRATION.clone())
             .unwrap();
+
         /*
          * Already exists
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once_st(move |_| Ok(USER_NO_OTP.clone()));
-        let auth_service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth_service = Authentication { repo, cache, email };
         let res = auth_service.start_registration(REGISTRATION.clone());
         match res {
             Ok(_) => panic!("Not good"),
@@ -149,23 +134,16 @@ mod tests {
         /*
          * Good to go
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Ok(USER_NO_OTP.id.clone()));
-        user_repo
-            .expect_update_email_verified_at()
+        repo.expect_update_user_email_verification()
             .return_once(|_| Ok(USER_NO_OTP.clone()));
         cache.expect_delete_token().return_once(|_, _| Ok(()));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let data = EmailToken {
             token: generate_hmac("REG_TOKEN_SECRET", &USER_NO_OTP.id, BASE64URL).unwrap(),
         };
@@ -173,19 +151,13 @@ mod tests {
         /*
          * Invalid reg token
          */
-        let user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let data = EmailToken {
             token: "12345".to_string(),
         };
@@ -205,15 +177,13 @@ mod tests {
         /*
          * Good to go
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         let mut user = USER_NO_OTP.clone();
         user.email_verified_at = None;
         // Find the user
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(move |_| Ok(user));
         // See if they have an email throttle
         cache
@@ -229,12 +199,7 @@ mod tests {
             .return_once(|_, _, _| Ok(()));
         // And set the email throttle
         cache.expect_set_email_throttle().return_once(|_| Ok(()));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let data = ResendRegToken {
             email: USER_NO_OTP.email.clone(),
         };
@@ -242,20 +207,13 @@ mod tests {
         /*
          * Already verified
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Find the verified user
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(move |_| Ok(USER_NO_OTP.clone()));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let data = ResendRegToken {
             email: USER_NO_OTP.email.clone(),
         };
@@ -272,17 +230,14 @@ mod tests {
     #[test]
     fn credentials_no_otp() {
         let mut service = MockServiceContract::new();
-        let mut user_repo = MockUserRepository::new();
-        let mut session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Find user without OTP secret
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(move |_| Ok(USER_NO_OTP.clone()));
         // Create session
-        session_repo
-            .expect_create()
+        repo.expect_create_session()
             .return_once(move |_, _, _, _, _| Ok(SESSION.clone()));
         // Delete login attempts
         cache.expect_delete_login_attempts().return_once(|_| Ok(()));
@@ -296,36 +251,24 @@ mod tests {
                     .to_response(StatusCode::OK)
                     .finish())
             });
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         auth.login(CREDENTIALS.clone()).unwrap();
     }
 
     #[actix_web::main]
     #[test]
     async fn credentials_and_otp() {
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Expect the user to exist
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(move |_| Ok(USER_OTP.clone()));
         // Expect to cache an OTP token
         cache
             .expect_set_token()
             .return_once(move |_, _, _: &str, _| Ok(()));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         // Verify the creds and grab the token from the response
         let res = auth.login(CREDENTIALS.clone()).unwrap();
         let body = to_bytes(res.into_body()).await.unwrap();
@@ -333,8 +276,7 @@ mod tests {
             serde_json::from_str::<TwoFactorAuthResponse>(std::str::from_utf8(&body).unwrap())
                 .unwrap()
                 .token;
-        let mut user_repo = MockUserRepository::new();
-        let mut session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Get the OTP token
@@ -346,25 +288,18 @@ mod tests {
             .expect_get_otp_throttle()
             .return_once(move |_, _| Err(Error::None));
         // Get the user's ID stored behind the token
-        user_repo
-            .expect_get_by_id()
+        repo.expect_get_user_by_id()
             .returning(move |_| Ok(USER_OTP.clone()));
         // Delete the OTP token
         cache.expect_delete_token().return_once(move |_, _| Ok(()));
         // Create a session
-        session_repo
-            .expect_create()
+        repo.expect_create_session()
             .returning(move |_, _, _, _, _| Ok(SESSION.clone()));
         // Delete login attempts
         cache.expect_delete_login_attempts().return_once(|_| Ok(()));
         // Cache the session since it has the permanent flag enabled
         cache.expect_set_session().return_once(move |_, _| Ok(()));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         // Grab current time slice and calculate the OTP
         let time_step_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -390,24 +325,17 @@ mod tests {
         /*
          * Invalid email
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
-        user_repo
-            .expect_get_by_email()
-            .return_once(move |_| Err(AdapterError::DoesNotExist));
+        repo.expect_get_user_by_email()
+            .return_once(move |_| Err(AdapterError::DoesNotExist.into()));
         let invalid_email = Credentials {
             email: "doesnt@exist.ever".to_string(),
             password: "not good".to_string(),
             remember: false,
         };
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let res = service.login(invalid_email);
         match res {
             Ok(_) => panic!("Not good"),
@@ -419,13 +347,11 @@ mod tests {
         /*
          * Invalid password
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Try to find a valid user with an invalid password
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(move |_| Ok(USER_NO_OTP.clone()));
         cache.expect_cache_login_attempt().returning(|_| Ok(1));
         let invalid_password = Credentials {
@@ -433,12 +359,7 @@ mod tests {
             password: "not good".to_string(),
             remember: false,
         };
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let res = service.login(invalid_password);
         match res {
             Ok(_) => panic!("Not good"),
@@ -452,18 +373,15 @@ mod tests {
     #[test]
     fn change_password() {
         let mut service = MockServiceContract::new();
-        let mut user_repo = MockUserRepository::new();
-        let mut session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         // Update pw
-        user_repo
-            .expect_update_password()
+        repo.expect_update_user_password()
             .return_once(move |_, _| Ok(USER_NO_OTP.clone()));
         // Purge sessions
         service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        session_repo
-            .expect_purge()
+        repo.expect_purge_sessions()
             .return_once(|_, _| Ok(vec![SESSION.clone()]));
         // Delete all the cached sessions
         cache.expect_delete_token().return_once(|_, _| Ok(()));
@@ -475,12 +393,7 @@ mod tests {
         email
             .expect_alert_password_change()
             .return_once(|_, _, _| Ok(()));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         let data = ChangePassword {
             password: "12345678".to_string(),
         };
@@ -493,8 +406,7 @@ mod tests {
          * Valid token
          */
         let mut service = MockServiceContract::new();
-        let mut user_repo = MockUserRepository::new();
-        let mut session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         // Expect to have a reset token
@@ -504,8 +416,7 @@ mod tests {
         // Delete the cached token
         cache.expect_delete_token().returning(|_, _| Ok(()));
         // Update the password to something random
-        user_repo
-            .expect_update_password()
+        repo.expect_update_user_password()
             .return_once(|_, _| Ok(USER_NO_OTP.clone()));
         // And send it to the user
         email
@@ -513,17 +424,11 @@ mod tests {
             .return_once(|_, _, _| Ok(()));
         // Purge all their sessions
         service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        session_repo
-            .expect_purge()
+        repo.expect_purge_sessions()
             .return_once(|_, _| Ok(vec![SESSION.clone()]));
         // Delete the cached sessions
         cache.expect_delete_token().returning(|_, _| Ok(()));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         let data = ResetPassword {
             token: "12345".to_string(),
         };
@@ -531,19 +436,13 @@ mod tests {
         /*
          * No token
          */
-        let user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         let data = ResetPassword {
             token: "12345".to_string(),
         };
@@ -559,13 +458,11 @@ mod tests {
 
     #[test]
     fn forgot_password() {
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let mut email = MockEmailContract::new();
         // Get the user
-        user_repo
-            .expect_get_by_email()
+        repo.expect_get_user_by_email()
             .return_once(|_| Ok(USER_NO_OTP.clone()));
         // Check email throttle
         cache
@@ -581,12 +478,7 @@ mod tests {
             .returning(|_, _, _: &str, _| Ok(()));
         // Set email throttle
         cache.expect_set_email_throttle().returning(|_| Ok(()));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let service = Authentication { repo, cache, email };
         let data = ForgotPassword {
             email: USER_NO_OTP.email.clone(),
         };
@@ -594,19 +486,12 @@ mod tests {
         /*
          * Invalid email
          */
-        let mut user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let cache = MockCacheContract::new();
         let email = MockEmailContract::new();
-        user_repo
-            .expect_get_by_email()
-            .return_once(|_| Err(AdapterError::DoesNotExist));
-        let service = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        repo.expect_get_user_by_email()
+            .return_once(|_| Err(AdapterError::DoesNotExist.into()));
+        let service = Authentication { repo, cache, email };
         let data = ForgotPassword {
             email: USER_NO_OTP.email.clone(),
         };
@@ -620,8 +505,7 @@ mod tests {
     #[test]
     fn verify_forgot_password() {
         let mut service = MockServiceContract::new();
-        let mut user_repo = MockUserRepository::new();
-        let mut session_repo = MockSessionRepository::new();
+        let mut repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         // Get the user from the verify token
@@ -631,24 +515,17 @@ mod tests {
         // Delete it
         cache.expect_delete_token().return_once(|_, _| Ok(()));
         // Update the user pw
-        user_repo
-            .expect_update_password()
+        repo.expect_update_user_password()
             .return_once(|_, _| Ok(USER_NO_OTP.clone()));
         // Purge all sessions
         service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        session_repo.expect_purge().return_once(|_, _| Ok(vec![]));
+        repo.expect_purge_sessions().return_once(|_, _| Ok(vec![]));
         // Establish a new one
-        session_repo
-            .expect_create()
+        repo.expect_create_session()
             .return_once(|_, _, _, _, _| Ok(SESSION.clone()));
         cache.expect_delete_login_attempts().return_once(|_| Ok(()));
         cache.expect_set_session().return_once(|_, _| Ok(()));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         let data = ForgotPasswordVerify {
             password: "12345678".to_string(),
             token: "12345".to_string(),
@@ -657,19 +534,13 @@ mod tests {
         /*
          * Wrong token
          */
-        let user_repo = MockUserRepository::new();
-        let session_repo = MockSessionRepository::new();
+        let repo = MockRepoContract::new();
         let mut cache = MockCacheContract::new();
         let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));
-        let auth = Authentication {
-            user_repo,
-            session_repo,
-            cache,
-            email,
-        };
+        let auth = Authentication { repo, cache, email };
         let data = ForgotPasswordVerify {
             password: "12345678".to_string(),
             token: "12345".to_string(),
@@ -684,4 +555,3 @@ mod tests {
         }
     }
 }
- */

@@ -1,16 +1,19 @@
 use crate::api::{
     middleware::auth::interceptor::AuthGuard,
     router::auth::{
-        infrastructure::Cache,
+        adapter::{Cache, Repository},
         o_auth::{domain::OAuthService, handler},
     },
 };
 use actix_web::web::{self, Data};
 use alx_core::clients::{
-    db::{postgres::Postgres, redis::Redis},
+    db::{
+        postgres::{PgPoolConnection, Postgres},
+        redis::Redis,
+    },
     oauth::github::GithubOAuth,
 };
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 use storage::{
     adapters::postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter},
     models::role::Role,
@@ -19,9 +22,13 @@ use storage::{
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         provider: GithubOAuth,
-        user_repo: PgUserAdapter { client: pg.clone() },
-        session_repo: PgSessionAdapter { client: pg.clone() },
-        oauth_repo: PgOAuthAdapter { client: pg.clone() },
+        repo: Repository {
+            client: pg.clone(),
+            trx: Option::<RefCell<PgPoolConnection>>::None,
+            _user: PgUserAdapter,
+            _session: PgSessionAdapter,
+            _oauth: PgOAuthAdapter,
+        },
         cache: Cache { client: rd.clone() },
     };
 
@@ -31,14 +38,22 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
 
     cfg.service(
         web::resource("/auth/oauth/github/login").route(web::post().to(handler::login::<
-            OAuthService<GithubOAuth, PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, Cache>,
+            OAuthService<
+                GithubOAuth,
+                Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                Cache,
+            >,
         >)),
     );
 
     cfg.service(
         web::resource("/auth/oauth/github/scope")
             .route(web::put().to(handler::request_scopes::<
-                OAuthService<GithubOAuth, PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, Cache>,
+                OAuthService<
+                    GithubOAuth,
+                    Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                    Cache,
+                >,
             >))
             .wrap(auth_guard),
     );

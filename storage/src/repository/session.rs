@@ -5,34 +5,33 @@ use crate::{
     models::{session::Session, user::User},
 };
 
-#[mockall::automock]
-pub trait SessionRepository {
+pub trait SessionRepository<C> {
     /// Create a session
-    fn create<'a>(
-        &self,
+    fn create(
+        conn: &mut C,
         user: &User,
         csrf: &str,
         expires_after: Option<i64>,
-        oauth_token: Option<&'a str>,
+        oauth_token: Option<&str>,
         provider: Option<OAuthProvider>,
     ) -> Result<Session, AdapterError>;
 
     /// Get unexpired session corresponding to the CSRF token
-    fn get_valid_by_id(&self, id: &str, csrf: &str) -> Result<Session, AdapterError>;
+    fn get_valid_by_id(conn: &mut C, id: &str, csrf: &str) -> Result<Session, AdapterError>;
 
     /// Update session's `expires_at` field
-    fn refresh(&self, id: &str, csrf: &str) -> Result<Session, AdapterError>;
+    fn refresh(conn: &mut C, id: &str, csrf: &str) -> Result<Session, AdapterError>;
 
     /// Update session's `expires_at` field to now
-    fn expire(&self, id: &str) -> Result<Session, AdapterError>;
+    fn expire(conn: &mut C, id: &str) -> Result<Session, AdapterError>;
 
     /// Expire all user sessions. A session ID can be provided to skip purging a specific session.
-    fn purge<'a>(&self, user_id: &str, skip: Option<&'a str>)
+    fn purge(conn: &mut C, user_id: &str, skip: Option<&str>)
         -> Result<Vec<Session>, AdapterError>;
 
     /// Update all sessions' OAuth access tokens based on the user ID and the provider.
     fn update_access_tokens(
-        &self,
+        conn: &mut C,
         access_token: &str,
         user_id: &str,
         provider: OAuthProvider,

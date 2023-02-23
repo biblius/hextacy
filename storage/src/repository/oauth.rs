@@ -1,50 +1,48 @@
-use crate::{adapters::AdapterError, models::oauth::OAuthMeta, Transaction};
+use crate::{adapters::AdapterError, models::oauth::OAuthMeta};
 use alx_clients::oauth::{OAuthProvider, TokenResponse};
 
-/* #[mockall::automock] */
-pub trait OAuthRepository<Conn> {
+pub trait OAuthRepository<C> {
     /// Create user OAuth metadata
     fn create<T>(
-        &self,
+        conn: &mut C,
         user_id: &str,
         account_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-        trx: Option<&mut Transaction<Conn>>,
     ) -> Result<OAuthMeta, AdapterError>
     where
         T: TokenResponse + Send + Sync;
 
     /// Get an entry by it's DB ID
-    fn get_by_id(&self, id: &str) -> Result<OAuthMeta, AdapterError>;
+    fn get_by_id(conn: &mut C, id: &str) -> Result<OAuthMeta, AdapterError>;
 
     /// Get an entry based on the OAuth account ID
-    fn get_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, AdapterError>;
+    fn get_by_account_id(conn: &mut C, account_id: &str) -> Result<OAuthMeta, AdapterError>;
 
     /// Get all oauth entries by the given user ID
-    fn get_by_user_id(&self, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError>;
+    fn get_by_user_id(conn: &mut C, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError>;
 
     /// Get all oauth entries by the given user ID and provider
     fn get_by_provider(
-        &self,
+        conn: &mut C,
         user_id: &str,
         provider: OAuthProvider,
     ) -> Result<OAuthMeta, AdapterError>;
 
     /// Revoke an access token
-    fn revoke(&self, access_token: &str) -> Result<OAuthMeta, AdapterError>;
+    fn revoke(conn: &mut C, access_token: &str) -> Result<OAuthMeta, AdapterError>;
 
     /// Revoke all access tokens based on user ID
-    fn revoke_all(&self, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError>;
+    fn revoke_all(conn: &mut C, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError>;
 
     /// Update a token's scopes, i.e. replace the found entry's tokens with the newly
     /// obtained ones. Matches against the user ID and the provider.
     fn update<T>(
-        &self,
+        conn: &mut C,
         user_id: &str,
-        provider: OAuthProvider,
         tokens: &T,
+        provider: OAuthProvider,
     ) -> Result<OAuthMeta, AdapterError>
     where
-        T: TokenResponse + 'static;
+        T: TokenResponse;
 }

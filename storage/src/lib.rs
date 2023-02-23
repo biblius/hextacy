@@ -1,4 +1,7 @@
+use std::cell::RefMut;
+
 use adapters::AdapterError;
+use alx_clients::db::postgres::PgPoolConnection;
 use diesel::{
     connection::{AnsiTransactionManager, TransactionManager},
     PgConnection,
@@ -8,24 +11,52 @@ pub mod adapters;
 pub mod models;
 pub mod repository;
 
-pub trait PgRepository {
-    fn connect(&self) -> Result<PgConnection, adapters::AdapterError>;
+#[macro_export]
+macro_rules! atomic {
+    ($meth:expr, $conn:expr, $($param:expr),*) => {
+        {
+            use std::borrow::BorrowMut;
+            match $conn {
+                AtomicConn::New(mut conn) => $meth(&mut conn, $($param),*).map_err(Error::new),
+                AtomicConn::Existing(mut conn) => $meth(conn.borrow_mut(), $($param),*).map_err(Error::new),
+            }
+        }
+    };
+}
 
-    fn transaction(&self) -> Result<Transaction<PgConnection>, AdapterError> {
-        let mut conn = self.connect()?;
-        <AnsiTransactionManager as TransactionManager<PgConnection>>::begin_transaction(&mut conn)
-            .map_err(AdapterError::from)?;
-        Ok(Transaction { trx: conn })
-    }
+pub trait AtomicRepoAccess<Conn> {
+    fn connect(&self) -> Result<AtomicConn<Conn>, adapters::AdapterError>;
+}
+
+pub trait RepoAccess<Conn> {
+    fn connect(&self) -> Result<Conn, adapters::AdapterError>;
+}
+
+pub enum AtomicConn<'a, T> {
+    New(T),
+    Existing(RefMut<'a, T>),
+}
+
+pub enum PgConnectionType {
+    Pool(PgPoolConnection),
+    Direct(PgConnection),
+}
+
+pub trait Atomic {
+    fn start_transaction(&mut self) -> Result<(), AdapterError>;
+
+    fn rollback_transaction(&mut self) -> Result<(), AdapterError>;
+
+    fn commit_transaction(&mut self) -> Result<(), AdapterError>;
 }
 
 pub struct Transaction<T> {
-    trx: T,
+    session: T,
 }
 
 impl<T> Transaction<T> {
     pub fn inner(&mut self) -> &mut T {
-        &mut self.trx
+        &mut self.session
     }
 }
 

@@ -8,11 +8,10 @@ use crate::{
     },
     repository::session::SessionRepository,
 };
-use alx_clients::{db::postgres::Postgres, oauth::OAuthProvider};
+use alx_clients::{db::postgres::PgPoolConnection, oauth::OAuthProvider};
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
-use std::sync::Arc;
 
 #[derive(Debug, Serialize, Insertable)]
 #[diesel(table_name = sessions)]
@@ -29,15 +28,13 @@ struct NewSession<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct PgSessionAdapter {
-    pub client: Arc<Postgres>,
-}
+pub struct PgSessionAdapter;
 
-impl SessionRepository for PgSessionAdapter {
+impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     /// Create a new user session. If `None` is given for `expires_after`, the session's `expires_at`
     /// field will be set to the maximum possible value, otherwise it will be set to expire in `expires_after` seconds.
     fn create(
-        &self,
+        conn: &mut PgPoolConnection,
         user: &User,
         csrf: &str,
         expires_after: Option<i64>,
@@ -63,48 +60,56 @@ impl SessionRepository for PgSessionAdapter {
 
         diesel::insert_into(dsl::sessions)
             .values(new)
-            .get_result::<Session>(&mut self.client.connect()?)
+            .get_result::<Session>(conn)
             .map_err(AdapterError::from)
     }
 
     /// Gets an unexpired session with its corresponding CSRF token
-    fn get_valid_by_id(&self, id: &str, csrf: &str) -> Result<Session, AdapterError> {
+    fn get_valid_by_id(
+        conn: &mut PgPoolConnection,
+        id: &str,
+        csrf: &str,
+    ) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl;
         dsl::sessions
             .filter(dsl::id.eq(id))
             .filter(dsl::csrf.eq(csrf))
             .filter(dsl::expires_at.gt(chrono::Utc::now()))
-            .first::<Session>(&mut self.client.connect()?)
+            .first::<Session>(conn)
             .map_err(AdapterError::from)
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
-    fn refresh(&self, id: &str, csrf: &str) -> Result<Session, AdapterError> {
+    fn refresh(conn: &mut PgPoolConnection, id: &str, csrf: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
             .filter(dsl::id.eq(id))
             .filter(dsl::csrf.eq(csrf))
             .set(dsl::expires_at.eq(Utc::now() + Duration::minutes(30)))
-            .load::<Session>(&mut self.client.connect()?)?
+            .load::<Session>(conn)?
             .pop()
             .ok_or_else(|| AdapterError::DoesNotExist)
     }
 
     /// Updates the sessions `expires_at` field to now
-    fn expire(&self, id: &str) -> Result<Session, AdapterError> {
+    fn expire(conn: &mut PgPoolConnection, id: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
             .filter(dsl::id.eq(id))
             .set(dsl::expires_at.eq(Utc::now()))
-            .load::<Session>(&mut self.client.connect()?)?
+            .load::<Session>(conn)?
             .pop()
             .ok_or_else(|| AdapterError::DoesNotExist)
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    fn purge(&self, usr_id: &str, skip: Option<&str>) -> Result<Vec<Session>, AdapterError> {
+    fn purge(
+        conn: &mut PgPoolConnection,
+        usr_id: &str,
+        skip: Option<&str>,
+    ) -> Result<Vec<Session>, AdapterError> {
         use super::schema::sessions::dsl;
 
         let mut query = diesel::update(dsl::sessions)
@@ -117,13 +122,11 @@ impl SessionRepository for PgSessionAdapter {
             query = query.filter(dsl::id.ne(skip))
         }
 
-        query
-            .load::<Session>(&mut self.client.connect()?)
-            .map_err(AdapterError::from)
+        query.load::<Session>(conn).map_err(AdapterError::from)
     }
 
     fn update_access_tokens(
-        &self,
+        conn: &mut PgPoolConnection,
         access_token: &str,
         user_id: &str,
         provider: OAuthProvider,
@@ -140,7 +143,7 @@ impl SessionRepository for PgSessionAdapter {
             .filter(dsl::auth_type.eq(ty))
             .filter(dsl::expires_at.ge(Utc::now()))
             .set(dsl::oauth_token.eq(access_token))
-            .load::<Session>(&mut self.client.connect()?)
+            .load::<Session>(conn)
             .map_err(AdapterError::from)
     }
 }

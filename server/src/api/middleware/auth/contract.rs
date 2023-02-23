@@ -15,3 +15,8 @@ pub(crate) trait CacheContract {
     fn cache_session(&self, csrf: &str, session: &Session) -> Result<(), Error>;
     fn refresh_session(&self, session_id: &str) -> Result<(), Error>;
 }
+
+pub(crate) trait RepoContract {
+    fn refresh_session(&self, id: &str, csrf: &str) -> Result<Session, Error>;
+    fn get_valid_session(&self, id: &str, csrf: &str) -> Result<Session, Error>;
+}

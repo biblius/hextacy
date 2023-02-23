@@ -1,11 +1,17 @@
 use super::super::{domain::OAuthService, handler};
-use crate::api::{middleware::auth::interceptor::AuthGuard, router::auth::infrastructure::Cache};
+use crate::api::{
+    middleware::auth::interceptor::AuthGuard,
+    router::auth::adapter::{Cache, Repository},
+};
 use actix_web::web::{self, Data};
 use alx_core::clients::{
-    db::{postgres::Postgres, redis::Redis},
+    db::{
+        postgres::{PgPoolConnection, Postgres},
+        redis::Redis,
+    },
     oauth::google::GoogleOAuth,
 };
-use std::sync::Arc;
+use std::{cell::RefCell, sync::Arc};
 use storage::{
     adapters::postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter},
     models::role::Role,
@@ -14,9 +20,13 @@ use storage::{
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         provider: GoogleOAuth,
-        user_repo: PgUserAdapter { client: pg.clone() },
-        session_repo: PgSessionAdapter { client: pg.clone() },
-        oauth_repo: PgOAuthAdapter { client: pg.clone() },
+        repo: Repository {
+            client: pg.clone(),
+            trx: Option::<RefCell<PgPoolConnection>>::None,
+            _user: PgUserAdapter,
+            _session: PgSessionAdapter,
+            _oauth: PgOAuthAdapter,
+        },
         cache: Cache { client: rd.clone() },
     };
 
@@ -26,14 +36,22 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
 
     cfg.service(
         web::resource("/auth/oauth/google/login").route(web::post().to(handler::login::<
-            OAuthService<GoogleOAuth, PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, Cache>,
+            OAuthService<
+                GoogleOAuth,
+                Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                Cache,
+            >,
         >)),
     );
 
     cfg.service(
         web::resource("/auth/oauth/google/scope")
             .route(web::put().to(handler::request_scopes::<
-                OAuthService<GoogleOAuth, PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, Cache>,
+                OAuthService<
+                    GoogleOAuth,
+                    Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                    Cache,
+                >,
             >))
             .wrap(auth_guard),
     );

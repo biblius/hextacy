@@ -18,8 +18,8 @@ use utils::env;
 
 #[async_trait]
 pub trait OAuth: ProviderParams {
-    type Account: OAuthAccount + DeserializeOwned + Send + Sync + 'static;
-    type CodeExchangeResponse: TokenResponse + DeserializeOwned + Send + Sync + 'static;
+    type Account: OAuthAccount + DeserializeOwned + 'static;
+    type CodeExchangeResponse: TokenResponse + DeserializeOwned + 'static;
 
     async fn exchange_code(
         &self,

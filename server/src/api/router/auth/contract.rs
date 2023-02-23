@@ -1,6 +1,75 @@
-use storage::models::session::Session;
-
 use crate::{config::cache::AuthCache, error::Error};
+use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
+use storage::models::{oauth::OAuthMeta, session::Session, user::User};
+
+#[cfg_attr(test, mockall::automock)]
+pub(super) trait RepoContract {
+    fn get_user_by_id(&self, id: &str) -> Result<User, Error>;
+    fn get_user_by_email(&self, email: &str) -> Result<User, Error>;
+
+    fn create_user(&self, email: &str, username: &str, pw: &str) -> Result<User, Error>;
+    fn update_user_email_verification(&self, id: &str) -> Result<User, Error>;
+    fn update_user_otp_secret(&self, id: &str, secret: &str) -> Result<User, Error>;
+    fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<User, Error>;
+    fn freeze_user(&self, id: &str) -> Result<User, Error>;
+
+    fn create_session<'a>(
+        &self,
+        user: &User,
+        csrf: &str,
+        expires: Option<i64>,
+        access_token: Option<&'a str>,
+        provider: Option<OAuthProvider>,
+    ) -> Result<Session, Error>;
+    fn expire_session(&self, id: &str) -> Result<Session, Error>;
+    fn purge_sessions<'a>(
+        &self,
+        user_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<Vec<Session>, Error>;
+    fn update_session_access_tokens(
+        &self,
+        access_token: &str,
+        user_id: &str,
+        provider: OAuthProvider,
+    ) -> Result<Vec<Session>, Error>;
+
+    fn create_user_from_oauth(
+        &self,
+        account_id: &str,
+        email: &str,
+        username: &str,
+        provider: OAuthProvider,
+    ) -> Result<User, Error>;
+
+    fn update_user_provider_id(
+        &self,
+        user_id: &str,
+        account_id: &str,
+        provider: OAuthProvider,
+    ) -> Result<User, Error>;
+
+    fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error>;
+
+    fn create_oauth<T>(
+        &self,
+        user_id: &str,
+        account_id: &str,
+        tokens: &T,
+        provider: OAuthProvider,
+    ) -> Result<OAuthMeta, Error>
+    where
+        T: TokenResponse + 'static;
+
+    fn update_oauth<T>(
+        &self,
+        user_id: &str,
+        tokens: &T,
+        provider: OAuthProvider,
+    ) -> Result<OAuthMeta, Error>
+    where
+        T: TokenResponse + 'static;
+}
 
 #[cfg_attr(test, mockall::automock)]
 pub(super) trait CacheContract {

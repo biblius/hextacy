@@ -1,15 +1,12 @@
 use super::schema::oauth;
-use crate::{
-    adapters::AdapterError, models::oauth::OAuthMeta, repository::oauth::OAuthRepository,
-    PgRepository, Transaction,
-};
+use crate::{adapters::AdapterError, models::oauth::OAuthMeta, repository::oauth::OAuthRepository};
 use alx_clients::{
-    db::postgres::Postgres,
+    db::postgres::PgPoolConnection,
     oauth::{OAuthProvider, TokenResponse},
 };
 use chrono::{Duration, NaiveDateTime, Utc};
-use diesel::{ExpressionMethods, Insertable, PgConnection, QueryDsl, RunQueryDsl};
-use std::{fmt::Debug, sync::Arc};
+use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
+use std::fmt::Debug;
 
 #[derive(Debug, Insertable)]
 #[diesel(table_name = oauth)]
@@ -24,31 +21,20 @@ struct NewOAuthEntry<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct PgOAuthAdapter {
-    pub client: Arc<Postgres>,
-}
+pub struct PgOAuthAdapter;
 
-impl PgRepository for PgOAuthAdapter {
-    fn connect(&self) -> Result<PgConnection, crate::adapters::AdapterError> {
-        self.client.connect_direct().map_err(|e| e.into())
-    }
-}
-
-impl OAuthRepository<PgConnection> for PgOAuthAdapter {
+impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     fn create<T>(
-        &self,
+        conn: &mut PgPoolConnection,
         user_id: &str,
         account_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-        mut trx: Option<&mut Transaction<PgConnection>>,
     ) -> Result<OAuthMeta, AdapterError>
     where
         T: TokenResponse + Send + Sync,
     {
         use super::schema::oauth::dsl;
-
-        let transaction = trx.as_mut().map(|t| t.inner());
 
         let entry = NewOAuthEntry {
             user_id,
@@ -62,53 +48,53 @@ impl OAuthRepository<PgConnection> for PgOAuthAdapter {
                 .map(|val| (Utc::now() + Duration::seconds(val)).naive_utc()),
         };
 
-        let insert = diesel::insert_into(dsl::oauth).values(entry);
-
-        match transaction {
-            Some(trx) => insert
-                .get_result::<OAuthMeta>(trx)
-                .map_err(AdapterError::from),
-            None => insert
-                .get_result::<OAuthMeta>(&mut self.client.connect()?)
-                .map_err(AdapterError::from),
-        }
+        diesel::insert_into(dsl::oauth)
+            .values(entry)
+            .get_result::<OAuthMeta>(conn)
+            .map_err(AdapterError::from)
     }
 
-    fn get_by_id(&self, id: &str) -> Result<OAuthMeta, AdapterError> {
+    fn get_by_id(conn: &mut PgPoolConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
             .filter(dsl::id.eq(id))
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
-            .first::<OAuthMeta>(&mut self.client.connect()?)
+            .first::<OAuthMeta>(conn)
             .map_err(AdapterError::from)
     }
 
-    fn get_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, AdapterError> {
+    fn get_by_account_id(
+        conn: &mut PgPoolConnection,
+        account_id: &str,
+    ) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
             .filter(dsl::account_id.eq(account_id))
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
-            .first::<OAuthMeta>(&mut self.client.connect()?)
+            .first::<OAuthMeta>(conn)
             .map_err(AdapterError::from)
     }
 
-    fn get_by_user_id(&self, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError> {
+    fn get_by_user_id(
+        conn: &mut PgPoolConnection,
+        user_id: &str,
+    ) -> Result<Vec<OAuthMeta>, AdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
             .filter(dsl::user_id.eq(user_id))
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
-            .load::<OAuthMeta>(&mut self.client.connect()?)
+            .load::<OAuthMeta>(conn)
             .map_err(AdapterError::from)
     }
 
     fn get_by_provider(
-        &self,
+        conn: &mut PgPoolConnection,
         user_id: &str,
         provider: OAuthProvider,
     ) -> Result<OAuthMeta, AdapterError> {
@@ -119,36 +105,39 @@ impl OAuthRepository<PgConnection> for PgOAuthAdapter {
             .filter(dsl::user_id.eq(user_id))
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
-            .first::<OAuthMeta>(&mut self.client.connect()?)
+            .first::<OAuthMeta>(conn)
             .map_err(AdapterError::from)
     }
 
-    fn revoke(&self, access_token: &str) -> Result<OAuthMeta, AdapterError> {
+    fn revoke(conn: &mut PgPoolConnection, access_token: &str) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         diesel::update(dsl::oauth)
             .filter(dsl::access_token.eq(access_token))
             .set(dsl::revoked.eq(true))
-            .load::<OAuthMeta>(&mut self.client.connect()?)?
+            .load::<OAuthMeta>(conn)?
             .pop()
             .ok_or_else(|| AdapterError::DoesNotExist.into())
     }
 
-    fn revoke_all(&self, user_id: &str) -> Result<Vec<OAuthMeta>, AdapterError> {
+    fn revoke_all(
+        conn: &mut PgPoolConnection,
+        user_id: &str,
+    ) -> Result<Vec<OAuthMeta>, AdapterError> {
         use super::schema::oauth::dsl;
 
         diesel::update(dsl::oauth)
             .filter(dsl::user_id.eq(user_id))
             .set(dsl::revoked.eq(true))
-            .load::<OAuthMeta>(&mut self.client.connect()?)
+            .load::<OAuthMeta>(conn)
             .map_err(AdapterError::from)
     }
 
     fn update<T>(
-        &self,
+        conn: &mut PgPoolConnection,
         user_id: &str,
-        provider: OAuthProvider,
         tokens: &T,
+        provider: OAuthProvider,
     ) -> Result<OAuthMeta, AdapterError>
     where
         T: TokenResponse,
@@ -166,7 +155,7 @@ impl OAuthRepository<PgConnection> for PgOAuthAdapter {
                     .map(|val| (Utc::now() + Duration::seconds(val)).naive_utc())),
                 dsl::scope.eq(tokens.scope()),
             ))
-            .load::<OAuthMeta>(&mut self.client.connect()?)?
+            .load::<OAuthMeta>(conn)?
             .pop()
             .ok_or_else(|| AdapterError::DoesNotExist)
     }

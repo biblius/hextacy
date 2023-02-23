@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use storage::models::{session::Session, user::User};
 
 #[cfg_attr(test, mockall::automock)]
-#[async_trait]
+#[async_trait(?Send)]
 pub(super) trait ServiceContract {
     /// Process the code received in the authorization step and log the user in or auto
     /// register them, based on whether they already exist. Establishes a session.

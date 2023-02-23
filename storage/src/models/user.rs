@@ -17,15 +17,29 @@ pub struct User {
     #[serde(skip_serializing)]
     pub otp_secret: Option<String>,
     #[serde(skip_serializing)]
+    pub frozen: bool,
+    #[serde(skip_serializing)]
     pub google_id: Option<String>,
     #[serde(skip_serializing)]
     pub github_id: Option<String>,
     #[serde(skip_serializing)]
-    pub frozen: bool,
-    #[serde(skip_serializing)]
     pub email_verified_at: Option<NaiveDateTime>,
     pub created_at: NaiveDateTime,
     pub updated_at: NaiveDateTime,
+}
+
+#[derive(Debug, Default, PartialEq)]
+pub struct UserUpdate<'a> {
+    email: Option<&'a str>,
+    username: Option<&'a str>,
+    first_name: Option<&'a str>,
+    last_name: Option<&'a str>,
+    role: Option<&'a Role>,
+    phone: Option<&'a str>,
+    password: Option<&'a str>,
+    otp_secret: Option<&'a str>,
+    google_id: Option<&'a str>,
+    github_id: Option<&'a str>,
 }
 
 impl User {

@@ -1,6 +1,9 @@
 use super::{contract::ServiceContract, data::OAuthCodeExchange};
 use crate::{
-    api::router::auth::{contract::CacheContract, data::AuthenticationSuccessResponse},
+    api::router::auth::{
+        contract::{CacheContract, RepoContract},
+        data::AuthenticationSuccessResponse,
+    },
     config::constants::COOKIE_S_ID,
     error::{AuthenticationError, Error},
 };
@@ -14,7 +17,6 @@ use alx_core::{
     },
 };
 use async_trait::async_trait;
-use diesel::PgConnection;
 use reqwest::{
     header::{HeaderName, HeaderValue},
     StatusCode,
@@ -22,34 +24,25 @@ use reqwest::{
 use storage::{
     adapters::AdapterError,
     models::{session::Session, user::User},
-    repository::{oauth::OAuthRepository, session::SessionRepository, user::UserRepository},
-    PgRepository,
 };
 use tracing::info;
 
-#[derive(Debug)]
-pub(super) struct OAuthService<P, UR, SR, OR, C>
+pub(super) struct OAuthService<P, R, C>
 where
     P: OAuth,
-    UR: UserRepository<PgConnection>,
-    SR: SessionRepository,
-    OR: OAuthRepository<PgConnection>,
+    R: RepoContract,
     C: CacheContract,
 {
     pub provider: P,
-    pub user_repo: UR,
-    pub session_repo: SR,
-    pub oauth_repo: OR,
+    pub repo: R,
     pub cache: C,
 }
 
-#[async_trait]
-impl<P, UR, SR, OR, C> ServiceContract for OAuthService<P, UR, SR, OR, C>
+#[async_trait(?Send)]
+impl<P, R, C> ServiceContract for OAuthService<P, R, C>
 where
     P: OAuth + Send + Sync,
-    UR: UserRepository<PgConnection> + Send + Sync,
-    SR: SessionRepository + Send + Sync,
-    OR: OAuthRepository<PgConnection> + PgRepository + Send + Sync,
+    R: RepoContract,
     C: CacheContract + Send + Sync,
 {
     async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error> {
@@ -64,41 +57,33 @@ where
             None => return Err(AuthenticationError::EmailUnverified.into()),
         };
 
-        let mut trx = self.oauth_repo.transaction()?;
+        // let mut trx = self.repo.transaction()?;
 
-        let user = match self.user_repo.get_by_email(&email) {
-            Ok(user) => self
-                .user_repo
-                .update_oauth_id(&user.id, &account.id(), provider)?,
-            Err(AdapterError::DoesNotExist) => self.user_repo.create_from_oauth(
-                &account.id(),
-                &email,
-                account.username(),
-                provider,
-                Some(&mut trx),
-            )?,
-            Err(e) => {
-                trx.rollback()?;
-                return Err(e.into());
-            }
-        };
+        let user =
+            match self.repo.get_user_by_email(&email) {
+                Ok(user) => self
+                    .repo
+                    .update_user_provider_id(&user.id, &account.id(), provider)?,
+                Err(Error::Adapter(AdapterError::DoesNotExist)) => self
+                    .repo
+                    .create_user_from_oauth(&account.id(), &email, account.username(), provider)?,
+                Err(e) => {
+                    //trx.rollback()?;
+                    return Err(e.into());
+                }
+            };
 
-        let existing_oauth = match self.oauth_repo.get_by_account_id(&account.id()) {
+        let existing_oauth = match self.repo.get_oauth_by_account_id(&account.id()) {
             Ok(oauth) => oauth,
             Err(e) => match e {
                 // If the entry does not exist, we must create one for the user
-                AdapterError::DoesNotExist => {
+                Error::Adapter(AdapterError::DoesNotExist) => {
                     info!("OAuth entry does not exist, creating");
-                    self.oauth_repo.create(
-                        &user.id,
-                        &account.id(),
-                        &tokens,
-                        provider,
-                        Some(&mut trx),
-                    )?
+                    self.repo
+                        .create_oauth(&user.id, &account.id(), &tokens, provider)?
                 }
                 e => {
-                    trx.rollback()?;
+                    //trx.rollback()?;
                     return Err(e.into());
                 }
             },
@@ -110,19 +95,19 @@ where
                 info!("OAuth access token expired, refreshing");
                 tokens = self.provider.refresh_access_token(refresh_token).await?;
 
-                self.oauth_repo.update(&user.id, provider, &tokens)?;
-                self.session_repo.update_access_tokens(
+                self.repo.update_oauth(&user.id, &tokens, provider)?;
+                self.repo.update_session_access_tokens(
                     tokens.access_token(),
                     &user.id,
                     provider,
                 )?;
             // Otherwise just update the existing entry
             } else {
-                self.oauth_repo.update(&user.id, provider, &tokens)?;
+                self.repo.update_oauth(&user.id, &tokens, provider)?;
             }
         }
 
-        trx.commit()?;
+        // trx.commit()?;
 
         Ok(MessageResponse::new("l")
             .to_response(StatusCode::OK)
@@ -149,22 +134,19 @@ where
 
         // Check if the user already exists under a different provider and update their entry if they do,
         // otherwise create
-        let user = match self.user_repo.get_by_email(email) {
-            Ok(user) => self
-                .user_repo
-                .update_oauth_id(&user.id, &account.id(), provider)?,
-            Err(AdapterError::DoesNotExist) => self.user_repo.create_from_oauth(
-                &account.id(),
-                email,
-                account.username(),
-                provider,
-                None,
-            )?,
-            Err(e) => return Err(e.into()),
-        };
+        let user =
+            match self.repo.get_user_by_email(email) {
+                Ok(user) => self
+                    .repo
+                    .update_user_provider_id(&user.id, &account.id(), provider)?,
+                Err(Error::Adapter(AdapterError::DoesNotExist)) => self
+                    .repo
+                    .create_user_from_oauth(&account.id(), email, account.username(), provider)?,
+                Err(e) => return Err(e.into()),
+            };
 
-        self.oauth_repo
-            .create(&user.id, &account.id(), &tokens, provider, None)?;
+        self.repo
+            .create_oauth(&user.id, &account.id(), &tokens, provider)?;
 
         self.establish_session(tokens, user)
     }
@@ -188,9 +170,9 @@ where
 
         // Update existing sessions tied to the user and their auth provider
         // as well as the related oauth metadata
-        self.session_repo
-            .update_access_tokens(access_token, user_id, provider)?;
-        self.oauth_repo.update(user_id, provider, &tokens)?;
+        self.repo
+            .update_session_access_tokens(access_token, user_id, provider)?;
+        self.repo.update_oauth(user_id, &tokens, provider)?;
 
         // Update the existing session, sessions updated in the previous step will not update
         // cached sessions so we have to cache the current one to reflect the change
@@ -213,7 +195,7 @@ where
         let expiration = tokens.expires_in();
         let access_token = tokens.access_token();
 
-        let session = self.session_repo.create(
+        let session = self.repo.create_session(
             &user,
             &csrf_token,
             expiration,

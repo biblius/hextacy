@@ -1,6 +1,6 @@
-use super::contract::{AuthGuardContract, CacheContract};
+use super::adapter::{Cache, Repository};
+use super::contract::{AuthGuardContract, CacheContract, RepoContract};
 use super::domain::AuthenticationGuard;
-use super::infratructure::Cache;
 use crate::error::{AuthenticationError, Error};
 /* use ::alx_core::clients::postgres::Postgres;
 use ::alx_core::clients::redis::Redis; */
@@ -15,40 +15,35 @@ use std::rc::Rc;
 use std::sync::Arc;
 use storage::adapters::postgres::session::PgSessionAdapter;
 use storage::models::role::Role;
-use storage::repository::session::SessionRepository;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]
-pub(crate) struct AuthGuard<SR, C>
-where
-    SR: SessionRepository,
-    C: CacheContract,
-{
-    guard: Rc<AuthenticationGuard<SR, C>>,
+pub(crate) struct AuthGuard<Repo, Cache> {
+    guard: Rc<AuthenticationGuard<Repo, Cache>>,
 }
 
-impl AuthGuard<PgSessionAdapter, Cache> {
-    pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
+impl AuthGuard<Repository<PgSessionAdapter>, Cache> {
+    pub fn new(pg: Arc<Postgres>, rd: Arc<Redis>, role: Role) -> Self {
         Self {
-            guard: Rc::new(AuthenticationGuard::new(pg_client, rd_client, role)),
+            guard: Rc::new(AuthenticationGuard::new(pg, rd, role)),
         }
     }
 }
 
-impl<S, SR, C> Transform<S, ServiceRequest> for AuthGuard<SR, C>
+impl<Serv, Repo, Cache> Transform<Serv, ServiceRequest> for AuthGuard<Repo, Cache>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
-    S::Future: 'static,
-    SR: SessionRepository + Send + Sync + 'static,
-    C: CacheContract + Send + Sync + 'static,
+    Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
+    Serv::Future: 'static,
+    Repo: RepoContract + Send + Sync + 'static,
+    Cache: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
     type Error = actix_web::Error;
     type InitError = ();
-    type Transform = AuthMiddleware<S, SR, C>;
+    type Transform = AuthMiddleware<Serv, Repo, Cache>;
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
-    fn new_transform(&self, service: S) -> Self::Future {
+    fn new_transform(&self, service: Serv) -> Self::Future {
         ready(Ok(AuthMiddleware {
             service: Rc::new(service),
             guard: self.guard.clone(),
@@ -56,21 +51,17 @@ where
     }
 }
 
-pub(crate) struct AuthMiddleware<S, SR, C>
-where
-    SR: SessionRepository,
-    C: CacheContract,
-{
-    guard: Rc<AuthenticationGuard<SR, C>>,
-    service: Rc<S>,
+pub(crate) struct AuthMiddleware<Serv, Repo, Cache> {
+    guard: Rc<AuthenticationGuard<Repo, Cache>>,
+    service: Rc<Serv>,
 }
 
-impl<S, SR, C> Service<ServiceRequest> for AuthMiddleware<S, SR, C>
+impl<Serv, Repo, Cache> Service<ServiceRequest> for AuthMiddleware<Serv, Repo, Cache>
 where
-    S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
-    S::Future: 'static,
-    SR: SessionRepository + Send + Sync + 'static,
-    C: CacheContract + Send + Sync + 'static,
+    Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
+    Serv::Future: 'static,
+    Repo: RepoContract + Send + Sync + 'static,
+    Cache: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
     type Error = actix_web::Error;

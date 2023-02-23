@@ -1,5 +1,5 @@
-use super::contract::{AuthGuardContract, CacheContract};
-use super::infratructure::Cache;
+use super::adapter::{Cache, Repository};
+use super::contract::{AuthGuardContract, CacheContract, RepoContract};
 use crate::config::constants::COOKIE_S_ID;
 use crate::error::{AuthenticationError, Error};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
@@ -9,35 +9,31 @@ use std::sync::Arc;
 use storage::adapters::postgres::session::PgSessionAdapter;
 use storage::models::role::Role;
 use storage::models::session::Session;
-use storage::repository::session::SessionRepository;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]
-pub(super) struct AuthenticationGuard<SR, C>
-where
-    SR: SessionRepository,
-    C: CacheContract,
-{
-    pub session_repo: SR,
+pub(super) struct AuthenticationGuard<R, C> {
+    pub repo: R,
     pub cache: C,
     pub auth_level: Role,
 }
 
-impl AuthenticationGuard<PgSessionAdapter, Cache> {
-    pub fn new(pg_client: Arc<Postgres>, rd_client: Arc<Redis>, role: Role) -> Self {
+impl AuthenticationGuard<Repository<PgSessionAdapter>, Cache> {
+    pub fn new(pg: Arc<Postgres>, rd: Arc<Redis>, role: Role) -> Self {
         Self {
-            session_repo: PgSessionAdapter {
-                client: pg_client.clone(),
+            cache: Cache { client: rd },
+            repo: Repository {
+                client: pg,
+                _session: PgSessionAdapter,
             },
-            cache: Cache { client: rd_client },
             auth_level: role,
         }
     }
 }
 
-impl<SR, C> AuthGuardContract for AuthenticationGuard<SR, C>
+impl<R, C> AuthGuardContract for AuthenticationGuard<R, C>
 where
-    SR: SessionRepository + Send + Sync,
+    R: RepoContract + Send + Sync,
     C: CacheContract + Send + Sync,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
@@ -69,7 +65,7 @@ where
                     self.cache.cache_session(session_id, &session)?;
                     debug!("Refreshing session {}", session.id);
                     if !session.is_permanent() {
-                        self.session_repo.refresh(&session.id, csrf)?;
+                        self.repo.refresh_session(&session.id, csrf)?;
                     }
                     Ok(session)
                 } else {
@@ -101,8 +97,6 @@ where
     }
 
     fn extract_user_session(&self, id: &str, csrf: &str) -> Result<Session, Error> {
-        self.session_repo
-            .get_valid_by_id(id, csrf)
-            .map_err(|e| e.into())
+        self.repo.get_valid_session(id, csrf).map_err(|e| e.into())
     }
 }

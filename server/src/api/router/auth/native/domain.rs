@@ -7,14 +7,7 @@ use super::{
     },
 };
 use crate::{
-    api::router::auth::data::AuthenticationSuccessResponse,
-    error::{AuthenticationError, Error},
-};
-use crate::{
-    api::router::auth::{
-        contract::{CacheContract, EmailContract},
-        infrastructure::Repository,
-    },
+    api::router::auth::contract::{CacheContract, EmailContract},
     config::{
         cache::AuthCache,
         constants::{
@@ -22,6 +15,10 @@ use crate::{
             REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_DURATION,
         },
     },
+};
+use crate::{
+    api::router::auth::{contract::RepoContract, data::AuthenticationSuccessResponse},
+    error::{AuthenticationError, Error},
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use alx_core::{
@@ -37,38 +34,25 @@ use alx_core::{
 };
 use async_trait::async_trait;
 use data_encoding::{BASE32, BASE64URL};
-use diesel::PgConnection;
 use reqwest::{
     header::{self, HeaderName, HeaderValue},
     StatusCode,
 };
-use storage::{
-    models::{session::Session, user::User},
-    repository::{oauth::OAuthRepository, session::SessionRepository, user::UserRepository},
-};
+use storage::models::{session::Session, user::User};
 use tracing::{debug, info};
 
-pub(super) struct Authentication<UR, SR, OR, C, E>
-where
-    UR: UserRepository<PgConnection>,
-    SR: SessionRepository,
-    OR: OAuthRepository<PgConnection>,
-    C: CacheContract,
-    E: EmailContract,
-{
-    pub repo: Repository<UR, SR, OR>,
+pub(super) struct Authentication<R, C, E> {
+    pub repo: R,
     pub cache: C,
     pub email: E,
 }
 
 #[async_trait]
-impl<UR, SR, OR, C, E> ServiceContract for Authentication<UR, SR, OR, C, E>
+impl<R, C, E> ServiceContract for Authentication<R, C, E>
 where
-    UR: UserRepository<PgConnection> + Send + Sync,
-    SR: SessionRepository + Send + Sync,
-    OR: OAuthRepository<PgConnection> + Send + Sync,
-    C: CacheContract + Send + Sync,
-    E: EmailContract + Send + Sync,
+    R: RepoContract,
+    C: CacheContract,
+    E: EmailContract,
 {
     /// Verifies the user's credentials and returns a response based on their 2fa status
     fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
@@ -80,7 +64,7 @@ where
 
         info!("Verifying credentials for {email}");
 
-        let user = match self.repo.user.get_by_email(email) {
+        let user = match self.repo.get_user_by_email(email) {
             Ok(u) => u,
             Err(_) => return Err(AuthenticationError::InvalidCredentials.into()),
         };
@@ -106,7 +90,7 @@ where
             }
 
             // Freeze the account if attempts exceed the threshold and send a password reset token
-            self.repo.user.freeze(&user.id)?;
+            self.repo.freeze_user(&user.id)?;
 
             let token = token(BASE64URL, 160);
 
@@ -163,7 +147,7 @@ where
 
         info!("Verifying OTP for {user_id}");
 
-        let user = self.repo.user.get_by_id(&user_id)?;
+        let user = self.repo.get_user_by_id(&user_id)?;
 
         let Some(ref secret) = user.otp_secret else {
             return Err(AuthenticationError::InvalidOTP.into());
@@ -212,7 +196,7 @@ where
 
         info!("Starting registration for {}", email);
 
-        if self.repo.user.get_by_email(email).is_ok() {
+        if self.repo.get_user_by_email(email).is_ok() {
             return Err(AuthenticationError::EmailTaken.into());
         }
 
@@ -224,7 +208,7 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.user.create(email, username, &hashed)?;
+        let user = self.repo.create_user(email, username, &hashed)?;
 
         let token = generate_hmac("REG_TOKEN_SECRET", &user.id, BASE64URL)?;
 
@@ -263,7 +247,7 @@ where
             return Err(AuthenticationError::InvalidToken("Registration").into());
         }
 
-        self.repo.user.update_email_verified_at(&user_id)?;
+        self.repo.update_user_email_verification(&user_id)?;
 
         self.cache.delete_token(AuthCache::RegToken, token)?;
 
@@ -278,7 +262,7 @@ where
     fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
         let email = data.email.as_str();
         info!("Resending registration token to {email}");
-        let user = self.repo.user.get_by_email(email)?;
+        let user = self.repo.get_user_by_email(email)?;
 
         if user.email_verified_at.is_some() {
             return Err(Error::new(AuthenticationError::AlreadyVerified));
@@ -316,7 +300,7 @@ where
 
         let secret = crypto::otp::generate_secret();
 
-        let user = self.repo.user.update_otp_secret(user_id, &secret)?;
+        let user = self.repo.update_user_otp_secret(user_id, &secret)?;
 
         let qr = crypto::otp::generate_totp_qr_code(&secret, &user.email)?;
 
@@ -340,7 +324,7 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.user.update_password(&session.user_id, &hashed)?;
+        let user = self.repo.update_user_password(&session.user_id, &hashed)?;
 
         self.purge_sessions(&user.id, None)?;
 
@@ -381,7 +365,7 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.user.update_password(&user_id, &hashed)?;
+        let user = self.repo.update_user_password(&user_id, &hashed)?;
 
         self.purge_sessions(&user.id, None)?;
 
@@ -404,7 +388,7 @@ where
 
         // Create a temporary password
         let (temp_pw, hash) = pw_and_hash()?;
-        let user = self.repo.user.update_password(&user_id, &hash)?;
+        let user = self.repo.update_user_password(&user_id, &hash)?;
 
         self.email
             .send_reset_password(&user.username, &user.email, &temp_pw)?;
@@ -424,7 +408,7 @@ where
 
         let email = data.email.as_str();
 
-        let user = self.repo.user.get_by_email(email)?;
+        let user = self.repo.get_user_by_email(email)?;
 
         // Check throttle
         if self.cache.get_email_throttle(&user.id).ok().is_some() {
@@ -460,7 +444,7 @@ where
         if data.purge {
             self.purge_sessions(&session.user_id, None)?;
         } else {
-            let session = self.repo.session.expire(&session.id)?;
+            let session = self.repo.expire_session(&session.id)?;
             self.cache.delete_token(AuthCache::Session, &session.id)?;
         }
 
@@ -475,7 +459,7 @@ where
 
     /// Expires all sessions in the database and deletes all corresponding cached sessions
     fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
-        let sessions = self.repo.session.purge(user_id, skip)?;
+        let sessions = self.repo.purge_sessions(user_id, skip)?;
         for s in sessions {
             self.cache.delete_token(AuthCache::Session, &s.id).ok();
         }
@@ -486,7 +470,7 @@ where
     fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
         let csrf_token = uuid();
 
-        let session = self.repo.session.create(
+        let session = self.repo.create_session(
             &user,
             &csrf_token,
             { !remember }.then_some(SESSION_DURATION),

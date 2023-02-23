@@ -10,6 +10,8 @@ pub enum AdapterError {
     Client(#[from] alx_clients::ClientError),
     #[error("Diesel: {0}")]
     Diesel(diesel::result::Error),
+    #[error("Atomic Error: {0}")]
+    Atomic(String),
 }
 
 impl From<diesel::result::Error> for AdapterError {
