@@ -1,4 +1,4 @@
-use super::super::{domain::OAuthService, handler};
+use super::super::{handler, service::OAuthService};
 use crate::api::{
     middleware::auth::interceptor::AuthGuard,
     router::auth::adapter::{Cache, Repository},
@@ -11,7 +11,7 @@ use alx_core::clients::{
     },
     oauth::google::GoogleOAuth,
 };
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 use storage::{
     adapters::postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter},
     models::role::Role,
@@ -20,13 +20,13 @@ use storage::{
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         provider: GoogleOAuth,
-        repo: Repository {
-            client: pg.clone(),
-            trx: Option::<RefCell<PgPoolConnection>>::None,
-            _user: PgUserAdapter,
-            _session: PgSessionAdapter,
-            _oauth: PgOAuthAdapter,
-        },
+        repo: Repository::<
+            Postgres,
+            PgPoolConnection,
+            PgUserAdapter,
+            PgSessionAdapter,
+            PgOAuthAdapter,
+        >::new(pg.clone()),
         cache: Cache { client: rd.clone() },
     };
 
@@ -38,7 +38,13 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
         web::resource("/auth/oauth/google/login").route(web::post().to(handler::login::<
             OAuthService<
                 GoogleOAuth,
-                Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                Repository<
+                    Postgres,
+                    PgPoolConnection,
+                    PgUserAdapter,
+                    PgSessionAdapter,
+                    PgOAuthAdapter,
+                >,
                 Cache,
             >,
         >)),
@@ -49,7 +55,13 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
             .route(web::put().to(handler::request_scopes::<
                 OAuthService<
                     GoogleOAuth,
-                    Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                    Repository<
+                        Postgres,
+                        PgPoolConnection,
+                        PgUserAdapter,
+                        PgSessionAdapter,
+                        PgOAuthAdapter,
+                    >,
                     Cache,
                 >,
             >))

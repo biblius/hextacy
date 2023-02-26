@@ -4,7 +4,7 @@ use alx_core::cache::CacheIdentifier;
 pub enum AuthCache {
     /// For keeping track of login attempts
     LoginAttempts,
-    /// For caching permanent sessions
+    /// For caching sessions
     Session,
     /// For keeping track of registration tokens
     RegToken,
@@ -14,6 +14,7 @@ pub enum AuthCache {
     OTPToken,
     /// For 2FA login failure
     OTPThrottle,
+    /// For 2FA login failure
     OTPAttempts,
     /// For stopping email craziness
     EmailThrottle,

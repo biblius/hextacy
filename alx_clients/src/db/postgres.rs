@@ -6,6 +6,8 @@ use diesel::{
 use tracing::{info, trace};
 use utils::env;
 
+use super::DBConnect;
+
 pub type PgPool = Pool<ConnectionManager<PgConnection>>;
 pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
@@ -40,6 +42,18 @@ impl Default for Postgres {
     }
 }
 
+impl DBConnect for Postgres {
+    type Connection = PgPoolConnection;
+
+    fn connect(&self) -> Result<Self::Connection, ClientError> {
+        trace!("Postgres - Attempting pooled connection");
+        match self.pool.get() {
+            Ok(conn) => Ok(conn),
+            Err(e) => Err(ClientError::PgPoolConnection(e.to_string())),
+        }
+    }
+}
+
 impl Postgres {
     pub fn new() -> Self {
         info!("Intitializing Postgres pool");
@@ -48,7 +62,6 @@ impl Postgres {
 
     /// Attempts to establish a pooled connection.
     pub fn connect(&self) -> Result<PgPoolConnection, ClientError> {
-        trace!("Postgres - Attempting pooled connection");
         match self.pool.get() {
             Ok(conn) => Ok(conn),
             Err(e) => Err(ClientError::PgPoolConnection(e.to_string())),
@@ -58,8 +71,7 @@ impl Postgres {
     /// Attempts to establish a direct connection to the postgres server. Panics if `POSTGRES_URL` is not set
     /// in the environment.
     pub fn connect_direct(&self) -> Result<PgConnection, ClientError> {
-        let db_url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
-
+        let db_url = env::get("POSTGRES_URL")?;
         PgConnection::establish(&db_url).map_err(Into::into)
     }
 

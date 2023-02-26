@@ -1,3 +1,11 @@
 [workspace]
 
-members = ["alx", "alx_clients", "alx_core", "logger", "server", "storage"]
+members = [
+  "alx",
+  "alx_clients",
+  "alx_core",
+  "alx_derive",
+  "logger",
+  "server",
+  "storage",
+]

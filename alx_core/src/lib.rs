@@ -1,5 +1,6 @@
 pub mod cache;
 pub mod crypto;
+pub mod db;
 pub mod web;
 
 pub use alx_clients as clients;

@@ -33,8 +33,8 @@ impl AuthenticationGuard<Repository<PgSessionAdapter>, Cache> {
 
 impl<R, C> AuthGuardContract for AuthenticationGuard<R, C>
 where
-    R: RepoContract + Send + Sync,
-    C: CacheContract + Send + Sync,
+    R: RepoContract,
+    C: CacheContract,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.

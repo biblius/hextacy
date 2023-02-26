@@ -6,142 +6,78 @@ use crate::config::constants::{
 };
 use crate::error::Error;
 use alx_core::cache::{CacheAccess, CacheError};
-use alx_core::clients::db::postgres::{PgPoolConnection, Postgres};
-use alx_core::clients::db::redis::{Commands, Redis, RedisPoolConnection};
+use alx_core::clients::db::{
+    postgres::PgPoolConnection,
+    redis::{Commands, Redis, RedisPoolConnection},
+    DBConnect,
+};
 use alx_core::clients::email;
 use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
+use alx_core::db::AtomicRepoAccess;
+use alx_core::{atomic, pg_atomic};
 use chrono::Utc;
-use diesel::connection::{AnsiTransactionManager, TransactionManager};
-use std::cell::RefCell;
+use diesel::connection::TransactionManager;
 use std::sync::Arc;
-use storage::adapters::AdapterError;
 use storage::models::oauth::OAuthMeta;
 use storage::models::session;
 use storage::models::user;
 use storage::repository::oauth::OAuthRepository;
 use storage::repository::session::SessionRepository;
 use storage::repository::user::UserRepository;
-use storage::{atomic, Atomic, AtomicConn, AtomicRepoAccess};
 use tracing::debug;
 
-pub(super) struct Repository<User, Session, OAuth, Conn>
-where
-    User: UserRepository<Conn>,
-    Session: SessionRepository<Conn>,
-    OAuth: OAuthRepository<Conn>,
-{
-    pub client: Arc<Postgres>,
-    pub trx: Option<RefCell<Conn>>,
-    pub _user: User,
-    pub _session: Session,
-    pub _oauth: OAuth,
+pg_atomic! {
+    User => UserRepository<C>,
+    Session => SessionRepository<C>,
+    OAuth => OAuthRepository<C>
 }
 
-impl<User, Session, OAuth> AtomicRepoAccess<PgPoolConnection>
-    for Repository<User, Session, OAuth, PgPoolConnection>
+impl<A, C, User, Session, OAuth> RepoContract for Repository<A, C, User, Session, OAuth>
 where
-    User: UserRepository<PgPoolConnection>,
-    Session: SessionRepository<PgPoolConnection>,
-    OAuth: OAuthRepository<PgPoolConnection>,
+    Self: AtomicRepoAccess<C>,
+    A: DBConnect<Connection = C>,
+    User: UserRepository<C>,
+    Session: SessionRepository<C>,
+    OAuth: OAuthRepository<C>,
 {
-    fn connect<'a>(&'a self) -> Result<AtomicConn<PgPoolConnection>, AdapterError> {
-        match self.trx {
-            Some(ref trx) => Ok(AtomicConn::Existing(trx.borrow_mut())),
-            None => Ok(AtomicConn::New(self.client.connect()?)),
-        }
-    }
-}
-
-impl<User, Session, OAuth> Atomic for Repository<User, Session, OAuth, PgPoolConnection>
-where
-    User: UserRepository<PgPoolConnection>,
-    Session: SessionRepository<PgPoolConnection>,
-    OAuth: OAuthRepository<PgPoolConnection>,
-{
-    fn start_transaction(&mut self) -> Result<(), AdapterError> {
-        match self.trx {
-            Some(_) => {
-                Err(AdapterError::Atomic("Transaction already in progress".to_string()).into())
-            }
-            None => {
-                let mut conn = self.client.connect()?;
-                AnsiTransactionManager::begin_transaction(&mut *conn)?;
-                self.trx = Some(RefCell::new(conn));
-                Ok(())
-            }
-        }
-    }
-
-    fn rollback_transaction(&mut self) -> Result<(), AdapterError> {
-        todo!()
-    }
-
-    fn commit_transaction(&mut self) -> Result<(), AdapterError> {
-        todo!()
-    }
-}
-
-impl<User, Session, OAuth, Conn> RepoContract for Repository<User, Session, OAuth, Conn>
-where
-    Self: AtomicRepoAccess<Conn>,
-    User: UserRepository<Conn>,
-    Session: SessionRepository<Conn>,
-    OAuth: OAuthRepository<Conn>,
-{
-    fn get_user_by_id(&self, id: &str) -> Result<storage::models::user::User, Error> {
+    fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic! {User::get_by_id, conn, id}
+        atomic! {User::get_by_id, conn, id}.map_err(Error::new)
     }
 
-    fn get_user_by_email(&self, email: &str) -> Result<storage::models::user::User, Error> {
+    fn get_user_by_email(&self, email: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic! {User::get_by_email, conn, email}
+        atomic! {User::get_by_email, conn, email}.map_err(Error::new)
     }
 
-    fn create_user(
-        &self,
-        email: &str,
-        username: &str,
-        pw: &str,
-    ) -> Result<storage::models::user::User, Error> {
+    fn create_user(&self, email: &str, username: &str, pw: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::create, conn, email, username, pw)
+        atomic!(User::create, conn, email, username, pw).map_err(Error::new)
     }
 
-    fn update_user_email_verification(
-        &self,
-        id: &str,
-    ) -> Result<storage::models::user::User, Error> {
+    fn update_user_email_verification(&self, id: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::update_email_verified_at, conn, id)
+        atomic!(User::update_email_verified_at, conn, id).map_err(Error::new)
     }
 
-    fn update_user_otp_secret(
-        &self,
-        id: &str,
-        secret: &str,
-    ) -> Result<storage::models::user::User, Error> {
+    fn update_user_otp_secret(&self, id: &str, secret: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::update_otp_secret, conn, id, secret)
+        atomic!(User::update_otp_secret, conn, id, secret).map_err(Error::new)
     }
 
-    fn update_user_password(
-        &self,
-        id: &str,
-        hashed_pw: &str,
-    ) -> Result<storage::models::user::User, Error> {
+    fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::update_password, conn, id, hashed_pw)
+        atomic!(User::update_password, conn, id, hashed_pw).map_err(Error::new)
     }
 
-    fn freeze_user(&self, id: &str) -> Result<storage::models::user::User, Error> {
+    fn freeze_user(&self, id: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::freeze, conn, id)
+        atomic!(User::freeze, conn, id).map_err(Error::new)
     }
 
     fn create_session<'a>(
         &self,
-        user: &storage::models::user::User,
+        user: &user::User,
         csrf: &str,
         expires: Option<i64>,
         access_token: Option<&'a str>,
@@ -157,11 +93,12 @@ where
             access_token,
             provider
         )
+        .map_err(Error::new)
     }
 
     fn expire_session(&self, id: &str) -> Result<session::Session, Error> {
         let conn = self.connect()?;
-        atomic!(Session::expire, conn, id)
+        atomic!(Session::expire, conn, id).map_err(Error::new)
     }
 
     fn purge_sessions<'a>(
@@ -170,7 +107,7 @@ where
         skip: Option<&'a str>,
     ) -> Result<Vec<session::Session>, Error> {
         let conn = self.connect()?;
-        atomic!(Session::purge, conn, user_id, skip)
+        atomic!(Session::purge, conn, user_id, skip).map_err(Error::new)
     }
 
     fn update_session_access_tokens(
@@ -187,6 +124,7 @@ where
             user_id,
             provider
         )
+        .map_err(Error::new)
     }
 
     fn create_user_from_oauth(
@@ -205,6 +143,7 @@ where
             username,
             provider
         )
+        .map_err(Error::new)
     }
 
     fn update_user_provider_id(
@@ -214,12 +153,12 @@ where
         provider: OAuthProvider,
     ) -> Result<user::User, Error> {
         let conn = self.connect()?;
-        atomic!(User::update_oauth_id, conn, user_id, account_id, provider)
+        atomic!(User::update_oauth_id, conn, user_id, account_id, provider).map_err(Error::new)
     }
 
     fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error> {
         let conn = self.connect()?;
-        atomic!(OAuth::get_by_account_id, conn, account_id)
+        atomic!(OAuth::get_by_account_id, conn, account_id).map_err(Error::new)
     }
 
     fn create_oauth<T>(
@@ -233,7 +172,7 @@ where
         T: TokenResponse + 'static,
     {
         let conn = self.connect()?;
-        atomic!(OAuth::create, conn, user_id, account_id, tokens, provider)
+        atomic!(OAuth::create, conn, user_id, account_id, tokens, provider).map_err(Error::new)
     }
 
     fn update_oauth<T>(
@@ -246,7 +185,7 @@ where
         T: TokenResponse + 'static,
     {
         let conn = self.connect()?;
-        atomic!(OAuth::update, conn, user_id, tokens, provider)
+        atomic!(OAuth::update, conn, user_id, tokens, provider).map_err(Error::new)
     }
 }
 
@@ -267,7 +206,7 @@ impl CacheAccess for Cache {
 impl CacheContract for Cache {
     /// Sessions get cached behind the user's csrf token.
     fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
-        debug!("Caching session with ID {}", session.id);
+        debug!("Caching session with ID {session_id}");
         self.set_json(
             AuthCache::Session,
             session_id,
@@ -324,7 +263,7 @@ impl CacheContract for Cache {
     }
 
     /// Cache the OTP throttle and attempts. The throttle always gets set to now and the attempts always get
-    /// incremented. The domain takes care of the actual throttling.
+    /// incremented. The domain should take care of the actual throttling.
     fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
         debug!("Throttling OTP attempts for: {user_id}");
 

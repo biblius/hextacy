@@ -200,6 +200,7 @@ where
             return Err(AuthenticationError::EmailTaken.into());
         }
 
+        // TODO: handle existing oauth accounts on reg
         /* if let Ok(user) = self.repo.user.get_by_email(email) {
 
             // if user.password.is_none()

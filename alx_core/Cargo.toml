@@ -62,3 +62,4 @@ syn = { version = "1.0.107", features = ["full"] }
 thiserror = "1.0.37"
 tokio = "1.24.2"
 utils = { version = "0.1.0", path = "../utils" }
+diesel = "2.0.3"

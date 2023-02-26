@@ -11,6 +11,8 @@ use actix_web::HttpResponse;
 use alx_core::{
     clients::oauth::{OAuth, OAuthAccount, TokenResponse},
     crypto::uuid,
+    db::Atomic,
+    transaction,
     web::http::{
         cookie,
         response::{MessageResponse, Response},
@@ -42,8 +44,8 @@ where
 impl<P, R, C> ServiceContract for OAuthService<P, R, C>
 where
     P: OAuth + Send + Sync,
-    R: RepoContract,
-    C: CacheContract + Send + Sync,
+    R: RepoContract + Atomic,
+    C: CacheContract,
 {
     async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error> {
         let OAuthCodeExchange { ref code } = code;
@@ -57,10 +59,8 @@ where
             None => return Err(AuthenticationError::EmailUnverified.into()),
         };
 
-        // let mut trx = self.repo.transaction()?;
-
-        let user =
-            match self.repo.get_user_by_email(&email) {
+        let user: Result<User, Error> = transaction!(self, {
+            let user = match self.repo.get_user_by_email(&email) {
                 Ok(user) => self
                     .repo
                     .update_user_provider_id(&user.id, &account.id(), provider)?,
@@ -68,50 +68,46 @@ where
                     .repo
                     .create_user_from_oauth(&account.id(), &email, account.username(), provider)?,
                 Err(e) => {
-                    //trx.rollback()?;
                     return Err(e.into());
                 }
             };
 
-        let existing_oauth = match self.repo.get_oauth_by_account_id(&account.id()) {
-            Ok(oauth) => oauth,
-            Err(e) => match e {
-                // If the entry does not exist, we must create one for the user
-                Error::Adapter(AdapterError::DoesNotExist) => {
-                    info!("OAuth entry does not exist, creating");
-                    self.repo
-                        .create_oauth(&user.id, &account.id(), &tokens, provider)?
-                }
-                e => {
-                    //trx.rollback()?;
-                    return Err(e.into());
-                }
-            },
-        };
+            let existing_oauth = match self.repo.get_oauth_by_account_id(&account.id()) {
+                Ok(oauth) => oauth,
+                Err(e) => match e {
+                    // If the entry does not exist, we must create one for the user
+                    Error::Adapter(AdapterError::DoesNotExist) => {
+                        info!("OAuth entry does not exist, creating");
+                        self.repo
+                            .create_oauth(&user.id, &account.id(), &tokens, provider)?
+                    }
+                    e => {
+                        return Err(e.into());
+                    }
+                },
+            };
 
-        if existing_oauth.expired() {
-            // If refresh token exists, refresh and update
-            if let Some(ref refresh_token) = existing_oauth.refresh_token {
-                info!("OAuth access token expired, refreshing");
-                tokens = self.provider.refresh_access_token(refresh_token).await?;
+            if existing_oauth.expired() {
+                // If refresh token exists, refresh and update
+                if let Some(ref refresh_token) = existing_oauth.refresh_token {
+                    info!("OAuth access token expired, refreshing");
+                    tokens = self.provider.refresh_access_token(refresh_token).await?;
 
-                self.repo.update_oauth(&user.id, &tokens, provider)?;
-                self.repo.update_session_access_tokens(
-                    tokens.access_token(),
-                    &user.id,
-                    provider,
-                )?;
-            // Otherwise just update the existing entry
-            } else {
-                self.repo.update_oauth(&user.id, &tokens, provider)?;
+                    self.repo.update_oauth(&user.id, &tokens, provider)?;
+                    self.repo.update_session_access_tokens(
+                        tokens.access_token(),
+                        &user.id,
+                        provider,
+                    )?;
+                // Otherwise just update the existing entry
+                } else {
+                    self.repo.update_oauth(&user.id, &tokens, provider)?;
+                }
             }
-        }
+            Ok(user)
+        });
 
-        // trx.commit()?;
-
-        Ok(MessageResponse::new("l")
-            .to_response(StatusCode::OK)
-            .finish())
+        self.establish_session(tokens, user?)
     }
 
     fn register<TR, A>(&self, tokens: TR, account: A) -> Result<HttpResponse, Error>
@@ -122,8 +118,7 @@ where
         let provider = self.provider.provider_id();
 
         info!(
-            "Registering new OAuth entry with provider {} and id {}",
-            provider,
+            "Registering new OAuth entry with provider {provider} and id {}",
             &account.id()
         );
 

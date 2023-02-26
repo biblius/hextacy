@@ -8,17 +8,14 @@ use utils::env;
 // Generate an HMAC token with the given environment secret and the provided buffer.
 ///
 /// The token is encoded to the provided encoding.
-///
-/// #### Panics if the provided `env_key` is not set in the .env file.
 pub fn generate_hmac(
     env_key: &str,
     nonce: &str,
     encoding: Encoding,
 ) -> Result<String, CryptoError> {
-    debug!("Generating HMAC with key {}", env_key);
+    debug!("Generating HMAC with key {env_key}");
 
-    let hmac_secret =
-        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{env_key}'"));
+    let hmac_secret = env::get(env_key)?;
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
 
@@ -34,9 +31,8 @@ pub fn verify_hmac(
     hmac: &str,
     encoding: Encoding,
 ) -> Result<bool, CryptoError> {
-    debug!("Verifying HMAC with key {}", env_key);
-    let hmac_secret =
-        env::get(env_key).unwrap_or_else(|_| panic!("No value found for key '{env_key}'"));
+    debug!("Verifying HMAC with key {env_key}");
+    let hmac_secret = env::get(env_key)?;
 
     let mut mac = hmac::Hmac::<Sha256>::new_from_slice(hmac_secret.as_bytes())?;
     hmac::Mac::update(&mut mac, nonce.as_bytes());

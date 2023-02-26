@@ -2,7 +2,7 @@ use crate::api::{
     middleware::auth::interceptor::AuthGuard,
     router::auth::{
         adapter::{Cache, Repository},
-        o_auth::{domain::OAuthService, handler},
+        o_auth::{handler, service::OAuthService},
     },
 };
 use actix_web::web::{self, Data};
@@ -13,7 +13,7 @@ use alx_core::clients::{
     },
     oauth::github::GithubOAuth,
 };
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 use storage::{
     adapters::postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter},
     models::role::Role,
@@ -22,13 +22,13 @@ use storage::{
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         provider: GithubOAuth,
-        repo: Repository {
-            client: pg.clone(),
-            trx: Option::<RefCell<PgPoolConnection>>::None,
-            _user: PgUserAdapter,
-            _session: PgSessionAdapter,
-            _oauth: PgOAuthAdapter,
-        },
+        repo: Repository::<
+            Postgres,
+            PgPoolConnection,
+            PgUserAdapter,
+            PgSessionAdapter,
+            PgOAuthAdapter,
+        >::new(pg.clone()),
         cache: Cache { client: rd.clone() },
     };
 
@@ -40,7 +40,13 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
         web::resource("/auth/oauth/github/login").route(web::post().to(handler::login::<
             OAuthService<
                 GithubOAuth,
-                Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                Repository<
+                    Postgres,
+                    PgPoolConnection,
+                    PgUserAdapter,
+                    PgSessionAdapter,
+                    PgOAuthAdapter,
+                >,
                 Cache,
             >,
         >)),
@@ -51,7 +57,13 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
             .route(web::put().to(handler::request_scopes::<
                 OAuthService<
                     GithubOAuth,
-                    Repository<PgUserAdapter, PgSessionAdapter, PgOAuthAdapter, PgPoolConnection>,
+                    Repository<
+                        Postgres,
+                        PgPoolConnection,
+                        PgUserAdapter,
+                        PgSessionAdapter,
+                        PgOAuthAdapter,
+                    >,
                     Cache,
                 >,
             >))

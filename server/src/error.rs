@@ -12,6 +12,8 @@ pub(crate) enum Error {
     Authentication(#[from] AuthenticationError),
     #[error("Client Error: {0}")]
     Client(#[from] alx_core::clients::ClientError),
+    #[error("Database Error: {0}")]
+    Database(#[from] alx_core::db::DatabaseError),
     #[error("Cache Error: {0}")]
     Cache(#[from] alx_core::cache::CacheError),
     #[error("Adapter Error: {0}")]

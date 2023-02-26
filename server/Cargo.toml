@@ -5,6 +5,7 @@ version = "0.1.0"
 
 [dependencies]
 alx_core = { path = "../alx_core" }
+alx_derive = { path = "../alx_derive" }
 
 # Date and time
 

@@ -1,5 +1,5 @@
 use super::adapter::Repository;
-use super::{domain::UserService, handler};
+use super::{handler, service::UserService};
 use crate::api::middleware::auth::interceptor;
 use actix_web::web::{self, Data};
 use alx_core::clients::db::postgres::PgPoolConnection;
@@ -10,7 +10,7 @@ use storage::models::role::Role;
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repo: Repository::<PgUserAdapter, PgPoolConnection>::new(pg.clone()),
+        repo: Repository::<Postgres, PgPoolConnection, PgUserAdapter>::new(pg.clone()),
     };
     let auth_guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 
@@ -20,7 +20,7 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
     cfg.service(
         web::resource("/users")
             .route(web::get().to(handler::get_paginated::<
-                UserService<Repository<PgUserAdapter, PgPoolConnection>>,
+                UserService<Repository<Postgres, PgPoolConnection, PgUserAdapter>>,
             >))
             .wrap(auth_guard),
     );

@@ -1,7 +1,7 @@
 pub(super) mod contract;
 pub(super) mod data;
-pub(super) mod domain;
 pub(super) mod handler;
+pub(super) mod service;
 pub(crate) mod setup;
 
 #[cfg(test)]
@@ -14,7 +14,7 @@ mod tests {
             ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Otp,
             RegistrationData, ResendRegToken, ResetPassword,
         },
-        domain::Authentication,
+        service::Authentication,
     };
     use crate::{
         api::router::auth::{
