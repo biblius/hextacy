@@ -1,3 +1,0 @@
-TOKKKKKKK Some(Ident { sym: C, span: #0 bytes(13714..13715) })
-TOKKKKKKK Some(Group { delimiter: None, stream: TokenStream [Ident { ident: "C", span: #0 bytes(102924..102925) }], span: #3217 bytes(1768259..1768264) })
-HELLOP "C"

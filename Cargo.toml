@@ -5,7 +5,7 @@ members = [
   "alx_clients",
   "alx_core",
   "alx_derive",
-  "logger",
+  "alx_logger",
   "server",
   "storage",
 ]

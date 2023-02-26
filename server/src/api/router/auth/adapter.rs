@@ -14,7 +14,7 @@ use alx_core::clients::db::{
 use alx_core::clients::email;
 use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
 use alx_core::db::AtomicRepoAccess;
-use alx_core::{atomic, pg_atomic};
+use alx_core::{atomic, contract, pg_atomic};
 use chrono::Utc;
 use diesel::connection::TransactionManager;
 use std::sync::Arc;
@@ -32,14 +32,14 @@ pg_atomic! {
     OAuth => OAuthRepository<C>
 }
 
-impl<A, C, User, Session, OAuth> RepoContract for Repository<A, C, User, Session, OAuth>
-where
-    Self: AtomicRepoAccess<C>,
-    A: DBConnect<Connection = C>,
-    User: UserRepository<C>,
-    Session: SessionRepository<C>,
-    OAuth: OAuthRepository<C>,
-{
+contract! {
+    RepoContract => Repository,
+    AtomicRepoAccess,
+
+    User => UserRepository<C>,
+    Session => SessionRepository<C>,
+    OAuth => OAuthRepository<C>;
+
     fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let conn = self.connect()?;
         atomic! {User::get_by_id, conn, id}.map_err(Error::new)

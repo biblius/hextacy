@@ -12,7 +12,7 @@ use tracing::info;
 async fn main() -> std::io::Result<()> {
     env::load_from_file("./.env").unwrap();
 
-    logger::init("debug");
+    alx_logger::init("debug");
     // logger::init_file("debug", "server.log");
 
     // Init all the lazy loaded static stuff

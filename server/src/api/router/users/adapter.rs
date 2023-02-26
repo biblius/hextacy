@@ -2,20 +2,23 @@ use super::contract::RepositoryContract;
 use crate::error::Error;
 use alx_core::clients::db::{postgres::PgPoolConnection, DBConnect};
 use alx_core::db::RepoAccess;
-use alx_core::pg_repo;
+use alx_core::{contract, pg_repo};
 use storage::models::user;
 use storage::repository::user::UserRepository;
 
 pg_repo! {
-    User => UserRepository<C>
+    Repository,
+
+    Conn => "Conn",
+
+    User => UserRepository<Conn>
 }
 
-impl<A, C, User> RepositoryContract for Repository<A, C, User>
-where
-    Self: RepoAccess<C>,
-    User: UserRepository<C>,
-    A: DBConnect<Connection = C>,
-{
+contract! {
+    RepositoryContract => Repository,
+    RepoAccess,
+    User => UserRepository<C>;
+
     fn get_paginated(
         &self,
         page: u16,
