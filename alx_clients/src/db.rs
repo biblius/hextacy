@@ -8,7 +8,13 @@ pub mod postgres;
 #[cfg(feature = "redis")]
 pub mod redis;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+/// A struct that contains a generic client `A` that through [DBConnect] establishes a database connection `C`.
+/// Serves as a wrapper around connections so they can stay generic while building repositories.
+///
+/// Each repository must have a client to use for establishing connections. One may implement this manually or
+/// use the macros provided in `alx_derive` for quick implementations. The derive macros generate this struct
+/// internally.
 pub struct Client<A, C>
 where
     A: DBConnect<Connection = C>,
@@ -25,7 +31,8 @@ where
     }
 }
 
-/// Trait used by clients for establishing database connections.
+/// Trait used by clients for establishing database connections. The [Client] implements this and delegates
+/// the `connect` method to any concrete type that gets instantiated in it.
 pub trait DBConnect {
     type Connection;
     fn connect(&self) -> Result<Self::Connection, ClientError>;

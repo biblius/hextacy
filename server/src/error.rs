@@ -146,8 +146,6 @@ pub(crate) enum AuthenticationError {
     AccountFrozen,
     #[error("Email taken")]
     EmailTaken,
-    #[error("Already verified")]
-    AlreadyVerified,
     #[error("Unverified email")]
     EmailUnverified,
     #[error("Authentication blocked")]
@@ -167,7 +165,6 @@ impl AuthenticationError {
             AccountFrozen => StatusCode::UNAUTHORIZED,
             EmailTaken => StatusCode::CONFLICT,
             EmailUnverified => StatusCode::UNAUTHORIZED,
-            AlreadyVerified => StatusCode::CONFLICT,
             AuthBlocked => StatusCode::UNAUTHORIZED,
         }
     }
@@ -191,9 +188,6 @@ impl AuthenticationError {
             }
             AuthenticationError::AuthBlocked => {
                 ("BLOCKED", "Authentication currently blocked".to_string())
-            }
-            AuthenticationError::AlreadyVerified => {
-                ("VERIFIED", "Account already verified".to_string())
             }
             AuthenticationError::InsufficientRights => {
                 ("FORBIDDEN", "Insufficient rights".to_string())

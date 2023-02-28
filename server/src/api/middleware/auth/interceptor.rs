@@ -1,6 +1,6 @@
 use super::adapter::{Cache, Repository};
 use super::contract::{AuthGuardContract, CacheContract, RepoContract};
-use super::domain::AuthenticationGuard;
+use super::service::AuthenticationGuard;
 use crate::error::{AuthenticationError, Error};
 /* use ::alx_core::clients::postgres::Postgres;
 use ::alx_core::clients::redis::Redis; */

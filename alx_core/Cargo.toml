@@ -21,7 +21,6 @@ alx_clients = { version = "0.1.0", path = "../alx_clients", features = [
   "postgres",
   "redis",
 ] }
-alx_logger = {path = "../alx_logger"}
 
 chrono = { version = "0.4", features = ["serde"] }
 serde = { version = "1.0.137", features = ["derive"] }
@@ -58,6 +57,7 @@ uuid = { version = "1.1.2", features = ["v4"] }
 
 async-trait = "0.1.42"
 colored = "2.0.0"
+diesel = "2.0.3"
 lazy_static = "1.4.0"
 mockall = "0.11.3"
 reqwest = { version = "0.11.14", features = ["json"] }
@@ -65,4 +65,7 @@ syn = { version = "1.0.107", features = ["full"] }
 thiserror = "1.0.37"
 tokio = "1.24.2"
 utils = { version = "0.1.0", path = "../utils" }
-diesel = "2.0.3"
+
+# Logger
+env_logger = "0.10.0"
+log4rs = "1.2.0"

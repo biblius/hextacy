@@ -26,9 +26,9 @@
 macro_rules! pg_repo {
     ($($id:ident => $bound:path),*) => {
         #[allow(non_snake_case)]
-        #[derive(Debug, alx_derive::PgRepo)]
+        #[derive(Debug, Clone, alx_derive::PgRepo)]
         #[connection = "C"]
-        pub(super) struct Repository<A, C, $($id),*>
+        pub struct Repository<A, C, $($id),*>
         where
             A: alx_core::clients::db::DBConnect<Connection = C>,
             $($id: $bound),*
@@ -53,7 +53,7 @@ macro_rules! pg_repo {
 
     ($($name:ident)?, $($id:ident => $bound:path),*) => {
         #[allow(non_snake_case)]
-        #[derive(Debug, alx_derive::PgRepo)]
+        #[derive(Debug, Clone, alx_derive::PgRepo)]
         #[connection = "C"]
         pub(super) struct $($name)?<A, C, $($id),*>
         where
@@ -80,7 +80,7 @@ macro_rules! pg_repo {
 
     ($conn:ident => $conn_l:literal, $($id:ident => $bound:path),*) => {
         #[allow(non_snake_case)]
-        #[derive(Debug, alx_derive::PgRepo)]
+        #[derive(Debug, Clone, alx_derive::PgRepo)]
         #[connection = $conn_l]
         pub(super) struct Repository<A, $conn, $($id),*>
         where
@@ -107,7 +107,7 @@ macro_rules! pg_repo {
 
     ($($name:ident)?, $conn:ident => $conn_l:literal, $($id:ident => $bound:path),*) => {
         #[allow(non_snake_case)]
-        #[derive(Debug, alx_derive::PgRepo)]
+        #[derive(Debug, Clone, alx_derive::PgRepo)]
         #[connection = $conn_l]
         pub(super) struct $($name)*<A, $conn, $($id),*>
         where

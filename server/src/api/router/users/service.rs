@@ -5,7 +5,6 @@ use super::{
 use crate::error::Error;
 use actix_web::HttpResponse;
 use alx_core::web::http::response::Response;
-use async_trait::async_trait;
 use reqwest::StatusCode;
 
 pub(super) struct UserService<R>
@@ -15,7 +14,6 @@ where
     pub repo: R,
 }
 
-#[async_trait]
 impl<R> ServiceContract for UserService<R>
 where
     R: RepositoryContract,

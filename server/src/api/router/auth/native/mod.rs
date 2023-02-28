@@ -217,14 +217,7 @@ mod tests {
         let data = ResendRegToken {
             email: USER_NO_OTP.email.clone(),
         };
-        let res = service.resend_registration_token(data);
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::AlreadyVerified)
-            )),
-        }
+        service.resend_registration_token(data).unwrap();
     }
 
     #[test]
@@ -496,10 +489,7 @@ mod tests {
             email: USER_NO_OTP.email.clone(),
         };
         let _msg = String::from("User");
-        match service.forgot_password(data) {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(e, Error::Adapter(AdapterError::DoesNotExist))),
-        };
+        service.forgot_password(data).unwrap();
     }
 
     #[test]

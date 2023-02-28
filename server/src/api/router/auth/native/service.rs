@@ -38,7 +38,10 @@ use reqwest::{
     header::{self, HeaderName, HeaderValue},
     StatusCode,
 };
-use storage::models::{session::Session, user::User};
+use storage::{
+    adapters::AdapterError,
+    models::{session::Session, user::User},
+};
 use tracing::{debug, info};
 
 pub(super) struct Authentication<R, C, E> {
@@ -263,10 +266,23 @@ where
     fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
         let email = data.email.as_str();
         info!("Resending registration token to {email}");
-        let user = self.repo.get_user_by_email(email)?;
+
+        // If the user does not exist we need to prevent erroring so as to not share
+        // which emails exist in the db
+        let response = MessageResponse::new(
+            "An email will be sent with further instructions if it exists in our database.",
+        )
+        .to_response(StatusCode::OK)
+        .finish();
+
+        let user = match self.repo.get_user_by_email(email) {
+            Ok(u) => u,
+            Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response),
+            Err(e) => return Err(e),
+        };
 
         if user.email_verified_at.is_some() {
-            return Err(Error::new(AuthenticationError::AlreadyVerified));
+            return Ok(response);
         }
 
         if self.cache.get_email_throttle(&user.id).ok().is_some() {
@@ -287,11 +303,7 @@ where
 
         self.cache.set_email_throttle(&user.id)?;
 
-        Ok(
-            MessageResponse::new("Successfully sent registration token. Incoming email.")
-                .to_response(StatusCode::OK)
-                .finish(),
-        )
+        Ok(response)
     }
 
     /// Generates an OTP secret for the user and returns it in a QR code in the response. Requires a valid
@@ -409,7 +421,19 @@ where
 
         let email = data.email.as_str();
 
-        let user = self.repo.get_user_by_email(email)?;
+        // If the user does not exist we need to prevent erroring so as to not share
+        // which emails exist in the db
+        let response = MessageResponse::new(
+            "An email will be sent with further instructions if it exists in our database.",
+        )
+        .to_response(StatusCode::OK)
+        .finish();
+
+        let user = match self.repo.get_user_by_email(email) {
+            Ok(u) => u,
+            Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response),
+            Err(e) => return Err(e),
+        };
 
         // Check throttle
         if self.cache.get_email_throttle(&user.id).ok().is_some() {
@@ -431,11 +455,7 @@ where
 
         self.cache.set_email_throttle(&user.id)?;
 
-        Ok(
-            MessageResponse::new("Started forgot password routine. Incoming email.")
-                .to_response(StatusCode::OK)
-                .finish(),
-        )
+        Ok(response)
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions
