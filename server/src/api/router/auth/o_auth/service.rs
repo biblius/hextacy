@@ -1,7 +1,7 @@
 use super::{contract::ServiceContract, data::OAuthCodeExchange};
 use crate::{
     api::router::auth::{
-        contract::{CacheContract, RepoContract},
+        contract::{CacheContract, RepositoryContract},
         data::AuthenticationSuccessResponse,
     },
     config::constants::COOKIE_S_ID,
@@ -32,11 +32,11 @@ use tracing::info;
 pub(super) struct OAuthService<P, R, C>
 where
     P: OAuth,
-    R: RepoContract,
+    R: RepositoryContract,
     C: CacheContract,
 {
     pub provider: P,
-    pub repo: R,
+    pub repository: R,
     pub cache: C,
 }
 
@@ -44,7 +44,7 @@ where
 impl<P, R, C> ServiceContract for OAuthService<P, R, C>
 where
     P: OAuth + Send + Sync,
-    R: RepoContract + Atomic,
+    R: RepositoryContract + Atomic,
     C: CacheContract,
 {
     async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error> {
@@ -60,26 +60,32 @@ where
         };
 
         let user: Result<User, Error> = transaction!(self, {
-            let user = match self.repo.get_user_by_email(&email) {
-                Ok(user) => self
-                    .repo
-                    .update_user_provider_id(&user.id, &account.id(), provider)?,
-                Err(Error::Adapter(AdapterError::DoesNotExist)) => self
-                    .repo
-                    .create_user_from_oauth(&account.id(), &email, account.username(), provider)?,
+            let user = match self.repository.get_user_by_email(&email).await {
+                Ok(user) => {
+                    self.repository
+                        .update_user_provider_id(&user.id, &account.id(), provider)
+                        .await?
+                }
+                Err(Error::Adapter(AdapterError::DoesNotExist)) => {
+                    self.repository
+                        .create_user_from_oauth(&account.id(), &email, account.username(), provider)
+                        .await?
+                }
                 Err(e) => {
                     return Err(e.into());
                 }
             };
 
-            let existing_oauth = match self.repo.get_oauth_by_account_id(&account.id()) {
+            let existing_oauth = match self.repository.get_oauth_by_account_id(&account.id()).await
+            {
                 Ok(oauth) => oauth,
                 Err(e) => match e {
                     // If the entry does not exist, we must create one for the user
                     Error::Adapter(AdapterError::DoesNotExist) => {
                         info!("OAuth entry does not exist, creating");
-                        self.repo
-                            .create_oauth(&user.id, &account.id(), &tokens, provider)?
+                        self.repository
+                            .create_oauth(&user.id, &account.id(), &tokens, provider)
+                            .await?
                     }
                     e => {
                         return Err(e.into());
@@ -93,24 +99,26 @@ where
                     info!("OAuth access token expired, refreshing");
                     tokens = self.provider.refresh_access_token(refresh_token).await?;
 
-                    self.repo.update_oauth(&user.id, &tokens, provider)?;
-                    self.repo.update_session_access_tokens(
-                        tokens.access_token(),
-                        &user.id,
-                        provider,
-                    )?;
+                    self.repository
+                        .update_oauth(&user.id, &tokens, provider)
+                        .await?;
+                    self.repository
+                        .update_session_access_tokens(tokens.access_token(), &user.id, provider)
+                        .await?;
                 // Otherwise just update the existing entry
                 } else {
-                    self.repo.update_oauth(&user.id, &tokens, provider)?;
+                    self.repository
+                        .update_oauth(&user.id, &tokens, provider)
+                        .await?;
                 }
             }
             Ok(user)
         });
 
-        self.establish_session(tokens, user?)
+        self.establish_session(tokens, user?).await
     }
 
-    fn register<TR, A>(&self, tokens: TR, account: A) -> Result<HttpResponse, Error>
+    async fn register<TR, A>(&self, tokens: TR, account: A) -> Result<HttpResponse, Error>
     where
         TR: TokenResponse + 'static,
         A: OAuthAccount + 'static,
@@ -129,21 +137,25 @@ where
 
         // Check if the user already exists under a different provider and update their entry if they do,
         // otherwise create
-        let user =
-            match self.repo.get_user_by_email(email) {
-                Ok(user) => self
-                    .repo
-                    .update_user_provider_id(&user.id, &account.id(), provider)?,
-                Err(Error::Adapter(AdapterError::DoesNotExist)) => self
-                    .repo
-                    .create_user_from_oauth(&account.id(), email, account.username(), provider)?,
-                Err(e) => return Err(e.into()),
-            };
+        let user = match self.repository.get_user_by_email(email).await {
+            Ok(user) => {
+                self.repository
+                    .update_user_provider_id(&user.id, &account.id(), provider)
+                    .await?
+            }
+            Err(Error::Adapter(AdapterError::DoesNotExist)) => {
+                self.repository
+                    .create_user_from_oauth(&account.id(), email, account.username(), provider)
+                    .await?
+            }
+            Err(e) => return Err(e.into()),
+        };
 
-        self.repo
-            .create_oauth(&user.id, &account.id(), &tokens, provider)?;
+        self.repository
+            .create_oauth(&user.id, &account.id(), &tokens, provider)
+            .await?;
 
-        self.establish_session(tokens, user)
+        self.establish_session(tokens, user).await
     }
 
     async fn request_additional_scopes(
@@ -165,9 +177,12 @@ where
 
         // Update existing sessions tied to the user and their auth provider
         // as well as the related oauth metadata
-        self.repo
-            .update_session_access_tokens(access_token, user_id, provider)?;
-        self.repo.update_oauth(user_id, &tokens, provider)?;
+        self.repository
+            .update_session_access_tokens(access_token, user_id, provider)
+            .await?;
+        self.repository
+            .update_oauth(user_id, &tokens, provider)
+            .await?;
 
         // Update the existing session, sessions updated in the previous step will not update
         // cached sessions so we have to cache the current one to reflect the change
@@ -180,7 +195,7 @@ where
             .finish())
     }
 
-    fn establish_session<TR: TokenResponse>(
+    async fn establish_session<TR: TokenResponse>(
         &self,
         tokens: TR,
         user: User,
@@ -190,13 +205,16 @@ where
         let expiration = tokens.expires_in();
         let access_token = tokens.access_token();
 
-        let session = self.repo.create_session(
-            &user,
-            &csrf_token,
-            expiration,
-            Some(access_token),
-            Some(self.provider.provider_id()),
-        )?;
+        let session = self
+            .repository
+            .create_session(
+                &user,
+                &csrf_token,
+                expiration,
+                Some(access_token),
+                Some(self.provider.provider_id()),
+            )
+            .await?;
 
         let session_cookie = cookie::create(COOKIE_S_ID, &session.id, false)?;
 

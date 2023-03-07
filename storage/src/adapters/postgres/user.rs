@@ -1,44 +1,21 @@
-use super::schema::users;
+use crate::adapters::postgres::schema::users;
+use crate::models::role::Role;
 use crate::{
     adapters::AdapterError,
     models::user::{SortOptions, User},
     repository::user::UserRepository,
 };
 use alx_clients::{db::postgres::PgPoolConnection, oauth::OAuthProvider};
+use async_trait::async_trait;
 use diesel::{AsChangeset, ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Deserialize, Serialize, Insertable)]
-#[diesel(table_name = users)]
-struct NewUser<'a> {
-    email: &'a str,
-    username: &'a str,
-    password: Option<&'a str>,
-    google_id: Option<&'a str>,
-    github_id: Option<&'a str>,
-}
-
-#[derive(Debug, Deserialize, Serialize, AsChangeset)]
-#[diesel(table_name = users)]
-pub struct UserUpdate<'a> {
-    google_id: Option<&'a str>,
-    github_id: Option<&'a str>,
-}
-
-impl<'a> NewUser<'a> {
-    fn set_provider_id(&mut self, id: &'a str, provider: OAuthProvider) {
-        match provider {
-            OAuthProvider::Google => self.google_id = Some(id),
-            OAuthProvider::Github => self.github_id = Some(id),
-        }
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct PgUserAdapter;
 
+#[async_trait]
 impl UserRepository<PgPoolConnection> for PgUserAdapter {
-    fn create(
+    async fn create(
         conn: &mut PgPoolConnection,
         email: &str,
         username: &str,
@@ -60,7 +37,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
             .map_err(|e| e.into())
     }
 
-    fn create_from_oauth(
+    async fn create_from_oauth(
         conn: &mut PgPoolConnection,
         account_id: &str,
         email: &str,
@@ -86,7 +63,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Fetches a user by their ID
-    fn get_by_id(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn get_by_id(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(id.eq(user_id))
@@ -94,7 +71,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
             .map_err(|e| e.into())
     }
 
-    fn get_by_oauth_id(
+    async fn get_by_oauth_id(
         conn: &mut PgPoolConnection,
         oauth_id: &str,
         provider: OAuthProvider,
@@ -116,7 +93,10 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Fetches a user by their email
-    fn get_by_email(conn: &mut PgPoolConnection, user_email: &str) -> Result<User, AdapterError> {
+    async fn get_by_email(
+        conn: &mut PgPoolConnection,
+        user_email: &str,
+    ) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(email.eq(user_email))
@@ -125,7 +105,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
-    fn update_password(
+    async fn update_password(
         conn: &mut PgPoolConnection,
         user_id: &str,
         pw_hash: &str,
@@ -139,7 +119,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Updates the user's OTP secret to the given key
-    fn update_otp_secret(
+    async fn update_otp_secret(
         conn: &mut PgPoolConnection,
         user_id: &str,
         secret: &str,
@@ -153,7 +133,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Update the user's email verified at field to now
-    fn update_email_verified_at(
+    async fn update_email_verified_at(
         conn: &mut PgPoolConnection,
         user_id: &str,
     ) -> Result<User, AdapterError> {
@@ -165,7 +145,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
             .ok_or_else(|| AdapterError::DoesNotExist)
     }
 
-    fn update_oauth_id(
+    async fn update_oauth_id(
         conn: &mut PgPoolConnection,
         id: &str,
         oauth_id: &str,
@@ -176,6 +156,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
         let mut update = UserUpdate {
             google_id: None,
             github_id: None,
+            ..Default::default()
         };
 
         match provider {
@@ -192,7 +173,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Sets the user's frozen flag to true
-    fn freeze(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn freeze(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
@@ -203,7 +184,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
     /// Returns the total count of users and a vec of users constrained by the options as
     /// the first and second element respectively
-    fn get_paginated(
+    async fn get_paginated(
         conn: &mut PgPoolConnection,
         page: u16,
         per_page: u16,
@@ -230,4 +211,38 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
         Ok(result)
     }
+}
+
+#[derive(Debug, Deserialize, Serialize, Insertable)]
+#[diesel(table_name = users)]
+struct NewUser<'a> {
+    email: &'a str,
+    username: &'a str,
+    password: Option<&'a str>,
+    google_id: Option<&'a str>,
+    github_id: Option<&'a str>,
+}
+
+impl<'a> NewUser<'a> {
+    fn set_provider_id(&mut self, id: &'a str, provider: OAuthProvider) {
+        match provider {
+            OAuthProvider::Google => self.google_id = Some(id),
+            OAuthProvider::Github => self.github_id = Some(id),
+        }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, AsChangeset)]
+#[diesel(table_name = users)]
+struct UserUpdate<'a> {
+    email: Option<&'a str>,
+    username: Option<&'a str>,
+    first_name: Option<&'a str>,
+    last_name: Option<&'a str>,
+    role: Option<&'a Role>,
+    phone: Option<&'a str>,
+    password: Option<&'a str>,
+    otp_secret: Option<&'a str>,
+    google_id: Option<&'a str>,
+    pub github_id: Option<&'a str>,
 }

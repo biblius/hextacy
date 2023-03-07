@@ -4,6 +4,7 @@ use alx_clients::{
     db::postgres::PgPoolConnection,
     oauth::{OAuthProvider, TokenResponse},
 };
+use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use std::fmt::Debug;
@@ -23,8 +24,9 @@ struct NewOAuthEntry<'a> {
 #[derive(Debug, Clone)]
 pub struct PgOAuthAdapter;
 
+#[async_trait(?Send)]
 impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
-    fn create<T>(
+    async fn create<T>(
         conn: &mut PgPoolConnection,
         user_id: &str,
         account_id: &str,
@@ -54,7 +56,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn get_by_id(conn: &mut PgPoolConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
+    async fn get_by_id(conn: &mut PgPoolConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -65,7 +67,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn get_by_account_id(
+    async fn get_by_account_id(
         conn: &mut PgPoolConnection,
         account_id: &str,
     ) -> Result<OAuthMeta, AdapterError> {
@@ -79,7 +81,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn get_by_user_id(
+    async fn get_by_user_id(
         conn: &mut PgPoolConnection,
         user_id: &str,
     ) -> Result<Vec<OAuthMeta>, AdapterError> {
@@ -93,7 +95,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn get_by_provider(
+    async fn get_by_provider(
         conn: &mut PgPoolConnection,
         user_id: &str,
         provider: OAuthProvider,
@@ -109,7 +111,10 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn revoke(conn: &mut PgPoolConnection, access_token: &str) -> Result<OAuthMeta, AdapterError> {
+    async fn revoke(
+        conn: &mut PgPoolConnection,
+        access_token: &str,
+    ) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         diesel::update(dsl::oauth)
@@ -120,7 +125,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .ok_or_else(|| AdapterError::DoesNotExist.into())
     }
 
-    fn revoke_all(
+    async fn revoke_all(
         conn: &mut PgPoolConnection,
         user_id: &str,
     ) -> Result<Vec<OAuthMeta>, AdapterError> {
@@ -133,7 +138,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    fn update<T>(
+    async fn update<T>(
         conn: &mut PgPoolConnection,
         user_id: &str,
         tokens: &T,

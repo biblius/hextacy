@@ -2,11 +2,14 @@ use super::{handler, service::Authentication};
 use crate::api::middleware::auth::interceptor;
 use crate::api::router::auth::adapter::{Cache, Email, Repository};
 use actix_web::web::{self, Data};
+use alx_core::clients::db::mongo::Mongo;
 use alx_core::clients::db::postgres::PgPoolConnection;
 use alx_core::clients::{db::postgres::Postgres, db::redis::Redis, email::Email as EmailClient};
+use mongodb::ClientSession;
 use std::sync::Arc;
+use storage::adapters::mongo::user::MgUserAdapter;
 use storage::adapters::postgres::oauth::PgOAuthAdapter;
-use storage::adapters::postgres::{session::PgSessionAdapter, user::PgUserAdapter};
+use storage::adapters::postgres::session::PgSessionAdapter;
 use storage::models::role::Role;
 
 pub(crate) fn routes(
@@ -16,13 +19,15 @@ pub(crate) fn routes(
     cfg: &mut web::ServiceConfig,
 ) {
     let service = Authentication {
-        repo: Repository::<
+        repository: Repository::<
             Postgres,
+            Mongo,
             PgPoolConnection,
-            PgUserAdapter,
+            ClientSession,
+            MgUserAdapter,
             PgSessionAdapter,
             PgOAuthAdapter,
-        >::new(pg.clone()),
+        >::new(pg.clone(), Arc::new(Mongo::new())),
         cache: Cache { client: rd.clone() },
         email: Email { client: email },
     };
@@ -35,8 +40,10 @@ pub(crate) fn routes(
             Authentication<
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -51,8 +58,10 @@ pub(crate) fn routes(
             Authentication<
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -68,8 +77,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,
@@ -86,8 +97,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,
@@ -104,8 +117,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,
@@ -121,8 +136,10 @@ pub(crate) fn routes(
             Authentication<
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -138,8 +155,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,
@@ -155,8 +174,10 @@ pub(crate) fn routes(
             Authentication<
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -172,8 +193,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,
@@ -189,8 +212,10 @@ pub(crate) fn routes(
             Authentication<
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -206,8 +231,10 @@ pub(crate) fn routes(
                 Authentication<
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,

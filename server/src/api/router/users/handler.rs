@@ -13,5 +13,5 @@ pub(super) async fn get_paginated<T: ServiceContract>(
 ) -> Result<impl Responder, Error> {
     let query = GetUsersPaginated::validify(data.0)?;
     info!("Getting users");
-    service.get_paginated(query)
+    service.get_paginated(query).await
 }

@@ -8,27 +8,34 @@ use crate::api::{
 use actix_web::web::{self, Data};
 use alx_core::clients::{
     db::{
+        mongo::Mongo,
         postgres::{PgPoolConnection, Postgres},
         redis::Redis,
     },
     oauth::github::GithubOAuth,
 };
+use mongodb::ClientSession;
 use std::sync::Arc;
 use storage::{
-    adapters::postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter},
+    adapters::{
+        mongo::user::MgUserAdapter,
+        postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter},
+    },
     models::role::Role,
 };
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         provider: GithubOAuth,
-        repo: Repository::<
+        repository: Repository::<
             Postgres,
+            Mongo,
             PgPoolConnection,
-            PgUserAdapter,
+            ClientSession,
+            MgUserAdapter,
             PgSessionAdapter,
             PgOAuthAdapter,
-        >::new(pg.clone()),
+        >::new(pg.clone(), Arc::new(Mongo::new())),
         cache: Cache { client: rd.clone() },
     };
 
@@ -42,8 +49,10 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
                 GithubOAuth,
                 Repository<
                     Postgres,
+                    Mongo,
                     PgPoolConnection,
-                    PgUserAdapter,
+                    ClientSession,
+                    MgUserAdapter,
                     PgSessionAdapter,
                     PgOAuthAdapter,
                 >,
@@ -59,8 +68,10 @@ pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceCo
                     GithubOAuth,
                     Repository<
                         Postgres,
+                        Mongo,
                         PgPoolConnection,
-                        PgUserAdapter,
+                        ClientSession,
+                        MgUserAdapter,
                         PgSessionAdapter,
                         PgOAuthAdapter,
                     >,

@@ -1,4 +1,5 @@
 use crate::ClientError;
+use async_trait::async_trait;
 use std::sync::Arc;
 
 #[cfg(feature = "mongo")]
@@ -31,20 +32,22 @@ where
     }
 }
 
+#[async_trait(?Send)]
 /// Trait used by clients for establishing database connections. The [Client] implements this and delegates
 /// the `connect` method to any concrete type that gets instantiated in it.
 pub trait DBConnect {
     type Connection;
-    fn connect(&self) -> Result<Self::Connection, ClientError>;
+    async fn connect(&self) -> Result<Self::Connection, ClientError>;
 }
 
+#[async_trait(?Send)]
 impl<A, C> DBConnect for Client<A, C>
 where
     A: DBConnect<Connection = C>,
 {
     type Connection = C;
 
-    fn connect(&self) -> Result<Self::Connection, ClientError> {
-        self.client.connect()
+    async fn connect(&self) -> Result<Self::Connection, ClientError> {
+        self.client.connect().await
     }
 }

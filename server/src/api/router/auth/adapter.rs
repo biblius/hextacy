@@ -1,4 +1,4 @@
-use super::contract::{CacheContract, EmailContract, RepoContract};
+use super::contract::{CacheContract, EmailContract, RepositoryContract};
 use crate::config::cache::AuthCache;
 use crate::config::constants::{
     EMAIL_DIRECTORY, EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, SESSION_CACHE_DURATION,
@@ -13,10 +13,11 @@ use alx_core::clients::db::{
 };
 use alx_core::clients::email;
 use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
-use alx_core::db::AtomicRepoAccess;
-use alx_core::{atomic, contract, pg_atomic};
+use alx_core::db::AcidRepositoryAccess;
+use alx_core::{acid_repo, atomic, contract};
 use chrono::Utc;
 use diesel::connection::TransactionManager;
+use mongodb::ClientSession;
 use std::sync::Arc;
 use storage::models::oauth::OAuthMeta;
 use storage::models::session;
@@ -26,56 +27,61 @@ use storage::repository::session::SessionRepository;
 use storage::repository::user::UserRepository;
 use tracing::debug;
 
-pg_atomic! {
-    User => UserRepository<C>,
-    Session => SessionRepository<C>,
-    OAuth => OAuthRepository<C>
+acid_repo! {
+    Pg => PgConnection : postgres, tx_pg,
+    Mg => MgConnection : mongo, tx_mg;
+
+    User => UserRepository<MgConnection>,
+    Session => SessionRepository<PgConnection>,
+    OAuth => OAuthRepository<PgConnection>
 }
 
 contract! {
-    RepoContract => Repository,
-    AtomicRepoAccess,
+    Pogtres => PgConnection,
+    Mongo => MgConnection;
 
-    User => UserRepository<C>,
-    Session => SessionRepository<C>,
-    OAuth => OAuthRepository<C>;
+    RepositoryContract => Repository, AcidRepositoryAccess;
 
-    fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    User => UserRepository<MgConnection>,
+    Session => SessionRepository<PgConnection>,
+    OAuth => OAuthRepository<PgConnection>;
+
+    async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic! {User::get_by_id, conn, id}.map_err(Error::new)
     }
 
-    fn get_user_by_email(&self, email: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn get_user_by_email(&self, email: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic! {User::get_by_email, conn, email}.map_err(Error::new)
     }
 
-    fn create_user(&self, email: &str, username: &str, pw: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn create_user(&self, email: &str, username: &str, pw: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic!(User::create, conn, email, username, pw).map_err(Error::new)
     }
 
-    fn update_user_email_verification(&self, id: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn update_user_email_verification(&self, id: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic!(User::update_email_verified_at, conn, id).map_err(Error::new)
     }
 
-    fn update_user_otp_secret(&self, id: &str, secret: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn update_user_otp_secret(&self, id: &str, secret: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic!(User::update_otp_secret, conn, id, secret).map_err(Error::new)
     }
 
-    fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic!(User::update_password, conn, id, hashed_pw).map_err(Error::new)
     }
 
-    fn freeze_user(&self, id: &str) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+    async fn freeze_user(&self, id: &str) -> Result<user::User, Error> {
+        let conn = self.connect().await?;
         atomic!(User::freeze, conn, id).map_err(Error::new)
     }
 
-    fn create_session<'a>(
+    async fn create_session<'a>(
         &self,
         user: &user::User,
         csrf: &str,
@@ -83,7 +89,7 @@ contract! {
         access_token: Option<&'a str>,
         provider: Option<OAuthProvider>,
     ) -> Result<session::Session, Error> {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(
             Session::create,
             conn,
@@ -96,27 +102,27 @@ contract! {
         .map_err(Error::new)
     }
 
-    fn expire_session(&self, id: &str) -> Result<session::Session, Error> {
-        let conn = self.connect()?;
+    async fn expire_session(&self, id: &str) -> Result<session::Session, Error> {
+        let conn = self.connect().await?;
         atomic!(Session::expire, conn, id).map_err(Error::new)
     }
 
-    fn purge_sessions<'a>(
+    async fn purge_sessions<'a>(
         &self,
         user_id: &str,
         skip: Option<&'a str>,
     ) -> Result<Vec<session::Session>, Error> {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(Session::purge, conn, user_id, skip).map_err(Error::new)
     }
 
-    fn update_session_access_tokens(
+    async fn update_session_access_tokens(
         &self,
         access_token: &str,
         user_id: &str,
         provider: OAuthProvider,
     ) -> Result<Vec<session::Session>, Error> {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(
             Session::update_access_tokens,
             conn,
@@ -127,14 +133,14 @@ contract! {
         .map_err(Error::new)
     }
 
-    fn create_user_from_oauth(
+    async fn create_user_from_oauth(
         &self,
         account_id: &str,
         email: &str,
         username: &str,
         provider: OAuthProvider,
     ) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(
             User::create_from_oauth,
             conn,
@@ -146,22 +152,22 @@ contract! {
         .map_err(Error::new)
     }
 
-    fn update_user_provider_id(
+    async fn update_user_provider_id(
         &self,
         user_id: &str,
         account_id: &str,
         provider: OAuthProvider,
     ) -> Result<user::User, Error> {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(User::update_oauth_id, conn, user_id, account_id, provider).map_err(Error::new)
     }
 
-    fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error> {
-        let conn = self.connect()?;
+    async fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error> {
+        let conn = self.connect().await?;
         atomic!(OAuth::get_by_account_id, conn, account_id).map_err(Error::new)
     }
 
-    fn create_oauth<T>(
+    async fn create_oauth<T>(
         &self,
         user_id: &str,
         account_id: &str,
@@ -171,11 +177,11 @@ contract! {
     where
         T: TokenResponse + 'static,
     {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(OAuth::create, conn, user_id, account_id, tokens, provider).map_err(Error::new)
     }
 
-    fn update_oauth<T>(
+    async fn update_oauth<T>(
         &self,
         user_id: &str,
         tokens: &T,
@@ -184,7 +190,7 @@ contract! {
     where
         T: TokenResponse + 'static,
     {
-        let conn = self.connect()?;
+        let conn = self.connect().await?;
         atomic!(OAuth::update, conn, user_id, tokens, provider).map_err(Error::new)
     }
 }
@@ -403,3 +409,212 @@ impl EmailContract for Email {
             .map_err(Error::new)
     }
 }
+
+/*
+#[derive(Debug, AcidRepository)]
+#[postgres(PgConn)]
+#[mongo(MgConn)]
+pub struct Repository<Pg, Mg, PgConn, MgConn, User, Session, OAuth>
+where
+    Pg: DBConnect<Connection = PgConn>,
+    Mg: DBConnect<Connection = MgConn>,
+    User: UserRepository<MgConn>,
+    Session: SessionRepository<PgConn>,
+    OAuth: OAuthRepository<PgConn>,
+{
+    postgres: Client<Pg, PgConn>,
+    mongo: Client<Mg, MgConn>,
+    tx_pg: Transaction<PgConn>,
+    tx_mg: Transaction<MgConn>,
+    user: PhantomData<User>,
+    session: PhantomData<Session>,
+    oauth: PhantomData<OAuth>,
+}
+
+impl<Pg, Mg, PgConn, MgConn, User, Session, OAuth>
+    Repository<Pg, Mg, PgConn, MgConn, User, Session, OAuth>
+where
+    Pg: DBConnect<Connection = PgConn>,
+    Mg: DBConnect<Connection = MgConn>,
+    User: UserRepository<MgConn>,
+    Session: SessionRepository<PgConn>,
+    OAuth: OAuthRepository<PgConn>,
+{
+    pub fn new(pg_client: Arc<Pg>, mg_client: Arc<Mg>) -> Self {
+        Self {
+            postgres: Client::new(pg_client),
+            mongo: Client::new(mg_client),
+            tx_pg: Transaction::new(None),
+            tx_mg: Transaction::new(None),
+            user: PhantomData,
+            session: PhantomData,
+            oauth: PhantomData,
+        }
+    }
+} */
+
+/*
+#[async_trait(?Send)]
+impl<Pg, Mg, PgConn, MgConn, User, Session, OAuth> RepositoryContract
+    for Repository<Pg, Mg, PgConn, MgConn, User, Session, OAuth>
+where
+    Self: AcidRepositoryAccess<PgConn> + AcidRepositoryAccess<MgConn>,
+    Pg: DBConnect<Connection = PgConn>,
+    Mg: DBConnect<Connection = MgConn>,
+    User: UserRepository<MgConn>,
+    Session: SessionRepository<PgConn>,
+    OAuth: OAuthRepository<PgConn>,
+{
+    async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic! {User::get_by_id, conn, id}.map_err(Error::new)
+    }
+
+    async fn get_user_by_email(&self, email: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic! {User::get_by_email, conn, email}.map_err(Error::new)
+    }
+
+    async fn create_user(
+        &self,
+        email: &str,
+        username: &str,
+        pw: &str,
+    ) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::create, conn, email, username, pw).map_err(Error::new)
+    }
+
+    async fn update_user_email_verification(&self, id: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::update_email_verified_at, conn, id).map_err(Error::new)
+    }
+
+    async fn update_user_otp_secret(&self, id: &str, secret: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::update_otp_secret, conn, id, secret).map_err(Error::new)
+    }
+
+    async fn update_user_password(&self, id: &str, hashed_pw: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::update_password, conn, id, hashed_pw).map_err(Error::new)
+    }
+
+    async fn freeze_user(&self, id: &str) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::freeze, conn, id).map_err(Error::new)
+    }
+
+    async fn create_session<'a>(
+        &self,
+        user: &user::User,
+        csrf: &str,
+        expires: Option<i64>,
+        access_token: Option<&'a str>,
+        provider: Option<OAuthProvider>,
+    ) -> Result<session::Session, Error> {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(
+            Session::create,
+            conn,
+            user,
+            csrf,
+            expires,
+            access_token,
+            provider
+        )
+        .map_err(Error::new)
+    }
+
+    async fn expire_session(&self, id: &str) -> Result<session::Session, Error> {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(Session::expire, conn, id).map_err(Error::new)
+    }
+
+    async fn purge_sessions<'a>(
+        &self,
+        user_id: &str,
+        skip: Option<&'a str>,
+    ) -> Result<Vec<session::Session>, Error> {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(Session::purge, conn, user_id, skip).map_err(Error::new)
+    }
+
+    async fn update_session_access_tokens(
+        &self,
+        access_token: &str,
+        user_id: &str,
+        provider: OAuthProvider,
+    ) -> Result<Vec<session::Session>, Error> {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(
+            Session::update_access_tokens,
+            conn,
+            access_token,
+            user_id,
+            provider
+        )
+        .map_err(Error::new)
+    }
+
+    async fn create_user_from_oauth(
+        &self,
+        account_id: &str,
+        email: &str,
+        username: &str,
+        provider: OAuthProvider,
+    ) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(
+            User::create_from_oauth,
+            conn,
+            account_id,
+            email,
+            username,
+            provider
+        )
+        .map_err(Error::new)
+    }
+
+    async fn update_user_provider_id(
+        &self,
+        user_id: &str,
+        account_id: &str,
+        provider: OAuthProvider,
+    ) -> Result<user::User, Error> {
+        let conn = <Self as AcidRepositoryAccess<MgConn>>::connect(self).await?;
+        atomic!(User::update_oauth_id, conn, user_id, account_id, provider).map_err(Error::new)
+    }
+
+    async fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error> {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(OAuth::get_by_account_id, conn, account_id).map_err(Error::new)
+    }
+
+    async fn create_oauth<T>(
+        &self,
+        user_id: &str,
+        account_id: &str,
+        tokens: &T,
+        provider: OAuthProvider,
+    ) -> Result<OAuthMeta, Error>
+    where
+        T: TokenResponse + 'static,
+    {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(OAuth::create, conn, user_id, account_id, tokens, provider).map_err(Error::new)
+    }
+
+    async fn update_oauth<T>(
+        &self,
+        user_id: &str,
+        tokens: &T,
+        provider: OAuthProvider,
+    ) -> Result<OAuthMeta, Error>
+    where
+        T: TokenResponse + 'static,
+    {
+        let conn = <Self as AcidRepositoryAccess<PgConn>>::connect(self).await?;
+        atomic!(OAuth::update, conn, user_id, tokens, provider).map_err(Error::new)
+    }
+} */

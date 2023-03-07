@@ -1,5 +1,5 @@
 use super::adapter::{Cache, Repository};
-use super::contract::{AuthGuardContract, CacheContract, RepoContract};
+use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
 use super::service::AuthenticationGuard;
 use crate::error::{AuthenticationError, Error};
 /* use ::alx_core::clients::postgres::Postgres;
@@ -34,7 +34,7 @@ impl<Serv, Repo, Cache> Transform<Serv, ServiceRequest> for AuthGuard<Repo, Cach
 where
     Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
     Serv::Future: 'static,
-    Repo: RepoContract + Send + Sync + 'static,
+    Repo: RepositoryContract + Send + Sync + 'static,
     Cache: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
@@ -60,7 +60,7 @@ impl<Serv, Repo, Cache> Service<ServiceRequest> for AuthMiddleware<Serv, Repo, C
 where
     Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
     Serv::Future: 'static,
-    Repo: RepoContract + Send + Sync + 'static,
+    Repo: RepositoryContract + Send + Sync + 'static,
     Cache: CacheContract + Send + Sync + 'static,
 {
     type Response = ServiceResponse;
@@ -80,7 +80,7 @@ where
                 |e, r: ServiceRequest| ServiceResponse::from_err(e, r.request().to_owned());
 
             // Get the csrf header
-            let csrf = match guard.get_csrf_header(&req) {
+            let csrf = match guard.get_csrf_header(&req).await {
                 Ok(token) => token,
                 Err(e) => return Ok(error_response(e, req)),
             };
@@ -88,16 +88,16 @@ where
             debug!("Found csrf header: {csrf}");
 
             // Get the session ID
-            let session_id = match guard.get_session_cookie(&req) {
+            let session_id = match guard.get_session_cookie(&req).await {
                 Ok(id) => id,
                 Err(e) => return Ok(error_response(e, req)),
             };
 
             debug!("Found session ID cookie {session_id}");
 
-            let user_sess = guard.get_valid_session(session_id.value(), csrf)?;
+            let user_sess = guard.get_valid_session(session_id.value(), csrf).await?;
 
-            if !guard.check_valid_role(&user_sess.role) {
+            if !guard.check_valid_role(&user_sess.role).await {
                 return Ok(error_response(
                     Error::new(AuthenticationError::InsufficientRights),
                     req,

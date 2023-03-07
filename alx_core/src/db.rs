@@ -1,21 +1,22 @@
-pub mod pg;
+pub mod repo;
 
+use async_trait::async_trait;
 use std::cell::{RefCell, RefMut};
 use thiserror::Error;
 
 #[macro_export]
-/// Macro intended as an ergonomic shortcut to get the underlying connection of [AtomicConn] enums and perform database
+/// Macro intended as an ergonomic shortcut to get the underlying connection of [AtomicConnection] enums and perform database
 /// operations on it.
 ///
 /// The first argument is always the operation to perform (a function call),
-/// the second is the [AtomicConn] returned from [AtomicRepoAccess]' connect
+/// the second is the [AtomicConnection] returned from [AcidRepositoryAccess]' connect
 /// method and the rest are any number of parameters that match the signature of the first argument.
 ///
 /// ### Example
 ///
 /// ```ignore
 /// fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
-///     // Connect via AtomicRepoAccess implementation
+///     // Connect via AcidRepositoryAccess implementation
 ///     let conn = self.connect()?;
 ///
 ///     // Perform the operation using the connection
@@ -27,12 +28,12 @@ use thiserror::Error;
 ///
 /// ```ignore
 /// fn get_user_by_id(&self, id: &str) -> Result<User, Error> {
-///     // Connect via AtomicRepoAccess implementation
+///     // Connect via AcidRepositoryAccess implementation
 ///     let conn = self.connect()?;
 ///
 ///     match conn {
-///         AtomicConn::New(mut conn) => User::get_by_id(&mut conn, id),
-///         AtomicConn::Existing(mut conn) => User::get_by_id(conn.borrow_mut().as_mut().unwrap(), id),
+///         AtomicConnection::New(mut conn) => User::get_by_id(&mut conn, id),
+///         AtomicConnection::Existing(mut conn) => User::get_by_id(conn.borrow_mut().as_mut().unwrap(), id),
 ///     }
 /// }
 /// ```
@@ -41,8 +42,8 @@ macro_rules! atomic {
         {
             use std::borrow::BorrowMut;
             match $conn {
-                alx_core::db::AtomicConn::New(mut conn) => $meth(&mut conn, $($param),*),
-                alx_core::db::AtomicConn::Existing(mut conn) => $meth(conn.borrow_mut().as_mut().unwrap(), $($param),*),
+                alx_core::db::AtomicConnection::New(mut conn) => $meth(&mut conn, $($param),*).await,
+                alx_core::db::AtomicConnection::Existing(mut conn) => $meth(conn.borrow_mut().as_mut().unwrap(), $($param),*).await,
             }
         }
     };
@@ -50,22 +51,22 @@ macro_rules! atomic {
 
 #[macro_export]
 /// Takes in `self` and the closure and wraps it in a transaction. The code block must return
-/// a `Result<T, E>`. The service that gets passed in the `self` parameter MUST have a `repo` field
-/// that implements [Atomic] and [AtomicRepoAccess].
+/// a `Result<T, E>`. The service that gets passed in the `self` parameter MUST have a `repository` field
+/// that implements [Atomic] and [AcidRepositoryAccess].
 ///
 /// The service repository (via the `Atomic` impl) will call
 /// `start_transaction()`, execute the block and based on the returned result will either commit or rollback
 /// the transaction.
 macro_rules! transaction {
     ($sel:expr, $b:block) => {{
-        $sel.repo.start_transaction()?;
+        $sel.repository.start_transaction().await?;
         match $b {
             Ok(res) => {
-                $sel.repo.commit_transaction()?;
+                $sel.repository.commit_transaction().await?;
                 Ok(res)
             }
             Err(e) => {
-                $sel.repo.rollback_transaction()?;
+                $sel.repository.rollback_transaction().await?;
                 Err(e)
             }
         }
@@ -80,20 +81,21 @@ macro_rules! transaction {
 ///
 /// ```ignore
 /// contract! {
-///     // Implements Contract for Implementor
-///     Contract => Implementor,
+///     // Specifies which clients will use which type of connections
+///     Postgres => PgConnection;
 ///
-///     // Can be RepoAccess or AtomicRepoAccess
-///     AccessType,
+///     // Implements Contract for Implementor and specifies which type
+///     // of access the repository will use, can be RepositoryAccess or AcidRepositoryAccess
+///     Contract => Implementor, AccessType;
 ///
-///     // Naming the bounds
-///     U => UserRepository<C>,
+///     // Naming the bounds through which the repository methods can be called
+///     User => UserRepository<C>,
 ///     /* ... */
 ///
 ///     // Function implementations for the trait
 ///     fn get_user_by_id(&self, some_param: &str) -> {
 ///         let mut conn = self.connect()?;
-///         U::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new)
+///         User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new)
 ///     }
 ///
 ///     /* ... */
@@ -104,7 +106,7 @@ macro_rules! transaction {
 /// to implement it (right).
 ///
 /// The second parameter is the repository access type, specifying whether the adapter will support transactions.
-/// This can be either [RepoAccess] or [AtomicRepoAccess].
+/// This can be either [RepositoryAccess] or [AcidRepositoryAccess].
 ///
 /// The third pair of parameters are any number of `ident => path` pairs representing how the repositories will be named in the impl block.
 /// From the example above, a `U` generic will be created in place of a `UserRepository`, therefore accessing its methods
@@ -115,12 +117,31 @@ macro_rules! transaction {
 /// The first three pairs of arguments are used for the bounds in the contract implementation, while the fourth (the function items)
 /// are used to generate the impl block.
 macro_rules! contract {
-    ($contract:path => $struct:ident, $type:ident, $($id:ident => $bound:path),*; $($b:item)*) => {
-        impl<A, C, $($id),*> $contract for $struct<A, C, $($id),*>
+    (
+    // Client => Connection generic
+     $($client:ident => $conn_name:ident),+;
+
+    // Contract to implement => Implementing struct, type of connection access
+     $contract:path => $struct:ident, $type:ident;
+
+     $($id:ident => $bound:path),*;
+
+     $($b:item)*
+    ) => {
+        #[async_trait::async_trait(?Send)]
+        impl
+            <$($client),+, $($conn_name),+, $($id),*> $contract
+        for
+            $struct<$($client),+, $($conn_name),+, $($id),*>
         where
-            Self: alx_core::db::$type<C>,
-            A: alx_core::clients::db::DBConnect<Connection = C>,
+            Self: $($type<$conn_name> +)+,
+
+            $(
+                $client: alx_core::clients::db::DBConnect<Connection = $conn_name>
+            ),+,
+
             $($id: $bound),*
+
             {
                 $($b)*
             }
@@ -133,33 +154,36 @@ pub type Transaction<C> = RefCell<Option<C>>;
 
 /// Used for establishing connections to a database. Implementations can be found in the `alx_derive`
 /// crate. Manual implementations should utilise the `alx_clients` crate.
-pub trait RepoAccess<C> {
-    fn connect(&self) -> Result<C, DatabaseError>;
+#[async_trait(?Send)]
+pub trait RepositoryAccess<C> {
+    async fn connect(&self) -> Result<C, DatabaseError>;
 }
 
 /// Used for creating transactions in repositories. Implementations can be found in the `alx_derive`
 /// crate. Structs implementing this trait should have a client and transaction field on them
 /// for establishing and storing transactions, respectively.
-pub trait AtomicRepoAccess<C>: Atomic {
-    fn connect(&self) -> Result<AtomicConn<C>, DatabaseError>;
+#[async_trait(?Send)]
+pub trait AcidRepositoryAccess<C>: Atomic {
+    async fn connect(&self) -> Result<AtomicConnection<C>, DatabaseError>;
 }
 
 /// Represents a newly established connection or an already existing one. Intended to be used by
-/// [AtomicRepoAccess] implementations. For a quick way to get the underlying connection of this enum,
+/// [AcidRepositoryAccess] implementations. For a quick way to get the underlying connection of this enum,
 /// use the [atomic!] macro.
-pub enum AtomicConn<'a, T> {
+pub enum AtomicConnection<'a, T> {
     New(T),
     Existing(RefMut<'a, Option<T>>),
 }
 
 /// Used by repositories that need atomic DB access. The concrete implementations are provided
 /// in the `alx_derive` crate.
+#[async_trait(?Send)]
 pub trait Atomic {
-    fn start_transaction(&self) -> Result<(), DatabaseError>;
+    async fn start_transaction(&self) -> Result<(), DatabaseError>;
 
-    fn rollback_transaction(&self) -> Result<(), DatabaseError>;
+    async fn rollback_transaction(&self) -> Result<(), DatabaseError>;
 
-    fn commit_transaction(&self) -> Result<(), DatabaseError>;
+    async fn commit_transaction(&self) -> Result<(), DatabaseError>;
 }
 
 #[derive(Debug, Error)]
@@ -170,6 +194,8 @@ pub enum DatabaseError {
     Transaction(#[from] TransactionError),
     #[error("Diesel Error: {0}")]
     Diesel(#[from] diesel::result::Error),
+    #[error("Mongo Error: {0}")]
+    Mongo(#[from] mongodb::error::Error),
 }
 
 #[derive(Debug, Error)]

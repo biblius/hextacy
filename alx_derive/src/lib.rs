@@ -1,65 +1,92 @@
-use proc_macro_error::proc_macro_error;
-
 mod db;
 
-const PG_POOLED: &str = "PgPoolConnection";
+const ALLOWED_CLIENTS: [&str; 2] = ["postgres", "mongo"];
+const PG_CONNECTION: &str = "PgPoolConnection";
+const MG_CONNECTION: &str = "ClientSession";
 
-#[proc_macro_derive(PgAtomic, attributes(connection))]
+use proc_macro_error::proc_macro_error;
+
+#[proc_macro_derive(AcidRepository, attributes(mongo, postgres))]
 #[proc_macro_error]
-/// Provides an implementation of `AtomicRepoAccess<PgPoolConnection>` and `Atomic`.
+/// Provides an implementation of `AcidRepositoryAccess<C>` and `Atomic` depending on the
+/// provided attributes.
 ///
-/// Useful for deriving on repository structs with generic connections. The `connection` attribute
-/// must be specified and equal to the generic connection parameter of the repository, e.g. if the generic
-/// connection is specified as `C` then the attribute must be `#[connection = "C"]`.
+/// Accepted attributes and fields are:
 ///
-/// Deriving structs MUST have a `client` and `transaction` field where the `client` is a generic database client
-/// `Client<A, C>` provided in `alx_core::clients::db` and the transaction is a `RefCell<Option<C>>`
-/// (`alx_core::db` provides a `Transaction` type for convenience).
+/// `#[postgres(Connection)]` -> `postgres`, `tx_pg`,
+///
+/// `#[mongo(Connection)]` -> `mongo`, `tx_mg`,
+///
+/// Useful for deriving on repository structs with generic connections that only use postgres.
+/// The `connection` attribute must be specified and equal to the generic connection parameter
+/// of the repository, e.g. if the generic connection is specified as `C` then the attribute must
+/// be `#[connection = "C"]`.
+///
+///
+/// Deriving structs MUST have a `postgres`, `mongo` or both fields and they must be a generic client
+/// `Client<A, C>` provided in `alx_core::clients::db`.
+///
+/// The structs, depending on which client they are using, must also contain the `tx_pg` or `tx_mg`
+/// fields which will be used to keep track of transactions for the respective client. Transaction fields
+/// must be a `RefCell<Option<C>>` (`alx_core::db` provides a `Transaction` type for convenience).
+///
+/// #### Example
 ///
 /// ```ignore
-/// use alx_core::{clients::db::Client, db::Transaction};
 ///
-/// #[derive(Debug, PgAtomic)]
-/// #[connection = "C"]
-/// pub(super) struct Repository<A, C, User>
+/// #[derive(Debug, AcidRepository)]
+/// #[postgres(Pg)]
+/// #[mongo(Mg)]
+/// pub(super) struct Repository<A, B, Pg, Mg, User>
 ///   where
-///     A: DBConnect<Connection = C>,
-///     User: UserRepository<C>
+///     A: DBConnect<Connection = Pg>,
+///     B: DBConnect<Connection = Mg>,
+///     User: UserRepository<Pg>,
+///     Session: SessionRepository<Mg>,
 ///  {
-///     pub client: Client<A, C>,
-///     pub transaction: Transaction<C>,
-///     _user: User,
+///     postgres: Client<A, Pg>,
+///     mongo: Client<B, Mg>,
+///     tx_pg: Transaction<Pg>,
+///     tx_mg: Transaction<Mg>,
+///     user: PhantomData<User>,
+///     session: PhantomData<Session>,
 ///  }
 /// ```
-pub fn derive_pg_atomic(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_atomic_repo(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut ast = syn::parse(input).unwrap();
-    db::pg_atomic::derive(&mut ast, PG_POOLED).into()
+    db::acid_repo::derive(&mut ast).into()
 }
 
-#[proc_macro_derive(PgRepo, attributes(connection))]
+#[proc_macro_derive(Repository, attributes(mongo, postgres))]
 #[proc_macro_error]
-/// Provides an implementation of `RepoAccess<PgPoolConnection>`.
+/// Provides an implementation of `RepositoryAccess<C>` depending on the provided attributes.
 ///
-/// Useful for deriving on repository structs with generic connections. The `connection` attribute
-/// must be specified and equal to the generic connection parameter of the repository, e.g. if the generic
-/// connection is specified as `C` then the attribute must be `#[connection = "C"]`.
+/// Accepted attributes and fields are:
 ///
-/// Deriving structs MUST have a `client` field where the `client` is a generic database client
+/// `#[postgres(Connection)]` -> `postgres`,
+///
+/// `#[mongo(Connection)]` -> `mongo`,
+///
+/// The attributes for the client connections must be specified and equal to a generic connection parameter
+/// of the repository, e.g. if a generic connection is specified as `C` then the attribute must be
+/// either `#[postgres(C)]` or `#[mongo(C)]` and will be concretised to the designated client connection.
+///
+/// Deriving structs MUST have a `postgres`, `mongo` or both fields and they must be a generic client
 /// `Client<A, C>` provided in `alx_core::clients::db`.
 ///
 /// ```ignore
-/// #[derive(Debug, PgRepo)]
-/// #[connection = "C"]
-/// pub(super) struct Repository<A, C, User>
+/// #[derive(Debug, Repository)]
+/// #[postgres(Connection)]
+/// pub(super) struct Repository<C, Connection, User>
 ///   where
-///     A: DBConnect<Connection = C>,
-///     User: UserRepository<C>
+///     C: DBConnect<Connection = Connection>,
+///     User: UserRepository<Connection>
 ///  {
-///     pub client: Client<A, C>,
-///     _user: User
+///     postgres: Client<C, Connection>,
+///     user: PhantomData<User>
 ///  }
 /// ```
-pub fn derive_pg_pooled(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_repository(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut ast = syn::parse(input).unwrap();
-    db::pg::derive(&mut ast, PG_POOLED).into()
+    db::repository::derive(&mut ast).into()
 }

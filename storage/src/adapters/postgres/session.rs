@@ -9,6 +9,7 @@ use crate::{
     repository::session::SessionRepository,
 };
 use alx_clients::{db::postgres::PgPoolConnection, oauth::OAuthProvider};
+use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
 use serde::Serialize;
@@ -30,10 +31,11 @@ struct NewSession<'a> {
 #[derive(Debug, Clone)]
 pub struct PgSessionAdapter;
 
+#[async_trait(?Send)]
 impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     /// Create a new user session. If `None` is given for `expires_after`, the session's `expires_at`
     /// field will be set to the maximum possible value, otherwise it will be set to expire in `expires_after` seconds.
-    fn create(
+    async fn create(
         conn: &mut PgPoolConnection,
         user: &User,
         csrf: &str,
@@ -65,7 +67,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     }
 
     /// Gets an unexpired session with its corresponding CSRF token
-    fn get_valid_by_id(
+    async fn get_valid_by_id(
         conn: &mut PgPoolConnection,
         id: &str,
         csrf: &str,
@@ -80,7 +82,11 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
-    fn refresh(conn: &mut PgPoolConnection, id: &str, csrf: &str) -> Result<Session, AdapterError> {
+    async fn refresh(
+        conn: &mut PgPoolConnection,
+        id: &str,
+        csrf: &str,
+    ) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
@@ -93,7 +99,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     }
 
     /// Updates the sessions `expires_at` field to now
-    fn expire(conn: &mut PgPoolConnection, id: &str) -> Result<Session, AdapterError> {
+    async fn expire(conn: &mut PgPoolConnection, id: &str) -> Result<Session, AdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
@@ -105,7 +111,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
     }
 
     /// Updates all user related sessions' `expires_at` field to now
-    fn purge(
+    async fn purge(
         conn: &mut PgPoolConnection,
         usr_id: &str,
         skip: Option<&str>,
@@ -125,7 +131,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
         query.load::<Session>(conn).map_err(AdapterError::from)
     }
 
-    fn update_access_tokens(
+    async fn update_access_tokens(
         conn: &mut PgPoolConnection,
         access_token: &str,
         user_id: &str,

@@ -1,14 +1,16 @@
 use super::data::GetUsersPaginated;
 use crate::error::Error;
 use actix_web::HttpResponse;
+use async_trait::async_trait;
 use storage::models::user::{self, User};
 
+#[async_trait(?Send)]
 pub(super) trait ServiceContract {
-    fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
+    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
 }
-
+#[async_trait(?Send)]
 pub(super) trait RepositoryContract {
-    fn get_paginated(
+    async fn get_paginated(
         &self,
         page: u16,
         per_page: u16,

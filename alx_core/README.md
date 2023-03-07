@@ -8,7 +8,7 @@ The main crate from which you can import the necessary types to aid you in devel
 
 - **db**
 
-  Contains traits that can be utilised to propagate connections from clients to structs implementing `RepoAccess` traits.
+  Contains traits that can be utilised to propagate connections from clients to structs implementing `RepositoryAccess` traits.
 
 - **ws**
 

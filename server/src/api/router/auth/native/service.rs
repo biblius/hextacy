@@ -17,7 +17,7 @@ use crate::{
     },
 };
 use crate::{
-    api::router::auth::{contract::RepoContract, data::AuthenticationSuccessResponse},
+    api::router::auth::{contract::RepositoryContract, data::AuthenticationSuccessResponse},
     error::{AuthenticationError, Error},
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
@@ -45,20 +45,20 @@ use storage::{
 use tracing::{debug, info};
 
 pub(super) struct Authentication<R, C, E> {
-    pub repo: R,
+    pub repository: R,
     pub cache: C,
     pub email: E,
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl<R, C, E> ServiceContract for Authentication<R, C, E>
 where
-    R: RepoContract,
+    R: RepositoryContract,
     C: CacheContract,
     E: EmailContract,
 {
     /// Verifies the user's credentials and returns a response based on their 2fa status
-    fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
+    async fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
         let Credentials {
             ref email,
             ref password,
@@ -67,7 +67,7 @@ where
 
         info!("Verifying credentials for {email}");
 
-        let user = match self.repo.get_user_by_email(email) {
+        let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
             Err(_) => return Err(AuthenticationError::InvalidCredentials.into()),
         };
@@ -93,7 +93,7 @@ where
             }
 
             // Freeze the account if attempts exceed the threshold and send a password reset token
-            self.repo.freeze_user(&user.id)?;
+            self.repository.freeze_user(&user.id).await?;
 
             let token = token(BASE64URL, 160);
 
@@ -132,11 +132,11 @@ where
                 .to_response(StatusCode::OK)
                 .finish());
         }
-        self.establish_session(user, remember)
+        self.establish_session(user, remember).await
     }
 
     /// Verifies the given OTP using the token generated on the credentials login. Throttles by 2*attempts seconds on each failed attempt.
-    fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
+    async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
         let Otp {
             ref password,
             ref token,
@@ -150,7 +150,7 @@ where
 
         info!("Verifying OTP for {user_id}");
 
-        let user = self.repo.get_user_by_id(&user_id)?;
+        let user = self.repository.get_user_by_id(&user_id).await?;
 
         let Some(ref secret) = user.otp_secret else {
             return Err(AuthenticationError::InvalidOTP.into());
@@ -186,11 +186,11 @@ where
             self.cache.delete_otp_throttle(&user.id)?;
         }
 
-        self.establish_session(user, remember)
+        self.establish_session(user, remember).await
     }
 
     /// Stores the initial data in the users table and sends an email to the user with the registration token.
-    fn start_registration(&self, data: RegistrationData) -> Result<HttpResponse, Error> {
+    async fn start_registration(&self, data: RegistrationData) -> Result<HttpResponse, Error> {
         let RegistrationData {
             ref email,
             ref username,
@@ -199,12 +199,14 @@ where
 
         info!("Starting registration for {}", email);
 
-        if self.repo.get_user_by_email(email).is_ok() {
-            return Err(AuthenticationError::EmailTaken.into());
+        match self.repository.get_user_by_email(email).await {
+            Ok(_) => return Err(AuthenticationError::EmailTaken.into()),
+            Err(Error::Adapter(AdapterError::DoesNotExist)) => {}
+            Err(e) => return Err(e.into()),
         }
 
         // TODO: handle existing oauth accounts on reg
-        /* if let Ok(user) = self.repo.user.get_by_email(email) {
+        /* if let Ok(user) = self.repository.user.get_by_email(email) {
 
             // if user.password.is_none()
             return Err(AuthenticationError::EmailTaken.into());
@@ -212,7 +214,10 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.create_user(email, username, &hashed)?;
+        let user = self
+            .repository
+            .create_user(email, username, &hashed)
+            .await?;
 
         let token = generate_hmac("REG_TOKEN_SECRET", &user.id, BASE64URL)?;
 
@@ -236,7 +241,7 @@ where
     }
 
     /// Verifies the registration token sent via email upon registration.
-    fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error> {
+    async fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error> {
         let token = &data.token;
 
         let user_id = match self.cache.get_token(AuthCache::RegToken, token) {
@@ -251,7 +256,9 @@ where
             return Err(AuthenticationError::InvalidToken("Registration").into());
         }
 
-        self.repo.update_user_email_verification(&user_id)?;
+        self.repository
+            .update_user_email_verification(&user_id)
+            .await?;
 
         self.cache.delete_token(AuthCache::RegToken, token)?;
 
@@ -263,7 +270,7 @@ where
     }
 
     /// Resends a registration token to the user if they are not already verified
-    fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
+    async fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
         let email = data.email.as_str();
         info!("Resending registration token to {email}");
 
@@ -275,7 +282,7 @@ where
         .to_response(StatusCode::OK)
         .finish();
 
-        let user = match self.repo.get_user_by_email(email) {
+        let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
             Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response),
             Err(e) => return Err(e),
@@ -308,12 +315,15 @@ where
 
     /// Generates an OTP secret for the user and returns it in a QR code in the response. Requires a valid
     /// session beforehand.
-    fn set_otp_secret(&self, session: Session) -> Result<HttpResponse, Error> {
+    async fn set_otp_secret(&self, session: Session) -> Result<HttpResponse, Error> {
         let Session { ref user_id, .. } = session;
 
         let secret = crypto::otp::generate_secret();
 
-        let user = self.repo.update_user_otp_secret(user_id, &secret)?;
+        let user = self
+            .repository
+            .update_user_otp_secret(user_id, &secret)
+            .await?;
 
         let qr = crypto::otp::generate_totp_qr_code(&secret, &user.email)?;
 
@@ -328,7 +338,7 @@ where
     }
 
     /// Updates the user's password. Purges all sessions and sends an email with a reset token.
-    fn change_password(
+    async fn change_password(
         &self,
         session: Session,
         data: ChangePassword,
@@ -337,9 +347,12 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.update_user_password(&session.user_id, &hashed)?;
+        let user = self
+            .repository
+            .update_user_password(&session.user_id, &hashed)
+            .await?;
 
-        self.purge_sessions(&user.id, None)?;
+        self.purge_sessions(&user.id, None).await?;
 
         let token = token(BASE64URL, 128);
 
@@ -361,7 +374,10 @@ where
     }
 
     /// Verify the forgot pw email token and update the user's password
-    fn verify_forgot_password(&self, data: ForgotPasswordVerify) -> Result<HttpResponse, Error> {
+    async fn verify_forgot_password(
+        &self,
+        data: ForgotPasswordVerify,
+    ) -> Result<HttpResponse, Error> {
         info!("Verifying forgot password");
 
         let ForgotPasswordVerify {
@@ -378,15 +394,18 @@ where
 
         let hashed = bcrypt_hash(password)?;
 
-        let user = self.repo.update_user_password(&user_id, &hashed)?;
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hashed)
+            .await?;
 
-        self.purge_sessions(&user.id, None)?;
+        self.purge_sessions(&user.id, None).await?;
 
-        self.establish_session(user, false)
+        self.establish_session(user, false).await
     }
 
     /// Updates a user's password to a random string and sends it to them in the email
-    fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error> {
+    async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error> {
         let pw_token = data.token.as_str();
 
         // Check if there's a reset PW token in the cache
@@ -401,12 +420,15 @@ where
 
         // Create a temporary password
         let (temp_pw, hash) = pw_and_hash()?;
-        let user = self.repo.update_user_password(&user_id, &hash)?;
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hash)
+            .await?;
 
         self.email
             .send_reset_password(&user.username, &user.email, &temp_pw)?;
 
-        self.purge_sessions(&user.id, None)?;
+        self.purge_sessions(&user.id, None).await?;
 
         Ok(
             MessageResponse::new("Successfully reset password. Incoming email.")
@@ -416,7 +438,7 @@ where
     }
 
     /// Resets the user's password and sends an email with a temporary one. Guarded by a half min throttle.
-    fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
+    async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
         info!("{} forgot password, sending email", data.email);
 
         let email = data.email.as_str();
@@ -429,7 +451,7 @@ where
         .to_response(StatusCode::OK)
         .finish();
 
-        let user = match self.repo.get_user_by_email(email) {
+        let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
             Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response),
             Err(e) => return Err(e),
@@ -459,13 +481,13 @@ where
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions
-    fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
+    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
         info!("Logging out {}", session.username);
 
         if data.purge {
-            self.purge_sessions(&session.user_id, None)?;
+            self.purge_sessions(&session.user_id, None).await?;
         } else {
-            let session = self.repo.expire_session(&session.id)?;
+            let session = self.repository.expire_session(&session.id).await?;
             self.cache.delete_token(AuthCache::Session, &session.id)?;
         }
 
@@ -479,8 +501,8 @@ where
     }
 
     /// Expires all sessions in the database and deletes all corresponding cached sessions
-    fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
-        let sessions = self.repo.purge_sessions(user_id, skip)?;
+    async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
+        let sessions = self.repository.purge_sessions(user_id, skip).await?;
         for s in sessions {
             self.cache.delete_token(AuthCache::Session, &s.id).ok();
         }
@@ -488,16 +510,19 @@ where
     }
 
     /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
-    fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
+    async fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
         let csrf_token = uuid();
 
-        let session = self.repo.create_session(
-            &user,
-            &csrf_token,
-            { !remember }.then_some(SESSION_DURATION),
-            None,
-            None,
-        )?;
+        let session = self
+            .repository
+            .create_session(
+                &user,
+                &csrf_token,
+                { !remember }.then_some(SESSION_DURATION),
+                None,
+                None,
+            )
+            .await?;
 
         let session_cookie = cookie::create(COOKIE_S_ID, &session.id, false)?;
 

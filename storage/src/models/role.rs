@@ -18,6 +18,12 @@ pub enum Role {
     User,
 }
 
+impl Default for Role {
+    fn default() -> Self {
+        Self::User
+    }
+}
+
 impl PartialOrd for Role {
     fn partial_cmp(&self, other: &Role) -> Option<Ordering> {
         Some(self.cmp(other))

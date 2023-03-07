@@ -1,4 +1,6 @@
+pub mod mongo;
 pub mod postgres;
+
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -9,6 +11,8 @@ pub enum AdapterError {
     Client(#[from] alx_clients::ClientError),
     #[error("Diesel: {0}")]
     Diesel(diesel::result::Error),
+    #[error("Mongo: {0}")]
+    Mongo(#[from] mongodb::error::Error),
 }
 
 impl From<diesel::result::Error> for AdapterError {

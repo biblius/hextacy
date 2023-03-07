@@ -1,4 +1,4 @@
-use super::contract::{CacheContract, RepoContract};
+use super::contract::{CacheContract, RepositoryContract};
 use crate::{
     config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
     error::Error,
@@ -11,6 +11,7 @@ use alx_core::{
     },
     CacheAccess,
 };
+use async_trait::async_trait;
 use chrono::Utc;
 use std::sync::Arc;
 use storage::{models::session, repository::session::SessionRepository};
@@ -21,18 +22,23 @@ pub struct Repository<Session> {
     pub _session: Session,
 }
 
-impl<Session> RepoContract for Repository<Session>
+#[async_trait(?Send)]
+impl<Session> RepositoryContract for Repository<Session>
 where
     Session: SessionRepository<PgPoolConnection>,
 {
-    fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+    async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
         let mut conn = self.client.connect()?;
-        Session::refresh(&mut conn, id, csrf).map_err(Error::new)
+        Session::refresh(&mut conn, id, csrf)
+            .await
+            .map_err(Error::new)
     }
 
-    fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+    async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
         let mut conn = self.client.connect()?;
-        Session::get_valid_by_id(&mut conn, id, csrf).map_err(Error::new)
+        Session::get_valid_by_id(&mut conn, id, csrf)
+            .await
+            .map_err(Error::new)
     }
 }
 

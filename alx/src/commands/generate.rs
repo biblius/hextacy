@@ -35,7 +35,7 @@ pub enum GenerateSubcommand {
 pub struct GenerateArgs {
     /// The name of the route of middleware.
     pub name: String,
-    /// The various services or repositories the endpoint will use. Comma seperated. e.g. `-c repo,cache`
+    /// The various services or repositories the endpoint will use. Comma seperated. e.g. `-c repository,cache`
     #[arg(short, long)]
     pub contracts: Option<String>,
     /// The path to the API you wish to generate this endpoint. Defaults to ./server/api/router

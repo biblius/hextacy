@@ -1,4 +1,5 @@
 use crate::ClientError;
+use async_trait::async_trait;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection, State},
     Connection, PgConnection,
@@ -42,10 +43,11 @@ impl Default for Postgres {
     }
 }
 
+#[async_trait(?Send)]
 impl DBConnect for Postgres {
     type Connection = PgPoolConnection;
 
-    fn connect(&self) -> Result<Self::Connection, ClientError> {
+    async fn connect(&self) -> Result<Self::Connection, ClientError> {
         trace!("Postgres - Attempting pooled connection");
         match self.pool.get() {
             Ok(conn) => Ok(conn),

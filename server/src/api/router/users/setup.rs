@@ -10,7 +10,7 @@ use storage::models::role::Role;
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repo: Repository::<Postgres, PgPoolConnection, PgUserAdapter>::new(pg.clone()),
+        repository: Repository::<Postgres, PgPoolConnection, PgUserAdapter>::new(pg.clone()),
     };
     let auth_guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 

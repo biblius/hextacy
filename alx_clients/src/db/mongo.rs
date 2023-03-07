@@ -1,7 +1,9 @@
+use super::DBConnect;
+use async_trait::async_trait;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
     sync::Client as SyncClient,
-    Client,
+    Client, ClientSession,
 };
 use tracing::trace;
 use utils::env;
@@ -82,6 +84,18 @@ fn client_options() -> ClientOptions {
         .credential(credential)
         .default_database(database)
         .build()
+}
+
+#[async_trait(?Send)]
+impl DBConnect for Mongo {
+    type Connection = ClientSession;
+
+    async fn connect(&self) -> Result<Self::Connection, crate::ClientError> {
+        trace!("Mongo - Attempting pooled connection");
+        let session = self.client.start_session(None).await.unwrap();
+        // TODO -------------------------------------------^
+        Ok(session)
+    }
 }
 
 pub struct MongoSync {

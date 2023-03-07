@@ -19,7 +19,7 @@ pub(super) trait ServiceContract {
     async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error>;
 
     /// Auto register the user based on the obtained OAuth account from the login step.
-    fn register<T, A>(&self, tokens: T, account: A) -> Result<HttpResponse, Error>
+    async fn register<T, A>(&self, tokens: T, account: A) -> Result<HttpResponse, Error>
     where
         T: TokenResponse + Send + Sync + 'static,
         A: OAuthAccount + Send + Sync + 'static;
@@ -35,7 +35,7 @@ pub(super) trait ServiceContract {
         code: OAuthCodeExchange,
     ) -> Result<HttpResponse, Error>;
 
-    fn establish_session<T>(&self, tokens: T, user: User) -> Result<HttpResponse, Error>
+    async fn establish_session<T>(&self, tokens: T, user: User) -> Result<HttpResponse, Error>
     where
         T: TokenResponse + Send + Sync + 'static;
 }
