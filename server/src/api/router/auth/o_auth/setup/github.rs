@@ -5,8 +5,15 @@ use crate::api::{
         o_auth::{handler, service::OAuthService},
     },
 };
+use crate::db::{
+    adapters::{
+        mongo::user::MgUserAdapter,
+        postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter},
+    },
+    models::role::Role,
+};
 use actix_web::web::{self, Data};
-use alx_core::clients::{
+use hextacy::clients::{
     db::{
         mongo::Mongo,
         postgres::{PgPoolConnection, Postgres},
@@ -16,13 +23,6 @@ use alx_core::clients::{
 };
 use mongodb::ClientSession;
 use std::sync::Arc;
-use storage::{
-    adapters::{
-        mongo::user::MgUserAdapter,
-        postgres::{oauth::PgOAuthAdapter, session::PgSessionAdapter},
-    },
-    models::role::Role,
-};
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {

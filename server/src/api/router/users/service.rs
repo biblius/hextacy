@@ -4,8 +4,8 @@ use super::{
 };
 use crate::error::Error;
 use actix_web::HttpResponse;
-use alx_core::web::http::response::Response;
 use async_trait::async_trait;
+use hextacy::web::http::response::Response;
 use reqwest::StatusCode;
 
 pub(super) struct UserService<R>

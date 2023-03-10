@@ -1,9 +1,9 @@
 use super::data::OAuthCodeExchange;
+use crate::db::models::{session::Session, user::User};
 use crate::error::Error;
 use actix_web::HttpResponse;
-use alx_core::clients::oauth::{OAuthAccount, TokenResponse};
 use async_trait::async_trait;
-use storage::models::{session::Session, user::User};
+use hextacy::clients::oauth::{OAuthAccount, TokenResponse};
 
 #[async_trait(?Send)]
 pub(super) trait ServiceContract {

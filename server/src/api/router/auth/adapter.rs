@@ -4,27 +4,27 @@ use crate::config::constants::{
     EMAIL_DIRECTORY, EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, SESSION_CACHE_DURATION,
     WRONG_PASSWORD_CACHE_DURATION,
 };
+use crate::db::models::oauth::OAuthMeta;
+use crate::db::models::session;
+use crate::db::models::user;
+use crate::db::repository::oauth::OAuthRepository;
+use crate::db::repository::session::SessionRepository;
+use crate::db::repository::user::UserRepository;
 use crate::error::Error;
-use alx_core::cache::{CacheAccess, CacheError};
-use alx_core::clients::db::{
+use chrono::Utc;
+use diesel::connection::TransactionManager;
+use hextacy::cache::{CacheAccess, CacheError};
+use hextacy::clients::db::{
     postgres::PgPoolConnection,
     redis::{Commands, Redis, RedisPoolConnection},
     DBConnect,
 };
-use alx_core::clients::email;
-use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
-use alx_core::db::AcidRepositoryAccess;
-use alx_core::{acid_repo, atomic, contract};
-use chrono::Utc;
-use diesel::connection::TransactionManager;
+use hextacy::clients::email;
+use hextacy::clients::oauth::{OAuthProvider, TokenResponse};
+use hextacy::db::AcidRepositoryAccess;
+use hextacy::{acid_repo, atomic, contract};
 use mongodb::ClientSession;
 use std::sync::Arc;
-use storage::models::oauth::OAuthMeta;
-use storage::models::session;
-use storage::models::user;
-use storage::repository::oauth::OAuthRepository;
-use storage::repository::session::SessionRepository;
-use storage::repository::user::UserRepository;
 use tracing::debug;
 
 acid_repo! {
@@ -345,7 +345,7 @@ impl EmailContract for Email {
         email: &str,
     ) -> Result<(), Error> {
         debug!("Sending registration token email to {email}");
-        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,
@@ -371,7 +371,7 @@ impl EmailContract for Email {
 
     fn alert_password_change(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,
@@ -397,7 +397,7 @@ impl EmailContract for Email {
 
     fn send_freeze_account(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = alx_core::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::from_template(
             EMAIL_DIRECTORY,

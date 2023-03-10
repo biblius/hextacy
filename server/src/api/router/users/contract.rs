@@ -1,8 +1,8 @@
 use super::data::GetUsersPaginated;
+use crate::db::models::user::{self, User};
 use crate::error::Error;
 use actix_web::HttpResponse;
 use async_trait::async_trait;
-use storage::models::user::{self, User};
 
 #[async_trait(?Send)]
 pub(super) trait ServiceContract {

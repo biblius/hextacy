@@ -6,6 +6,10 @@ use super::{
         ResendRegToken, ResetPassword, TwoFactorAuthResponse,
     },
 };
+use crate::db::{
+    adapters::AdapterError,
+    models::{session::Session, user::User},
+};
 use crate::{
     api::router::auth::contract::{CacheContract, EmailContract},
     config::{
@@ -21,7 +25,9 @@ use crate::{
     error::{AuthenticationError, Error},
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
-use alx_core::{
+use async_trait::async_trait;
+use data_encoding::{BASE32, BASE64URL};
+use hextacy::{
     crypto::{
         self,
         hmac::{generate_hmac, verify_hmac},
@@ -32,15 +38,9 @@ use alx_core::{
         response::{MessageResponse, Response},
     },
 };
-use async_trait::async_trait;
-use data_encoding::{BASE32, BASE64URL};
 use reqwest::{
     header::{self, HeaderName, HeaderValue},
     StatusCode,
-};
-use storage::{
-    adapters::AdapterError,
-    models::{session::Session, user::User},
 };
 use tracing::{debug, info};
 
@@ -218,8 +218,8 @@ where
             .repository
             .create_user(email, username, &hashed)
             .await?;
-
-        let token = generate_hmac("REG_TOKEN_SECRET", &user.id, BASE64URL)?;
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        let token = generate_hmac(secret.as_bytes(), user.id.as_bytes(), BASE64URL)?;
 
         self.cache.set_token(
             AuthCache::RegToken,
@@ -252,7 +252,13 @@ where
         info!("Verfiying registration token for {user_id}");
 
         // Verify the token with the hashed user ID, error if they mismatch
-        if !verify_hmac("REG_TOKEN_SECRET", &user_id, token, BASE64URL)? {
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        if !verify_hmac(
+            secret.as_bytes(),
+            user_id.as_bytes(),
+            token.as_bytes(),
+            BASE64URL,
+        )? {
             return Err(AuthenticationError::InvalidToken("Registration").into());
         }
 

@@ -1,20 +1,20 @@
 use super::contract::{CacheContract, RepositoryContract};
+use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{
     config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
     error::Error,
 };
-use alx_core::{
+use async_trait::async_trait;
+use chrono::Utc;
+use hextacy::{
+    cache::CacheAccess,
     cache::CacheError,
     clients::db::{
         postgres::{PgPoolConnection, Postgres},
         redis::{Commands, Redis, RedisPoolConnection},
     },
-    CacheAccess,
 };
-use async_trait::async_trait;
-use chrono::Utc;
 use std::sync::Arc;
-use storage::{models::session, repository::session::SessionRepository};
 
 #[derive(Debug, Clone)]
 pub struct Repository<Session> {

@@ -1,10 +1,3 @@
 [workspace]
 
-members = [
-  "alx",
-  "alx_clients",
-  "alx_core",
-  "alx_derive",
-  "server",
-  "storage",
-]
+members = ["hextacy", "hextacy_derive", "server", "xtc"]

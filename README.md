@@ -13,13 +13,13 @@ The kind of project structure this repository uses is heavily based on [hexagona
 2. Install the CLI tool via
 
     ```bash
-    cargo install --path alx
+    cargo install --path xtc
     ```
 
 3. For the secrets, (namely REG_TOKEN_SECRET and COOKIE_SECRET) run
 
     ```bash
-    alx c secret <SECRET_NAME> [-n <NAME>] [-l <LENGTH>]
+    xtc c secret <SECRET_NAME> [-n <NAME>] [-l <LENGTH>]
     ```
 
     and replace the example ones with them.
@@ -27,10 +27,10 @@ The kind of project structure this repository uses is heavily based on [hexagona
     Run migrations via
 
     ```bash
-    alx m run
+    xtc m run
     ```
 
-    Give yourself a pat on the back since you've made it this far and optionally check out all the commands with `alx -h`.
+    Give yourself a pat on the back since you've made it this far and optionally check out all the commands with `xtc -h`.
 
     Run the server with
 
@@ -44,7 +44,7 @@ You now have a ready to go infrastructure, now go make that billion $$$ app!
 
 ## **Architecture**
 
-The following is the server architecture intended to be used with the various alx helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
+The following is the server architecture intended to be used with the various xtc helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
 
 Backend server development usually, if not always, consists of data stores. *Repositories* provide methods through which the application's *Adapters* can interact with to get access to database *Models*.
 
@@ -168,8 +168,8 @@ Now we have to define our repository and is when we enter the esoteric realms of
 - **adapter.rs**
 
   ```rust
-  use alx_derive::Repository;
-  use alx_core::clients::db::{Client, DBConnect};
+  use hextacy_derive::Repository;
+  use hextacy::clients::db::{Client, DBConnect};
   use std::{marker::PhantomData, sync::Arc};
 
   #[derive(Debug, Clone, Repository)]
@@ -296,7 +296,7 @@ To reduce some of the unpleasentness with dealing with so many generics, macros 
   ```
 
 Looks much better! This will essentially generate all the code with the generics from the original file.
-You can read more about how the macros work in the `alx_core::db` module.
+You can read more about how the macros work in the `hextacy::db` module.
 
 ### **Transactions**
 
@@ -307,9 +307,9 @@ We do this by adding a transaction field to the repository, which is simply a `R
 This ref cell can now hold an open connection that can be used to perform queries. The `Atomic` trait provides an interface for any repository to start, commit or rollback a transaction. The way this is done is by checking whether our ref cell contains a connection, if it does we use that one and if it doesn't we simply instruct our client to establish a new one. Taking it one step further, let's make the user service repository atomic:
 
   ```rust
-  use alx_derive::Repository;
-  use alx_core::db::{AtomicConnection, Transaction};
-  use alx_core::clients::db::{Client, DBConnect};
+  use hextacy_derive::Repository;
+  use hextacy::db::{AtomicConnection, Transaction};
+  use hextacy::clients::db::{Client, DBConnect};
   use std::{marker::PhantomData, sync::Arc};
   
   #[derive(Debug, Clone, AcidRepository)]
@@ -344,8 +344,8 @@ Now, instead of simply establishing a connection and calling `User::get_paginate
         let mut conn = self.connect()?;
         // Use atomic! to reduce this boilerplate
         match conn {
-          alx_core::db::AtomicConnection::New(mut conn) => User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new),
-          alx_core::db::AtomicConnection::Existing(mut conn) => User::get_paginated(conn.borrow_mut().as_mut().unwrap(), page, per_page, sort).map_err(Error::new),
+          hextacy::db::AtomicConnection::New(mut conn) => User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new),
+          hextacy::db::AtomicConnection::Existing(mut conn) => User::get_paginated(conn.borrow_mut().as_mut().unwrap(), page, per_page, sort).map_err(Error::new),
         }
         
     }
@@ -357,7 +357,7 @@ To reduce the boilerplate around matching whether a connection exists, the `atom
 Notice that `Repository` is changed to `AcidRepository` and `RepositoryAccess` is changed to `AcidRepositoryAccess`. The access traits are the same, except that the atomic version returns an `AtomicConnection<C>` and requires the repository to implement `Atomic`, which `AcidRepository` does behind the scenes:
 
   ```rust
-  use alx_core::db::{Atomic, DatabaseError, TransactionError};
+  use hextacy::db::{Atomic, DatabaseError, TransactionError};
   use diesel::connection::AnsiTransactionManager;
 
   impl</* ..bounds.. */> Atomic for Repository< /* ..bounds.. */, PgPoolConnection>
@@ -423,7 +423,7 @@ pub trait UserRepository<C> {
 
 The adapter just implements the `UserRepository` trait and returns the model using its specific ORM. This concludes the architectural part (for now... :).
 
-## **alx_core**
+## **hextacy**
 
 Contains various utilities for working with http, email and websockets:
 
@@ -545,35 +545,35 @@ If a user changes their password their sessions will be purged and they will rec
 
 Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established (`forgot_password`, `verify_forgot_password`).
 
-## **ALX**
+## **XTC**
 
 A.K.A. the CLI tool provides a way of seamlessly generating and documenting endpoints and middleware.
 
 To set up the cli tool after cloning the repository enter
 
 ```bash
-cargo install --path alx
+cargo install --path xtc
 ```
 
 from the project root.
 
-The list of top level commands can be viewed with the `alx -h` command.
+The list of top level commands can be viewed with the `xtc -h` command.
 
 The most notable commands are `[g]enerate` which sets up endpoint/middleware boilerplate and `[anal]yze` which scans the router and middleware directories and constructs a Json/Yaml file containing endpoint info.
 
-Alx only works for the project structure described in [the architecture section](#the-server).
+Xtc only works for the project structure described in [the architecture section](#the-server).
 
 The `[g]enerate` command generates an endpoint structure like the one described in the router. It can generate `route [r]` and `middleware [mw]` boilerplate. Contracts can also supplied to the command with the `-c` flag followed by the contracts you wish to hook up to the endpoint, comma seperated e.g.
 
 ```bash
-alx gen route <NAME> -c repository,cache
+xtc gen route <NAME> -c repository,cache
 ```
 
 This will automagically hook up the contracts to the service and set up an infrastructure boilerplate. It will also append `pub(crate) mod <NAME>` to the router's `mod.rs`. It also takes in a `-p` argument which can be used to specify the directory you want to set up the endpoint.
 
 The `analyze` function heavily relies on the [syn crate](https://docs.rs/syn/latest/syn/). It analyzes the syntax of the `data`, `handler` and `setup` files and extracts the necessary info to document the endpoint.
 
-All commands take in the `-v` flag which stands for 'verbose' and if true print what alx is doing to stdout. By default, all commands are run quietly.
+All commands take in the `-v` flag which stands for 'verbose' and if true print what xtc is doing to stdout. By default, all commands are run quietly.
 
 TODO:
 
@@ -581,6 +581,6 @@ TODO:
 
 - [ ] Openssl with let's encrypt
 
-- [ ] Init project with `alx init`
+- [ ] Init project with `xtc init`
 
 - [ ] Something probably

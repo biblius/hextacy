@@ -1,4 +1,4 @@
-use alx_core::cache::CacheIdentifier;
+use hextacy::cache::CacheIdentifier;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AuthCache {

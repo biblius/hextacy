@@ -1,10 +1,11 @@
 mod api;
-pub mod config;
+mod config;
+mod db;
 mod error;
 mod helpers;
 
 use actix_web::{middleware::Logger, App, HttpServer};
-use alx_core::{env, web::http};
+use hextacy::{env, web::http};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing::info;
 
@@ -12,7 +13,7 @@ use tracing::info;
 async fn main() -> std::io::Result<()> {
     env::load_from_file("./.env").unwrap();
 
-    alx_core::logger::init("debug");
+    hextacy::logger::init("debug");
     // logger::init_file("debug", "server.log");
 
     // Init all the lazy loaded static stuff

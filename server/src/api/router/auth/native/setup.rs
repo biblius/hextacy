@@ -1,16 +1,16 @@
 use super::{handler, service::Authentication};
 use crate::api::middleware::auth::interceptor;
 use crate::api::router::auth::adapter::{Cache, Email, Repository};
+use crate::db::adapters::mongo::user::MgUserAdapter;
+use crate::db::adapters::postgres::oauth::PgOAuthAdapter;
+use crate::db::adapters::postgres::session::PgSessionAdapter;
+use crate::db::models::role::Role;
 use actix_web::web::{self, Data};
-use alx_core::clients::db::mongo::Mongo;
-use alx_core::clients::db::postgres::PgPoolConnection;
-use alx_core::clients::{db::postgres::Postgres, db::redis::Redis, email::Email as EmailClient};
+use hextacy::clients::db::mongo::Mongo;
+use hextacy::clients::db::postgres::PgPoolConnection;
+use hextacy::clients::{db::postgres::Postgres, db::redis::Redis, email::Email as EmailClient};
 use mongodb::ClientSession;
 use std::sync::Arc;
-use storage::adapters::mongo::user::MgUserAdapter;
-use storage::adapters::postgres::oauth::PgOAuthAdapter;
-use storage::adapters::postgres::session::PgSessionAdapter;
-use storage::models::role::Role;
 
 pub(crate) fn routes(
     pg: Arc<Postgres>,

@@ -1,12 +1,12 @@
 use super::adapter::Repository;
 use super::{handler, service::UserService};
 use crate::api::middleware::auth::interceptor;
+use crate::db::adapters::postgres::user::PgUserAdapter;
+use crate::db::models::role::Role;
 use actix_web::web::{self, Data};
-use alx_core::clients::db::postgres::PgPoolConnection;
-use alx_core::clients::db::{postgres::Postgres, redis::Redis};
+use hextacy::clients::db::postgres::PgPoolConnection;
+use hextacy::clients::db::{postgres::Postgres, redis::Redis};
 use std::sync::Arc;
-use storage::adapters::postgres::user::PgUserAdapter;
-use storage::models::role::Role;
 
 pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {

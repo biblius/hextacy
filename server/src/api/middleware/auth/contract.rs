@@ -1,7 +1,7 @@
+use crate::db::{models::role::Role, models::session::Session};
 use crate::error::Error;
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
 use async_trait::async_trait;
-use storage::{models::role::Role, models::session::Session};
 
 #[async_trait(?Send)]
 pub(crate) trait AuthGuardContract {

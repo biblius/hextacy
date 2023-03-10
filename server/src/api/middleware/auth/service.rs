@@ -1,15 +1,15 @@
 use super::adapter::{Cache, Repository};
 use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
 use crate::config::constants::COOKIE_S_ID;
+use crate::db::adapters::postgres::session::PgSessionAdapter;
+use crate::db::models::role::Role;
+use crate::db::models::session::Session;
 use crate::error::{AuthenticationError, Error};
 use actix_web::{cookie::Cookie, dev::ServiceRequest};
-use alx_core::clients::db::postgres::Postgres;
-use alx_core::clients::db::redis::Redis;
 use async_trait::async_trait;
+use hextacy::clients::db::postgres::Postgres;
+use hextacy::clients::db::redis::Redis;
 use std::sync::Arc;
-use storage::adapters::postgres::session::PgSessionAdapter;
-use storage::models::role::Role;
-use storage::models::session::Session;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug, Clone)]

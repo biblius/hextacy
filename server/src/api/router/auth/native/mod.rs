@@ -16,6 +16,10 @@ mod tests {
         },
         service::Authentication,
     };
+    use crate::db::{
+        adapters::AdapterError,
+        models::{session::Session, user::User},
+    };
     use crate::{
         api::router::auth::{
             contract::{MockCacheContract, MockEmailContract, MockRepositoryContract},
@@ -24,7 +28,9 @@ mod tests {
         error::{AuthenticationError, Error},
     };
     use actix_web::body::to_bytes;
-    use alx_core::{
+    use data_encoding::{BASE32, BASE64URL};
+    use derive_new::new;
+    use hextacy::{
         crypto::{
             hmac::generate_hmac,
             {bcrypt_hash, uuid},
@@ -32,15 +38,9 @@ mod tests {
         env,
         web::http::response::Response,
     };
-    use data_encoding::{BASE32, BASE64URL};
-    use derive_new::new;
     use lazy_static::lazy_static;
     use reqwest::StatusCode;
     use serde::{Deserialize, Serialize};
-    use storage::{
-        adapters::AdapterError,
-        models::{session::Session, user::User},
-    };
 
     /// Mock this one here so we don't clog the code with unnecessary implementations
     #[derive(Debug, Serialize, Deserialize, new)]
@@ -84,7 +84,6 @@ mod tests {
 
     #[actix_web::main]
     async fn registration() {
-        env::set("REG_TOKEN_SECRET", "supersecret");
         /*
          * Good to go
          */
@@ -162,7 +161,12 @@ mod tests {
             email,
         };
         let data = EmailToken {
-            token: generate_hmac("REG_TOKEN_SECRET", &USER_NO_OTP.id, BASE64URL).unwrap(),
+            token: generate_hmac(
+                "supersecret".as_bytes(),
+                USER_NO_OTP.id.as_bytes(),
+                BASE64URL,
+            )
+            .unwrap(),
         };
         service.verify_registration_token(data).await.unwrap();
         /*

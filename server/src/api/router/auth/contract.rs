@@ -1,7 +1,7 @@
+use crate::db::models::{oauth::OAuthMeta, session::Session, user::User};
 use crate::{config::cache::AuthCache, error::Error};
-use alx_core::clients::oauth::{OAuthProvider, TokenResponse};
 use async_trait::async_trait;
-use storage::models::{oauth::OAuthMeta, session::Session, user::User};
+use hextacy::clients::oauth::{OAuthProvider, TokenResponse};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(?Send)]

@@ -2,19 +2,19 @@ use super::adapter::{Cache, Repository};
 use super::contract::{AuthGuardContract, CacheContract, RepositoryContract};
 use super::service::AuthenticationGuard;
 use crate::error::{AuthenticationError, Error};
-/* use ::alx_core::clients::postgres::Postgres;
-use ::alx_core::clients::redis::Redis; */
+/* use ::hextacy::clients::postgres::Postgres;
+use ::hextacy::clients::redis::Redis; */
+use crate::db::adapters::postgres::session::PgSessionAdapter;
+use crate::db::models::role::Role;
 use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
-use alx_core::clients::db::postgres::Postgres;
-use alx_core::clients::db::redis::Redis;
 use futures_util::future::LocalBoxFuture;
 use futures_util::FutureExt;
+use hextacy::clients::db::postgres::Postgres;
+use hextacy::clients::db::redis::Redis;
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
-use storage::adapters::postgres::session::PgSessionAdapter;
-use storage::models::role::Role;
 use tracing::{debug, info};
 
 #[derive(Debug, Clone)]

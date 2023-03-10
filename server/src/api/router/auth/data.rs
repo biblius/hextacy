@@ -1,7 +1,7 @@
-use alx_core::web::http::response::Response;
+use crate::db::models::user::User;
 use derive_new::new;
+use hextacy::web::http::response::Response;
 use serde::Serialize;
-use storage::models::user::User;
 
 /// Sent when the user completely authenticates
 #[derive(Debug, Serialize, new)]

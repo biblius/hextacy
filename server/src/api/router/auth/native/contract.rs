@@ -2,10 +2,10 @@ use super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Logout, Otp,
     RegistrationData, ResendRegToken, ResetPassword,
 };
+use crate::db::models::{session::Session, user::User};
 use crate::error::Error;
 use actix_web::HttpResponse;
 use async_trait::async_trait;
-use storage::models::{session::Session, user::User};
 
 #[cfg_attr(test, mockall::automock)]
 #[async_trait(?Send)]

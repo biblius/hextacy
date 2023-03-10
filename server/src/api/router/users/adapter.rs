@@ -1,10 +1,10 @@
 use super::contract::RepositoryContract;
+use crate::db::models::user;
+use crate::db::repository::user::UserRepository;
 use crate::error::Error;
-use alx_core::clients::db::{postgres::PgPoolConnection, DBConnect};
-use alx_core::db::RepositoryAccess;
-use alx_core::{contract, repository};
-use storage::models::user;
-use storage::repository::user::UserRepository;
+use hextacy::clients::db::{postgres::PgPoolConnection, DBConnect};
+use hextacy::db::RepositoryAccess;
+use hextacy::{contract, repository};
 
 repository! {
     Postgres => PgConnection : postgres;

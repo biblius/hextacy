@@ -4,7 +4,7 @@ pub mod cors;
 
 use crate::api::router;
 use actix_web::web::ServiceConfig;
-use alx_core::clients::{
+use hextacy::clients::{
     db::{postgres::Postgres, redis::Redis},
     email::Email,
 };

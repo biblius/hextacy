@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use alx_core::clients::db::redis;
+use hextacy::clients::db::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -10,18 +10,20 @@ use validify::{ValidationError, ValidationErrors};
 pub(crate) enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
+    #[error("Env var Error: {0}")]
+    Var(#[from] std::env::VarError),
     #[error("Client Error: {0}")]
-    Client(#[from] alx_core::clients::ClientError),
+    Client(#[from] hextacy::clients::ClientError),
     #[error("Database Error: {0}")]
-    Database(#[from] alx_core::db::DatabaseError),
+    Database(#[from] hextacy::db::DatabaseError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] alx_core::cache::CacheError),
+    Cache(#[from] hextacy::cache::CacheError),
     #[error("Adapter Error: {0}")]
-    Adapter(#[from] storage::adapters::AdapterError),
+    Adapter(#[from] crate::db::adapters::AdapterError),
     #[error("Redis Error: {0}")]
     Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
-    Crypto(#[from] alx_core::crypto::CryptoError),
+    Crypto(#[from] hextacy::crypto::CryptoError),
     #[error("Diesel Error: {0}")]
     Diesel(#[from] diesel::result::Error),
     #[error("Serde Error: {0}")]
@@ -33,9 +35,9 @@ pub(crate) enum Error {
     #[error("Validation Error")]
     Validation(Vec<ValidationError>),
     #[error("Http Error")]
-    Http(#[from] alx_core::web::http::HttpError),
+    Http(#[from] hextacy::web::http::HttpError),
     #[error("OAuth Provider Error")]
-    OAuthProvider(#[from] alx_core::clients::oauth::OAuthProviderError),
+    OAuthProvider(#[from] hextacy::clients::oauth::OAuthProviderError),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]
@@ -57,7 +59,7 @@ impl Error {
     pub fn message_and_description(&self) -> (&'static str, String) {
         match self {
             Self::Authentication(e) => e.describe(),
-            Self::Adapter(storage::adapters::AdapterError::DoesNotExist) => {
+            Self::Adapter(crate::db::adapters::AdapterError::DoesNotExist) => {
                 ("NOT_FOUND", format!("Resource does not exist"))
             }
             Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),
