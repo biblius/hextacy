@@ -2,9 +2,10 @@ use crate::clients::ClientError;
 use async_trait::async_trait;
 use std::sync::Arc;
 
+#[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
 pub mod mongo;
+#[cfg(any(feature = "db", feature = "full", feature = "diesel"))]
 pub mod postgres;
-pub mod redis;
 
 #[derive(Debug, Clone)]
 /// A struct that contains a generic client `A` that through [DBConnect] establishes a database connection `C`.

@@ -192,8 +192,10 @@ pub enum DatabaseError {
     Client(#[from] super::clients::ClientError),
     #[error("Transaction Error: {0}")]
     Transaction(#[from] TransactionError),
+    #[cfg(any(feature = "db", feature = "full", feature = "diesel"))]
     #[error("Diesel Error: {0}")]
     Diesel(#[from] diesel::result::Error),
+    #[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
     #[error("Mongo Error: {0}")]
     Mongo(#[from] mongodb::error::Error),
 }

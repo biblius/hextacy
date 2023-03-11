@@ -1,5 +1,4 @@
 use super::ClientError;
-use crate::env;
 use async_trait::async_trait;
 use diesel::{
     r2d2::{ConnectionManager, Pool, PooledConnection, State},
@@ -14,11 +13,15 @@ pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Builds a postgres connection pool. Searches the shell env for `POSTGRES_URL` and `PG_POOL_SIZE`.
 /// Panics if the db url isn't present or if the pool size is not parseable. The pool size defaults to 8 if not set.
-pub fn build_pool() -> PgPool {
-    let url = env::get("POSTGRES_URL").expect("POSTGRES_URL must be set");
-    let pool_size = env::get_or_default("PG_POOL_SIZE", "8")
-        .parse::<u32>()
-        .expect("Unable to parse PG_POOL_SIZE, maker sure it is a valid integer");
+pub fn build_pool(
+    host: &str,
+    port: u16,
+    user: &str,
+    password: &str,
+    db: &str,
+    pool_size: u32,
+) -> PgPool {
+    let url = format!("postgresql://{user}:{password}@{host}:{port}/{db}");
 
     trace!("Bulding Postgres pool for {url}");
 
@@ -37,12 +40,6 @@ pub struct Postgres {
     pool: PgPool,
 }
 
-impl Default for Postgres {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[async_trait(?Send)]
 impl DBConnect for Postgres {
     type Connection = PgPoolConnection;
@@ -57,9 +54,18 @@ impl DBConnect for Postgres {
 }
 
 impl Postgres {
-    pub fn new() -> Self {
+    pub fn new(
+        host: &str,
+        port: u16,
+        user: &str,
+        password: &str,
+        db: &str,
+        pool_size: u32,
+    ) -> Self {
         info!("Intitializing Postgres pool");
-        Self { pool: build_pool() }
+        Self {
+            pool: build_pool(host, port, user, password, db, pool_size),
+        }
     }
 
     /// Attempts to establish a pooled connection.
@@ -70,10 +76,8 @@ impl Postgres {
         }
     }
 
-    /// Attempts to establish a direct connection to the postgres server. Panics if `POSTGRES_URL` is not set
-    /// in the environment.
-    pub fn connect_direct(&self) -> Result<PgConnection, ClientError> {
-        let db_url = env::get("POSTGRES_URL")?;
+    /// Expects a url as postgresql://user:password@host:port/database
+    pub fn connect_direct(&self, db_url: &str) -> Result<PgConnection, ClientError> {
         PgConnection::establish(&db_url).map_err(Into::into)
     }
 

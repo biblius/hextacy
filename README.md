@@ -4,51 +4,13 @@ A repository designed to quick start web server development with [actix_web](htt
 
 The kind of project structure this repository uses is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
-## **Get started**
-
-1. Create a real `.env` file filling out the example file with your desired parameters and create the database you entered in the file. You do not have to fill out fields you don't intend to use.
-
-    - For the Email part, use [this spec](https://support.google.com/mail/answer/7126229?hl=en#zippy=%2Cstep-change-smtp-other-settings-in-your-email-client) to set up the SMTP host(smtp.gmail.com) and port(465) and [follow these instructions](https://support.google.com/accounts/answer/185833?hl=en#zippy=%2Cwhy-you-may-need-an-app-password) to generate an app password. The password can then be used for the `SMTP_PASSWORD` variable. For the sender and username enter your email address.
-
-2. Install the CLI tool via
-
-    ```bash
-    cargo install --path xtc
-    ```
-
-3. For the secrets, (namely REG_TOKEN_SECRET and COOKIE_SECRET) run
-
-    ```bash
-    xtc c secret <SECRET_NAME> [-n <NAME>] [-l <LENGTH>]
-    ```
-
-    and replace the example ones with them.
-
-    Run migrations via
-
-    ```bash
-    xtc m run
-    ```
-
-    Give yourself a pat on the back since you've made it this far and optionally check out all the commands with `xtc -h`.
-
-    Run the server with
-
-    ```bash
-    cargo run -p server
-    ```
-
-    and load the postman collection located in `misc` to interact with it.
-
-You now have a ready to go infrastructure, now go make that billion $$$ app!
-
 ## **Architecture**
 
-The following is the server architecture intended to be used with the various xtc helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
+The following is the server architecture intended to be used with the various hextacy helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
 
-Backend server development usually, if not always, consists of data stores. *Repositories* provide methods through which the application's *Adapters* can interact with to get access to database *Models*.
+Backend servers usually, if not always, consists of data stores. *Repositories* provide methods through which an application's *Adapters* can interact with to get access to database *Models*.
 
-In this architecture, a repository contains no implementation details. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model. For this reason, repository methods must always take in a completely generic connection parameter. This generic parameter is made concrete in adapter implementations.
+In this architecture, a repository contains no implementation details. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model. For this reason, repository methods must always take in a completely generic connection parameter which is made concrete in adapter implementations.
 
 When business level services need access to the database, they can obtain it by having a repository struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
 
@@ -60,7 +22,7 @@ So far, we have 2 generic parameters, the client and the connection, and we have
 
 Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every intermediate repository we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
 
-First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint:
+First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](https://github.com/biblius/hextacy_examples.git) in the examples repo to see how everything is ultimately set up.
 
 ## **The server**
 
@@ -281,7 +243,7 @@ To reduce some of the unpleasentness with dealing with so many generics, macros 
 
       RepositoryContract => Repository, RepositoryAccess;
       
-      User => UserRepository<C>;
+      User => UserRepository<Connection>;
   
       fn get_paginated(
           &self,
@@ -347,7 +309,6 @@ Now, instead of simply establishing a connection and calling `User::get_paginate
           hextacy::db::AtomicConnection::New(mut conn) => User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new),
           hextacy::db::AtomicConnection::Existing(mut conn) => User::get_paginated(conn.borrow_mut().as_mut().unwrap(), page, per_page, sort).map_err(Error::new),
         }
-        
     }
   }
   ```
@@ -425,7 +386,19 @@ The adapter just implements the `UserRepository` trait and returns the model usi
 
 ## **hextacy**
 
-Contains various utilities for working with http, email and websockets:
+Feature flags:
+
+```bash
+  - full - Enables all the feature below
+
+  - db - Enables mongo, diesel and redis
+  - ws - Enable the WS session adapter and message broker
+
+  - diesel - Enables the diesel postgres client and derive macros
+  - mongo - Enables the mongodb client and derive macros
+  - redis - Enables the redis client and cache access trait
+  - email - Enables the SMTP client and lettre
+```
 
 - ### **db**
 
@@ -433,7 +406,7 @@ Contains various utilities for working with http, email and websockets:
 
 - ### **clients**
   
-  Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs.
+  Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs. Check out the [clients readme](./hextacy/src/clients/README.md)
 
 - ### **logger**
 
@@ -469,83 +442,7 @@ Contains various utilities for working with http, email and websockets:
 
   Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation. The `CacheAccess` and `CacheIdentifier` traits can be used for such purposes.
 
-### **A note on middleware**
-  
-  The structure is similar to the endpoints as demonstrated above. If you're interested in a bit more detail about how Actix's middleware works, [here's a nice blog post you can read](https://imfeld.dev/writing/actix-web-middleware). By wrapping resources with middleware we get access to the request before it actually hits the handler. This enables us to append any data to the request for use by the designated handler. Essentially, we have to implement the `Transform` trait for the middleware and the `Service` trait for the actual business logic.
-
-  If you take a look at the `auth` middleware you'll notice how our `Transform` implementation, specifically the `new_transform` function returns a future whose output value is a result containing either the `AuthMiddleware` or an `InitError` which is a unit type. If you take a look at the signature for Actix's `wrap` function you can see that we can pass to it anything that implements `Transform`. This means that, for example, when we want to wrap a resource with our `AuthGuardMiddleware`, we have to pass the instantiated `AuthGuard` struct, because that's the one implementing `Transform`.
-  If you take an even closer look at what happens in `wrap` you'll see that it triggers `new_transform` internally, meaning the instantiated `AuthGuard` transforms into an `AuthGuardMiddleware` which executes all the business.
-
-  The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
-
-### **The config file**
-
-  We tie all our handlers together in the `config.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
-
-  ```rust
-  pub(super) fn init(cfg: &mut ServiceConfig) {
-      let pg = Arc::new(Postgres::new());
-
-      users::setup::routes(pg, cfg);
-  }
-  ```
-
-  We would then pass this function to our server setup.
-
-  ```rust
-      HttpServer::new(move || {
-          App::new()
-              .configure(config::init)
-              .wrap(Logger::default())
-      })
-      .bind_openssl(addr, builder)?
-      .run()
-      .await
-  ```
-
-  Read more about the openssl setup in `openssl/README.md`
-
-The helpers module contains various helper functions usable throughout the server.
-
-### **Storage Directory Overview**
-
-The storage crate is project specific which is why it's completely seperated from the rest. It contains 3 main modules:
-
-- **Repository**
-
-    Contains interfaces for interacting with application models. Their sole purpose is to describe the nature of interaction with the database, they are completely oblivious to the implementation. This module is designed to be as generic as possible and usable anywhere in the service logic.
-
-- **Adapters**
-
-    Contains the client specific implementations of the repository interfaces. Adapters adapt the behaviour dictated by their underlying repository. Seperating implementation from behaviour decouples any other module using a repository from the client specific code located in the adapter.
-
-- **Models**
-
-    Where application models are located.
-
-The storage adapters can utilize connections established from the clients module.
-
-## **Authentication flow**
-
-The user is expected to enter their email and password after which an email with a registration token gets sent (`start_registration`).
-
-Users can request another token if their token expires (`resend_registration_token`).
-
-Once the user verifies their registration token they must log in, after which they will receive a session ID cookie and a CSRF token in the header (`verify_registration_token`, `login`).
-
-The cookie and token are then used by the middleware to authenticate the user when accessing protected resources. It does so by grabbing both from the request and trying to fetch a session first from the cache, then if that fails from postgres. The session is searched for by ID and must be unexpired and have a matching csrf token, otherwise the middleware will error.
-
-A route exists for setting a user's OTP secret and a session must be established to access it (`set_otp_secret`).
-
-When a user sets their OTP secret they have to provide a valid OTP after successfully verifying credentials or they won't be able to establish a session (`verify_otp`).
-
-Users can change their password and logout only if they have an established session. On logout a user can also choose to purge all of their sessions (`change_password`, `logout`).
-
-If a user changes their password their sessions will be purged and they will receive an email notifying them of the change with a password reset token in case it wasn't them. The PW reset token lasts for 2 days (`reset_password`).
-
-Users who forgot their passwords can request a password reset. They will receive an email with a temporary token they must send upon changing their password for the server to accept the change. Once they successfully change it their sessions will be purged and a new one will be established (`forgot_password`, `verify_forgot_password`).
-
-## **XTC**
+## **XTC - Very much a work in progress**
 
 A.K.A. the CLI tool provides a way of seamlessly generating and documenting endpoints and middleware.
 
@@ -577,10 +474,6 @@ All commands take in the `-v` flag which stands for 'verbose' and if true print 
 
 TODO:
 
-- [ ] Add maxmind and activity logging middleware
-
-- [ ] Openssl with let's encrypt
-
 - [ ] Init project with `xtc init`
-
-- [ ] Something probably
+- [ ] Add trybuild tests for macros
+- [ ]

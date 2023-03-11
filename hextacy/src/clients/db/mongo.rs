@@ -1,9 +1,8 @@
 use super::DBConnect;
-use crate::{clients::ClientError, env};
+use crate::clients::ClientError;
 use async_trait::async_trait;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
-    sync::Client as SyncClient,
     Client, ClientSession,
 };
 use tracing::trace;
@@ -13,8 +12,9 @@ pub struct Mongo {
 }
 
 impl Mongo {
-    pub fn new() -> Self {
-        match Client::with_options(client_options()) {
+    pub fn new(host: &str, port: u16, user: &str, password: &str, db: &str) -> Self {
+        let options = client_options(host, port, user, password, db);
+        match Client::with_options(options) {
             Ok(client) => {
                 trace!("Built Mongo client");
                 Self { client }
@@ -23,10 +23,10 @@ impl Mongo {
         }
     }
 
-    pub fn direct() -> Self {
-        let mut opts = client_options();
-        opts.direct_connection = Some(true);
-        match Client::with_options(opts) {
+    pub fn direct(host: &str, port: u16, user: &str, password: &str, db: &str) -> Self {
+        let mut options = client_options(host, port, user, password, db);
+        options.direct_connection = true.into();
+        match Client::with_options(options) {
             Ok(client) => {
                 trace!("Built Mongo client with direct connection");
                 Self { client }
@@ -36,53 +36,23 @@ impl Mongo {
     }
 }
 
-impl Default for Mongo {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Searches for `MONGO_HOST`, `MONGO_PORT`, `MONGO_USER`, `MONGO_PASSWORD`,
-/// and `MONDO_DATABASE` environment variables and panics if any are not set.
-fn client_options() -> ClientOptions {
-    let mut params = env::get_multiple(&[
-        "MONGO_HOST",
-        "MONGO_PORT",
-        "MONGO_USER",
-        "MONGO_PASSWORD",
-        "MONGO_DATABASE",
-    ]);
-
-    let database = params.pop().expect("MONGO_DATABASE must be set");
-
-    let password = params.pop().expect("MONGO_PASSWORD must be set");
-
-    let user = params.pop().expect("MONGO_USER must be set");
-
-    let port = params
-        .pop()
-        .expect("MONGO_PORT must be set")
-        .parse()
-        .expect("MONGO_PORT must be a valid integer");
-
-    let host = params.pop().expect("MONGO_HOST must be set");
-
+fn client_options(host: &str, port: u16, user: &str, password: &str, db: &str) -> ClientOptions {
     let address = ServerAddress::Tcp {
-        host,
+        host: host.to_string(),
         port: Some(port),
     };
 
     let credential = Credential::builder()
-        .password(password)
-        .username(user)
+        .password(password.to_string())
+        .username(user.to_string())
         .build();
 
-    trace!("Building Mongo client options with {}", address);
+    trace!("Building Mongo client options with {address}");
 
     ClientOptions::builder()
         .hosts(vec![address])
         .credential(credential)
-        .default_database(database)
+        .default_database(db.to_string())
         .build()
 }
 
@@ -92,41 +62,7 @@ impl DBConnect for Mongo {
 
     async fn connect(&self) -> Result<Self::Connection, ClientError> {
         trace!("Mongo - Attempting pooled connection");
-        let session = self.client.start_session(None).await.unwrap();
-        // TODO -------------------------------------------^
+        let session = self.client.start_session(None).await?;
         Ok(session)
-    }
-}
-
-pub struct MongoSync {
-    pub client: SyncClient,
-}
-
-impl MongoSync {
-    pub fn new() -> Self {
-        match SyncClient::with_options(client_options()) {
-            Ok(client) => {
-                trace!("Built sync Mongo client");
-                Self { client }
-            }
-            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
-        }
-    }
-    pub fn direct() -> Self {
-        let mut opts = client_options();
-        opts.direct_connection = Some(true);
-        match SyncClient::with_options(opts) {
-            Ok(client) => {
-                trace!("Built sync Mongo client with direct connection");
-                Self { client }
-            }
-            Err(e) => panic!("Error occurred while building sync Mongo client: {e}"),
-        }
-    }
-}
-
-impl Default for MongoSync {
-    fn default() -> Self {
-        Self::new()
     }
 }

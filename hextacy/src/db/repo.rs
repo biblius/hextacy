@@ -33,7 +33,7 @@ macro_rules! repository {
       $($id:ident => $repo_bound:path),*
     ) => {
          #[allow(non_snake_case)]
-         #[derive(Debug, Clone, hextacy_derive::Repository)]
+         #[derive(Debug, Clone, hextacy::derive::Repository)]
          $(
             #[$field($conn_name)]
          )+
@@ -101,7 +101,7 @@ macro_rules! acid_repo {
       $($id:ident => $repo_bound:path),*
     ) => {
            #[allow(non_snake_case)]
-           #[derive(Debug, Clone, hextacy_derive::AcidRepository)]
+           #[derive(Debug, Clone, hextacy::derive::AcidRepository)]
            $(
               #[$field($conn_name)]
            )+

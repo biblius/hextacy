@@ -1,13 +1,13 @@
 [package]
 authors = ["biblius <crazycompanyxxl@gmail.com>"]
-description = "Consolidates all XTC modules into one library and provides core functionality for backend server development with actix"
+description = "Library containing various utilities to aid server development with hexagonal architecture"
 edition = "2021"
-homepage = "https://github.com/biblius/alchemy"
-keywords = ["alchemy", "backend", "hextacy", "server", "xtc"]
+homepage = "https://github.com/biblius/hextacy"
+keywords = ["backend", "hextacy", "hextc", "xtc"]
 license = "MIT"
 name = "hextacy"
 readme = "../README.md"
-version = "0.1.0"
+version = "0.1.1"
 
 [lib]
 name = "hextacy"
@@ -24,15 +24,24 @@ serde_json = "1.0.81"
 tracing = "0.1.35"
 tracing-test = "0.2.3"
 
-# HTTP
+# HTTP & Websocket
 
+actix = { version = "0.13.0", optional = true }
 actix-web = "4"
+actix-web-actors = { version = "4.1.0", optional = true }
 cookie = { version = "0.16.1", features = ["secure"] }
 
-# Websocket
+# Clients
 
-actix = "0.13.0"
-actix-web-actors = "4.1.0"
+diesel = { version = "2.0.1", features = [
+  "chrono",
+  "postgres",
+  "r2d2",
+  "serde_json",
+], optional = true }
+lettre = { version = "0.10.3", optional = true }
+mongodb = { version = "2.3.1", features = ["tokio-runtime"], optional = true }
+r2d2_redis = { version = "0.14.0", optional = true }
 
 # Crypto
 
@@ -50,7 +59,7 @@ uuid = { version = "1.1.2", features = ["v4"] }
 
 async-trait = "0.1.42"
 colored = "2.0.0"
-diesel = "2.0.3"
+dotenv = "0.15.0"
 lazy_static = "1.4.0"
 mockall = "0.11.3"
 reqwest = { version = "0.11.14", features = ["json"] }
@@ -62,7 +71,17 @@ tokio = "1.24.2"
 env_logger = "0.10.0"
 hextacy_derive = { version = "0.1.0", path = "../hextacy_derive" }
 log4rs = "1.2.0"
-mongodb = "2.4.0"
-r2d2_redis = "0.14.0"
-dotenv = "0.15.0"
-lettre = "0.10.3"
+
+
+[features]
+default = ["full"]
+
+full = ["db", "email", "ws"]
+
+db = ["dep:diesel", "dep:mongodb", "dep:r2d2_redis"]
+ws = ["dep:actix", "dep:actix-web-actors"]
+
+diesel = ["dep:diesel"]
+email = ["dep:lettre"]
+mongo = ["dep:mongodb"]
+redis = ["dep:r2d2_redis"]

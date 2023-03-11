@@ -1,5 +1,6 @@
-use super::ClientError;
 pub use lettre;
+
+use super::ClientError;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{message::header::ContentType, Message, SmtpTransport, Transport};
 use std::{fmt::Write, fs, path::Path};
