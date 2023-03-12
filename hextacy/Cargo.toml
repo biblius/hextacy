@@ -50,7 +50,7 @@ data-encoding = "2.3.2"
 hmac = "0.12.1"
 jsonwebtoken = "8.1.1"
 rand = "0.8.5"
-rsa = { version = "0.6.1", features = ["pem"] }
+rsa = { version = "0.8.2", features = ["pem"] }
 sha2 = "0.10.6"
 thotp = "0.1.11"
 uuid = { version = "1.1.2", features = ["v4"] }
