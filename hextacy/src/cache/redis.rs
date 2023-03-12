@@ -1,6 +1,8 @@
 use crate::clients::cache::redis::{
-    Commands, FromRedisValue, RedisError, RedisPoolConnection, ToRedisArgs,
+    redis::{FromRedisValue, RedisError, ToRedisArgs},
+    RedisPoolConnection,
 };
+use redis::Commands;
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Display;
 use thiserror::Error;

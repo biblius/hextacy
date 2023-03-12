@@ -26,7 +26,7 @@ pub enum ClientError {
     RdPoolConnection(String),
     #[cfg(any(feature = "full", feature = "db", feature = "redis"))]
     #[error("RD Connection error: {0}")]
-    RdDirectConnection(#[from] r2d2_redis::redis::RedisError),
+    RdDirectConnection(#[from] redis::RedisError),
 
     #[cfg(any(feature = "full", feature = "email"))]
     #[error("Transport error: {0}")]

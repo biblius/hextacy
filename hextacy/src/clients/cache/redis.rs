@@ -1,18 +1,12 @@
+pub use redis;
+
 use crate::clients::ClientError;
-use r2d2_redis::{
-    r2d2::{Pool, PooledConnection},
-    redis::{Client, ConnectionInfo, IntoConnectionInfo},
-    RedisConnectionManager,
-};
+use r2d2::{Pool, PooledConnection};
+use redis::{Client, ConnectionInfo, IntoConnectionInfo};
 use tracing::{info, trace};
 
-pub use r2d2_redis::redis::Commands;
-pub use r2d2_redis::redis::FromRedisValue;
-pub use r2d2_redis::redis::RedisError;
-pub use r2d2_redis::redis::ToRedisArgs;
-
-pub type RedisPool = Pool<r2d2_redis::RedisConnectionManager>;
-pub type RedisPoolConnection = PooledConnection<r2d2_redis::RedisConnectionManager>;
+pub type RedisPool = Pool<redis::Client>;
+pub type RedisPoolConnection = PooledConnection<redis::Client>;
 
 /// Builds a Redis connection pool with a default size of 8 workers
 pub fn build_pool(
@@ -27,26 +21,19 @@ pub fn build_pool(
 
     trace!("Building Redis pool for {:?}", conn_info.addr);
 
-    let manager = RedisConnectionManager::new(conn_info)
-        .expect("Error while attempting to construct Redis connection manager");
+    let client = redis::Client::open(conn_info).expect("Could not create redis client");
 
     Pool::builder()
         .max_size(pool_size)
-        .build(manager)
+        .build(client)
         .unwrap_or_else(|e| panic!("Failed to create redis pool: {e}"))
 }
 
 /// Panics if the DB url cannot be constructed
 fn connection_info(host: &str, port: u16, user: &str, password: &str, db: i64) -> ConnectionInfo {
-    let db_url = format!("redis://{host}:{port}");
-
-    trace!("Building Redis connection info with {db_url}");
-
+    let db_url = format!("redis://{user}:{password}@{host}:{port}");
     let mut conn_info = db_url.into_connection_info().unwrap();
-    conn_info.username = Some(user.to_string());
-    conn_info.passwd = Some(password.to_string());
-    conn_info.db = db;
-
+    conn_info.redis.db = db;
     conn_info
 }
 

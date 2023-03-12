@@ -1,3 +1,4 @@
+use actix_web::cookie::Cookie;
 use actix_web::{
     http::{
         header::{HeaderName, HeaderValue},
@@ -5,7 +6,6 @@ use actix_web::{
     },
     HttpResponse, HttpResponseBuilder,
 };
-use cookie::Cookie;
 use serde::Serialize;
 
 pub struct ResponseBuilder<'a, T: Response<'a>> {
