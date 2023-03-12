@@ -7,7 +7,7 @@ keywords = ["backend", "hextacy", "hextc", "xtc"]
 license = "MIT"
 name = "hextacy"
 readme = "../README.md"
-version = "0.1.11"
+version = "0.1.12"
 
 [lib]
 name = "hextacy"
