@@ -83,13 +83,14 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          args: --feature-powerset check --lib --tests
+          # Exclude xtc since it's a binary
+          args: --workspace --exclude xtc --feature-powerset check --lib --tests
 
   msrv:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        msrv: [1.63.0]
+        msrv: [1.65.0]
     name: ubuntu / ${{ matrix.msrv }}
     steps:
       - uses: actions/checkout@v3

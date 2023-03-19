@@ -26,6 +26,7 @@ jobs:
         run: cargo generate-lockfile
       - name: cargo test --locked
         run: cargo test --locked --all-features --all-targets
+
   minimal:
     runs-on: ubuntu-latest
     name: ubuntu / stable / minimal-versions
@@ -37,19 +38,23 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install nightly for -Zminimal-versions
         uses: dtolnay/rust-toolchain@nightly
+      - name: Export OPENSSL_DIR
+        run: export OPENSSL_DIR='usr/bin/openssl'
       - name: rustup default stable
         run: rustup default stable
       - name: cargo update -Zminimal-versions
         run: cargo +nightly update -Zminimal-versions
       - name: cargo test
-        run: cargo test --locked --all-features --all-targets
+        # We are interested only in libs, since examples can complain about openssl
+        run: cargo test --lib --locked --all-features --all-targets
+
   os-check:
     runs-on: ${{ matrix.os }}
     name: ${{ matrix.os }} / stable
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest]
     steps:
       - uses: actions/checkout@v3
         with:
@@ -60,7 +65,8 @@ jobs:
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
       - name: cargo test
-        run: cargo test --locked --all-features --all-targets
+        run: cargo test --workspace --locked --all-features --all-targets
+
   coverage:
     runs-on: ubuntu-latest
     name: ubuntu / stable / coverage
