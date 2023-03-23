@@ -70,7 +70,7 @@ dotenv = "0.15.0"
 lazy_static = "1.4.0"
 mockall = "0.11.3"
 reqwest = { version = "0.11.14", features = ["json"] }
-syn = { version = "1.0.107", features = ["full"] }
+syn = { version = "2.0.7", features = ["full"] }
 thiserror = "1.0.37"
 tokio = "1.24.2"
 
