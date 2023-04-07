@@ -1,11 +1,9 @@
 use super::CryptoError;
-use colored::Colorize;
 use jsonwebtoken::*;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use tracing::info;
 
 /// Used for jwts. sub is the actual payload, iat and exp are unix timestamps representing the issued at and expiration times respectively.
 /// As per https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
@@ -32,14 +30,14 @@ impl Claims {
 pub fn generate(
     sub: String,
     issuer: String,
-    expires_in: cookie::time::Duration,
+    expires_in: chrono::Duration,
     algo: Algorithm,
 ) -> Result<String, CryptoError> {
     let priv_key = fs::read(Path::new("../encryption/key_pair/priv_key.pem"))?;
     let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
 
     let now = jsonwebtoken::get_current_timestamp();
-    let exp_timestamp = now + expires_in.whole_seconds() as u64;
+    let exp_timestamp = now + expires_in.num_seconds() as u64;
 
     let claims = Claims::new(sub, issuer, exp_timestamp);
     let token = encode(&Header::new(algo), &claims, &encoding_key)?;
@@ -49,7 +47,6 @@ pub fn generate(
 
 /// Parses the token issued by the generate_jwt function.
 pub fn parse<T: Serialize + DeserializeOwned>(token: &str) -> Result<T, CryptoError> {
-    info!("{}", "Verifying JWT".cyan());
     // Fetch public key
     let pub_key = fs::read(Path::new("../encryption/key_pair/pub_key.pem"))?;
 

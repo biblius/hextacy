@@ -1,4 +1,3 @@
-pub mod cookie;
 pub mod response;
 pub mod security_headers;
 

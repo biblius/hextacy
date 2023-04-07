@@ -1,6 +1,7 @@
 use actix_web::http::header::*;
 use actix_web::middleware::DefaultHeaders;
 
+//TODO : Create with params
 /// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
 pub fn default_content_security_policy() -> (HeaderName, HeaderValue) {
     (

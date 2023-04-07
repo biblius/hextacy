@@ -2,87 +2,87 @@
 
 A repository designed to quick start web server development with [actix_web](https://actix.rs/) by providing an extensible infrastructure and a CLI tool to reduce manually writing boilerplate while maintaining best practices.
 
-The kind of project structure this repository uses is heavily based on [hexagonal architecture](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)) also known as the *ports and adapters* architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
+The kind of project structure this repository uses is heavily based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
 ## **Architecture**
 
 The following is the server architecture intended to be used with the various hextacy helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
 
-Backend servers usually, if not always, consists of data stores. *Repositories* provide methods through which an application's *Adapters* can interact with to get access to database *Models*.
+Backend servers usually, if not always, consists of data stores. _Repositories_ provide methods through which an application's _Adapters_ can interact with to get access to database _Models_.
 
 In this architecture, a repository contains no implementation details. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model. For this reason, repository methods must always take in a completely generic connection parameter which is made concrete in adapter implementations.
 
-When business level services need access to the database, they can obtain it by having a repository struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
+When business level services need access to the database, they can obtain it by having a service adapter struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
 
-In the service's definition, its repository must be constrained by any repository traits the service requires. This will require that the intermediate service repository also takes in generic connection parameters. Since the service should be oblivious to the repository implementation, this means that the client this intermediate repository uses to establish database connections must also be generic, since the service cannot know in advance which adapter it will be using.
+In the service's definition, its adapter must be constrained by any repository traits the service requires. This will require that the service adapter also takes in generic connection parameters. Since the service should be oblivious to the repository implementation, this means that the driver this service adapter uses to establish database connections must also be generic, since the service cannot know in advance which adapter it will be using.
 
-The generic connection could be mitigated by moving the client from the business level to the adapter level, but unfortunately we would then lose the ability perfom database transactions (without a nightmare API). The business level must retain its ability to perform atomic queries.
+The generic connection could be mitigated by moving the driver from the business level to the adapter level, but unfortunately we would then lose the ability perfom database transactions (without a nightmare API). The business level must retain its ability to perform atomic queries.
 
-So far, we have 2 generic parameters, the client and the connection, and we have repositories, interfaces our service repositories can utilise to obtain data, so good!
+So far, we have 2 generic parameters, the driver and the connection, and we have repositories, interfaces our service repositories can utilise to obtain data, so good!
 
-Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every intermediate repository we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
+Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every service adapter we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
 
-First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](https://github.com/biblius/hextacy_examples.git) in the examples repo to see how everything is ultimately set up.
+First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](./examples/server/src/) in the examples repo to see how everything is ultimately set up.
 
 ## **The server**
 
-  First things first, we have to define the data we'll use:
-  
-- **data.rs**
-  
-    ```rust
-    // We expect this in the query params
-    // Validify creates a GetUsersPaginatedPayload in the background
-    #[derive(Debug, Deserialize)]
-    #[validify]
-    #[serde(rename_all = "camelCase")]
-    pub(super) struct GetUsersPaginated {
-      #[validate(range(min = 1, max = 65_535))]
-      pub page: Option<u16>,
-      #[validate(range(min = 1, max = 65_535))]
-      pub per_page: Option<u16>,
-    }
-  
-    // It must derive Serialize and optionally new for convenience (provided by the
-    // derive_new crate)
-    #[derive(Debug, Serialize, new)]
-    pub(super) struct UserResponse {
-      users: Vec<User>,
-    }
+First things first, we have to define the data we'll use:
 
-    impl Response for UserResponse {}
-    ```
+- **data.rs**
+
+  ```rust
+  // We expect this in the query params
+  // Validify creates a GetUsersPaginatedPayload in the background
+  #[derive(Debug, Deserialize)]
+  #[validify]
+  #[serde(rename_all = "camelCase")]
+  pub(super) struct GetUsersPaginated {
+    #[validate(range(min = 1, max = 65_535))]
+    pub page: Option<u16>,
+    #[validate(range(min = 1, max = 65_535))]
+    pub per_page: Option<u16>,
+  }
+
+  // It must derive Serialize and optionally new for convenience (provided by the
+  // derive_new crate)
+  #[derive(Debug, Serialize, new)]
+  pub(super) struct UserResponse {
+    users: Vec<User>,
+  }
+
+  impl Response for UserResponse {}
+  ```
 
 `GetUsersPaginated` comes in, gets validated, `UserReponse` comes out, simple enough!
 We create entry points for the service with handlers:
 
 - **handler.rs**
-  
-    ```rust
-    use super::{contract::ServiceContract, data::GetUsersPaginatedPayload};
-  
-    pub(super) async fn get_paginated<S: ServiceContract>(
-      data: web::Query<GetUsersPaginatedPayload>,
-      service: web::Data<S>,
-    ) -> Result<impl Responder, Error> {
-        let query = GetUsersPaginated::validify(data.0)?;
-        info!("Getting users");
-        service.get_paginated(query)
-    }
-    ```
+
+  ```rust
+  use super::{api::ServiceApi, data::GetUsersPaginatedPayload};
+
+  pub(super) async fn get_paginated<S: ServiceApi>(
+    data: web::Query<GetUsersPaginatedPayload>,
+    service: web::Data<S>,
+  ) -> Result<impl Responder, Error> {
+      let query = GetUsersPaginated::validify(data.0)?;
+      info!("Getting users");
+      service.get_paginated(query)
+  }
+  ```
 
 So far we've been showcasing a simple actix handler, so let's get to the good stuff.
 
-Notice that we have a `ServiceContract` bound in our handler. Services define their api through contracts. Contracts are nothing more than traits (interfaces) through which we interact with the service:
+Notice that we have a `ServiceApi` bound in our handler. Services define their api through traits:
 
-- **contract.rs**
+- **api.rs**
 
   ```rust
-  pub(super) trait ServiceContract {
+  pub(super) trait ServiceApi {
     fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
   }
 
-  pub(super) trait RepositoryContract {
+  pub(super) trait RepositoryApi {
       fn get_paginated(
           &self,
           page: u16,
@@ -92,22 +92,20 @@ Notice that we have a `ServiceContract` bound in our handler. Services define th
   }
   ```
 
-These contracts define the behaviour we want from our service and the infrastructure it will use.
-The service contract is implemented by the service struct:
+In it we define the behaviour we want from our service and the infrastructure it will use.
+The service api is implemented by the service struct:
 
 - **service.rs**
 
   ```rust
   pub(super) struct UserService<R>
-  where
-      R: RepositoryContract,
   {
       pub repository: R,
   }
 
-  impl<R> ServiceContract for UserService<R>
+  impl<R> ServiceApi for UserService<R>
   where
-      R: RepositoryContract,
+      R: RepositoryApi,
   {
       fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
           let users = self.repository.get_paginated(
@@ -123,7 +121,7 @@ The service contract is implemented by the service struct:
   }
   ```
 
-The service has a single field that must implement the contract. This contract serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryContract`. This helps with the generic bounds in the upcoming repository and makes testing the services a breeze!
+The service has a single field that is completely generic, however in the impl block we bind it to the api. This api serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryApi`. This helps with the generic bounds in the upcoming repository and makes testing the services a breeze!
 
 Now we have to define our repository and is when we enter the esoteric realms of rust trait bounds:
 
@@ -131,47 +129,49 @@ Now we have to define our repository and is when we enter the esoteric realms of
 
   ```rust
   use hextacy_derive::Repository;
-  use hextacy::clients::db::{Client, DBConnect};
+  use hextacy::drivers::db::{Driver, DBConnect};
   use std::{marker::PhantomData, sync::Arc};
 
   #[derive(Debug, Clone, Repository)]
-  #[postgres(Conn)]
-  pub struct Repository<C, Conn, User>
+  #[postgres(Connection)]
+  pub struct ServiceAdapter<D, Connection, User>
   where
-      C: DBConnect<Connection = Conn>,
-      User: UserRepository<Conn>,
+      D: DBConnect<Connection = Connection>,
+      User: UserRepository<Connection>,
   {
-      postgres: Client<C, Conn>,
+      #[diesel(Connection)]
+      postgres: Driver<D, Connection>,
       user: PhantomData<User>,
   }
 
   // This one's for convenience
-  impl<C, Conn, User> Repository<C, Conn, User>
+  impl<D, Connection, User> ServiceAdapter<D, Connection, User>
   where
-      C: DBConnect<Connection = Conn>,
-      User: UserRepository<Conn>
+      D: DBConnect<Connection = Connection>,
+      User: UserRepository<Connection>
   {
-      pub fn new(client: Arc<A>) -> Self {
+      pub fn new(driver: Arc<A>) -> Self {
           Self {
-              client: Client::new(client),
+              driver: Driver::new(driver),
               user: PhantomData
           }
       }
   }
 
-  impl<C, Conn, User> RepositoryContract for Repository<C, Conn, User> 
+  #[async_trait::async_trait]
+  impl<D, Connection, User> RepositoryApi for ServiceAdapter<D, Connection, User>
   where
-      Self: RepositoryAccess<Conn>,
-      C: DBConnect<Connection = Conn>,
-      User: UserRepository<Conn>
+      Self: RepositoryAccess<Connection>,
+      D: DBConnect<Connection = Connection>,
+      User: UserRepository<Connection>
   {
-    fn get_paginated(
+    async fn get_paginated(
         &self,
         page: u16,
         per_page: u16,
         sort: Option<user::SortOptions>,
     ) -> Result<Vec<user::User>, Error> {
-        let mut conn = self.connect()?;
+        let mut conn = self.connect().await?;
         User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new)
     }
   }
@@ -179,23 +179,21 @@ Now we have to define our repository and is when we enter the esoteric realms of
 
 That's a lot of stuff for just getting users out of the database.
 
-The `Repository` derive implements the `RepositoryAccess` trait using `PgPoolConnection` as its connection type, since we annotated it with
-postgres.
+The `Repository` derive implements the `RepositoryAccess` trait using `PgPoolConnection` as its connection type, since we annotated its driver field with diesel - a postgres driver that uses `PgPoolConnection`.
 
-`RepositoryAccess` is a simple trait that is generic over the connection and gives its implementors a `connect()` method to establish a connection to the database. In the `Repository` derive, this generic connection is concretised to `PgPoolConnection`, which basically means we can use any client that can establish that connection. The `Postgres` client can do just that (it is simply a wrapper around a connection pool).
+`RepositoryAccess` is a simple trait that is generic over the connection and gives its implementors a `connect()` method to establish a connection to the database. In the `Repository` derive, this generic connection is concretised to `PgPoolConnection`, which basically means we can use any driver that can establish that connection. The `PostgresDiesel` driver can do just that (it is simply a wrapper around a connection pool).
 
-The `#[postgres(Conn)]` attribute tells the derive macro which generic connection parameter to substitute in the implementation and must match the generic in the struct. `RepositoryAccess` can be manually implemented as well.
+The `#[diesel(Connection)]` attribute tells the derive macro which generic connection parameter to substitute in the implementation with a concrete implementation and must match the generic connection the struct. `RepositoryAccess` can be manually implemented as well.
 
-`DBConnect` is a trait used by clients to establish an actual connection. All concrete clients implement it in their specific ways.
-It is also implemented by the `Client` struct. A `Client` is a wrapper around a concrete client and simply delegates the `connect()` call to it.
+`DBConnect` is a trait used by drivers to establish an actual connection. All concrete drivers implement it in their specific ways. It is also implemented by the `Driver` struct. A `Driver` is a wrapper around a concrete driver and simply delegates the `connect()` call to it.
 
-As you can see, the client's `C` parameter MUST implement `DBConnect` which takes care of connecting to the database and its connection MUST be the same as the connection on `DBConnect`. This takes care of how we're connecting to the DB.
+As you can see, the driver's `D` parameter MUST implement `DBConnect` which takes care of connecting to the database and its connection MUST be the same as the connection on `DBConnect`. This takes care of how we're connecting to the DB.
 
-The `User` bound is simply a bound to a repository the service's repository will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
+The `User` bound is simply a bound to a repository the service adapter will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
-So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres client, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation. It's called postgres because the derive macro has a specific set of fields on which it operates, this could be named anything in case of manual implementations.
+So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation. It's called postgres because the derive macro has a specific set of fields on which it operates, this could be named anything in case of manual implementations.
 
-So pretty much, all the service has are calls to some generic clients, connections and repositories.
+So pretty much, all the service has are calls to some generic drivers, connections and repositories.
 
 This fact is at the core of this architecture and is precisely what makes it so powerful. Not only does this make testing a piece of cake, but it also allows us to switch up our adapters any way we want without ever having to change the business logic. They are completely decoupled.
 
@@ -206,7 +204,7 @@ Finally, we'll concretise everything in the setup:
   ```rust
   pub(crate) fn routes(pg: Arc<Postgres>, rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repository: Repository::<Postgres, PgPoolConnection, PgUserAdapter>::new(pg.clone()),
+        repository: ServiceAdapter::<Postgres, PgPoolConnection, PgUserAdapter>::new(pg.clone()),
     };
     let auth_guard = interceptor::AuthGuard::new(pg, rd, Role::User);
 
@@ -216,35 +214,35 @@ Finally, we'll concretise everything in the setup:
     cfg.service(
         web::resource("/users")
             .route(web::get().to(handler::get_paginated::<
-                UserService<Repository<Postgres, PgPoolConnection, PgUserAdapter>>,
+                UserService<ServiceAdapter<Postgres, PgPoolConnection, PgUserAdapter>>,
             >))
             .wrap(auth_guard),
     );
   }
   ```
 
-I'll admit it, the trait bounds do look kind of ugly, but seeing as this is the only place where we concretise our types, we never have to worry about the rest of the service breaking when we makes changes in our adapters.
+I'll admit it, the trait bounds do look kind of ugly, but seeing as this is the only place where we concretise our types, we never have to worry about the rest of the service breaking when we makes changes in our adapters. The concrete repository can be extracted to a type definition to reduce the amount of places where it needs to be changed and for visibility.
 
-To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `repository!` and `contract!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
+To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `adapt!` and `api_impl!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
 
-- ***adapter.rs***
+- **_adapter.rs_**
 
   ```rust
   /* ..imports.. */
 
-  repository! {
-      C => Connection : field_name;
+  adapt! {
+      D => Connection : field_name;
 
       User => UserRepository<Connection>
   }
-  
-  contract! {
-      C => Connection;
 
-      RepositoryContract => Repository, RepositoryAccess;
-      
+  api_impl! {
+      Repository : RepositoryApi,
+
+      D => Connection;
+
       User => UserRepository<Connection>;
-  
+
       fn get_paginated(
           &self,
           page: u16,
@@ -262,110 +260,52 @@ You can read more about how the macros work in the `hextacy::db` module.
 
 ### **Transactions**
 
-The reason for the repositories always taking in a connection in their methods is transactions. Since business level services should have the ability to rollback transactions if anything goes south, we have to somehow enable their repositories to suport transactions.
+The reason for the repositories always taking in a connection in their methods is transactions. Since business level services should have the ability to rollback transactions if anything goes south, we have to somehow enable their adapters to suport transactions.
 
-We do this by adding a transaction field to the repository, which is simply a `RefCell` around an `Option<C>` where `C` is the connection. We use the ref cell to get mutable access to transactions without poisoning our API with `&mut self` references.
+Transactions could theoretically be started in the business level, but I prefer to group complicated repository logic to a single adapter call that takes care of everything. This way we never have to pass in connections to the service adapter's methods, but if there is some complex logic in the business layer that has to affect the outcomes of transactions, its api can be defined in a way that lets us pass in connections/transactions to it so we remain flexible.
 
-This ref cell can now hold an open connection that can be used to perform queries. The `Atomic` trait provides an interface for any repository to start, commit or rollback a transaction. The way this is done is by checking whether our ref cell contains a connection, if it does we use that one and if it doesn't we simply instruct our client to establish a new one. Taking it one step further, let's make the user service repository atomic:
+The `Atomic` trait provides an interface for any repository to start, commit or rollback a transaction by binding the generic connection used in the repository to the `Atomic` trait. This bound can be introduced in the API implementation for the service adapter:
 
-  ```rust
-  use hextacy_derive::Repository;
-  use hextacy::db::{AtomicConnection, Transaction};
-  use hextacy::clients::db::{Client, DBConnect};
-  use std::{marker::PhantomData, sync::Arc};
-  
-  #[derive(Debug, Clone, AcidRepository)]
-  #[postgres(Conn)]
-  pub struct Repository<C, Conn, User>
-  where
-      C: DBConnect<Connection = Conn>,
-      User: UserRepository<Conn>,
-  {
-      pub postgres: Client<C, Conn>,
-      // Type provided for convenience which is equivalent to RefCell<Option<Conn>>
-      pub pg_tx: Transaction<Conn>,
-      user: PhantomData<User>,
+```rust
+#[async_trait::async_trait]
+impl<D, Connection, User> RepositoryApi for Repository<D, Connection, User>
+where
+    Self: RepositoryAccess<Connection>,
+    D: DBConnect<Connection = Connection>,
+    User: UserRepository<Connection> + UserRepository<<Connection as Atomic>::TransactionResult>,
+    Connection: Atomic, // Like thus
+{
+  async fn get_paginated(
+      &self,
+      page: u16,
+      per_page: u16,
+      sort: Option<user::SortOptions>,
+  ) -> Result<Vec<user::User>, Error> {
+      let conn = self.connect().await?;
+      let mut tx = conn.start_transaction().await?; // Provided by the Atomic trait
+      match User::get_paginated(&mut tx, page, per_page, sort).await {
+        Ok(user) => {
+          <Connection as Atomic>::commit_transaction(tx).await?;
+          Ok(user)
+        },
+        Err(e) => {
+          <Connection as Atomic>::abort_transaction(tx).await?;
+          Err(e.into())
+        }
+      }
   }
-  ```
+}
+```
 
-Now, instead of simply establishing a connection and calling `User::get_paginated`, we first have to check whether an open connection exists:
+Atomic is implemented for all out of the box driver connections in hextacy. The reason why it looks the way it does is to provide a uniform API for transactions that are done on connections and transactions that return a transaction struct.
 
-  ```rust
-  impl<C, Conn, User> RepositoryContract for Repository<C, Conn, User> 
-  where
-      Self: AcidRepositoryAccess<Conn>,
-      C: DBConnect<Connection = Conn>,
-      User: UserRepository<Conn>
-  {
-    fn get_paginated(
-        &self,
-        page: u16,
-        per_page: u16,
-        sort: Option<user::SortOptions>,
-    ) -> Result<Vec<user::User>, Error> {
-        let mut conn = self.connect()?;
-        // Use atomic! to reduce this boilerplate
-        match conn {
-          hextacy::db::AtomicConnection::New(mut conn) => User::get_paginated(&mut conn, page, per_page, sort).map_err(Error::new),
-          hextacy::db::AtomicConnection::Existing(mut conn) => User::get_paginated(conn.borrow_mut().as_mut().unwrap(), page, per_page, sort).map_err(Error::new),
-        }
-    }
-  }
-  ```
+For example, diesel uses a transaction manager which starts the transaction on the connection and returns a `Result<()>` while seaorm's transaction manager returns a `Result<DatabaseTransaction>`. If we were to directly implement these it would break our API, since different code needs to be executed depending on the driver (in seaorm we wouldn't just be able to pass the connection to our repository calls since the transaction is located in the struct which must be used in order to tell the ORM to perform the operations atomically).
 
-To reduce the boilerplate around matching whether a connection exists, the `atomic!` macro can be utilised to perform the query. It does exactly what's written above.
+The `Atomic` trait normalises the API; For diesel we simply return the connection in `start_transaction` and use that, while for seaorm we return the `DatabaseTransaction`.
 
-Notice that `Repository` is changed to `AcidRepository` and `RepositoryAccess` is changed to `AcidRepositoryAccess`. The access traits are the same, except that the atomic version returns an `AtomicConnection<C>` and requires the repository to implement `Atomic`, which `AcidRepository` does behind the scenes:
+The API is normalised because anything that's returned is in `Atomic::TransactionResult`. If you take a look at the above code block, you'll notice we've bound `User` to a repository that now must operate on both the connection and its transaction result.
 
-  ```rust
-  use hextacy::db::{Atomic, DatabaseError, TransactionError};
-  use diesel::connection::AnsiTransactionManager;
-
-  impl</* ..bounds.. */> Atomic for Repository< /* ..bounds.. */, PgPoolConnection>
-  where /* ..bounds.. */ 
-  {
-        fn start_transaction(&self) -> Result<(), DatabaseError> {
-            let mut tx = self.pg_tx.borrow_mut();
-            match *tx {
-                Some(_) => Err(DatabaseError::Transaction(TransactionError::InProgress)),
-                None => {
-                    let mut conn = self.client.connect()?;
-                    AnsiTransactionManager::begin_transaction(&mut *conn)?;
-                    *tx = Some(conn);
-                    Ok(())
-                }
-            }
-        }
-
-        fn rollback_transaction(&self) -> Result<(), DatabaseError> {
-            let mut tx = self.pg_tx.borrow_mut();
-            match tx.take() {
-                Some(ref mut conn) => AnsiTransactionManager::rollback_transaction(&mut **conn)
-                    .map_err(DatabaseError::from),
-                None => Err(DatabaseError::Transaction(TransactionError::NonExisting).into()),
-            }
-        }
-
-        fn commit_transaction(&self) -> Result<(), DatabaseError> {
-            let mut tx = self.pg_tx.borrow_mut();
-            match tx.take() {
-                Some(ref mut conn) => {
-                    AnsiTransactionManager::commit_transaction(&mut **conn)
-                        .map_err(DatabaseError::from)
-                }
-                None => Err(DatabaseError::Transaction(TransactionError::NonExisting).into()),
-            }
-        }
-    }
-  ```
-
-Atomic implementations need to have concrete types since it must know which transaction manager to use to operate on the connection.
-
-Thankfully, `AcidRepository` does this for us. One more shorcut that can be used is the `acid_repo!` macro which functions the same as `repository` except with the addition of the transaction field and the atomic access implementation.
-
-Business level services can now utilise the three methods to perform transactions as they see fit. To reduce the boilerplate associated with them, we can utilise the `transaction!` macro.
-
-This macro takes in a callback that must return a result. Before the callback start, `start_transaction` will be called, then, depending on the result, the transaction will either be committed or rollbacked.
+For connection based transactions (like diesel and mongo), the `Atomic::TransactionResult` will be the very same connection, meaning we do not have to create an additional implementation for the transaction. In seaorm however, we need to crate an implementation specifically for the transaction (basically a copy of the impl, but substituting all `DatabaseConnection`s to `DatabaseTransaction`s).
 
 To elaborate further, here's what a repository would look like:
 
@@ -394,24 +334,24 @@ Feature flags:
   - db - Enables mongo, diesel and redis
   - ws - Enable the WS session adapter and message broker
 
-  - diesel - Enables the diesel postgres client and derive macros
-  - mongo - Enables the mongodb client and derive macros
-  - redis - Enables the redis client and cache access trait
-  - email - Enables the SMTP client and lettre
+  - diesel - Enables the diesel postgres driver and derive macros
+  - mongo - Enables the mongodb driver and derive macros
+  - redis - Enables the redis driver and cache access trait
+  - email - Enables the SMTP driver and lettre
 ```
 
 - ### **db**
 
   Contains a collection of traits to implement on structures that access databases and interact with repositories. Provides macros to easily generate repository structs as shown in the example.
 
-- ### **clients**
-  
-  Contains structures implementing client specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs. Check out the [clients readme](./hextacy/src/clients/README.md)
+- ### **drivers**
+
+  Contains structures implementing driver specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs. Check out the [drivers readme](./hextacy/src/drivers/README.md)
 
 - ### **logger**
 
   The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits your needs better.
-  
+
 - ### **crypto**
 
   Contains cryptographic utilities for encrypting and signing data and generating tokens.
@@ -422,21 +362,21 @@ Feature flags:
 
   - **http**
 
-      The most notable here are the *Default security headers* middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the *Response* trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response. Also some cookie helpers.
+    The most notable here are the _Default security headers_ middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the _Response_ trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response. Also some cookie helpers.
 
   - **ws**
 
-      Module containing a Websocket session handler.
+    Module containing a Websocket session handler.
 
-      Every message sent to this handler must have a top level `"domain"` field. Domains are completely arbitrary and are used to tell the ws session which datatype to broadcast.
+    Every message sent to this handler must have a top level `"domain"` field. Domains are completely arbitrary and are used to tell the ws session which datatype to broadcast.
 
-      Domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS session actors will in turn publish them whenever they receive any from their respective clients.
+    Domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS session actors will in turn publish them whenever they receive any from their respective clients.
 
-      Registered data types are usually enums which are then matched in handlers of the receiving actors. Enums should always be untagged, so as to mitigate unnecessary nestings from the client sockets.
+    Registered data types are usually enums which are then matched in handlers of the receiving actors. Enums should always be untagged, so as to mitigate unnecessary nestings from the client sockets.
 
-      Uses an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
+    Uses an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
-      Check out the `web::ws` module for more info and an example of how it works.
+    Check out the `web::ws` module for more info and an example of how it works.
 
 - ### **cache**
 
@@ -445,10 +385,7 @@ Feature flags:
 TODO:
 
 - Hextacy
-
-  - [ ] Add trybuild tests for macros and tests in general
-  - [ ] Create generic cache client trait
-  - [ ] Add SeaORM to clients
+  - [ ] Create generic cache driver trait
 
 - Xtc
 

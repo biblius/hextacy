@@ -2,7 +2,7 @@
 #[cfg(any(feature = "db", feature = "full", feature = "redis"))]
 pub mod cache;
 
-/// Traits and macros for implementing clients and connections.
+/// Traits and macros for implementing drivers and connections.
 #[cfg(any(
     feature = "db",
     feature = "full",
@@ -11,8 +11,8 @@ pub mod cache;
 ))]
 pub mod db;
 
-/// Clients for connecting to the database, cache and email.
-pub mod clients;
+/// Drivers for connecting to the database, cache and smtp.
+pub mod drivers;
 
 /// Cryptographic utilities
 pub mod crypto;
@@ -32,5 +32,5 @@ pub mod web;
 
 /// Derive macros for quick implementations of generic repository traits.
 pub mod derive {
-    pub use hextacy_derive::{AcidRepository, Repository};
+    pub use hextacy_derive::Repository;
 }

@@ -1,4 +1,4 @@
-use crate::clients::cache::redis::{
+use crate::drivers::cache::redis::{
     redis::{FromRedisValue, RedisError, ToRedisArgs},
     RedisPoolConnection,
 };
@@ -104,8 +104,8 @@ pub trait CacheIdentifier {
 
 #[derive(Debug, Error)]
 pub enum CacheError {
-    #[error("Client error {0}")]
-    Client(#[from] crate::clients::ClientError),
+    #[error("Driver error {0}")]
+    Driver(#[from] crate::drivers::DriverError),
     #[error("Redis error {0}")]
     Redis(#[from] RedisError),
     #[error("Serde error {0}")]

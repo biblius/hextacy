@@ -4,7 +4,6 @@ use super::WsError;
 use crate::web::ws::broker::Broker;
 use actix::prelude::*;
 use actix_web_actors::ws;
-use colored::Colorize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -131,36 +130,6 @@ impl WsSession {
             callbacks: HashMap::new(),
         }
     }
-    /// A ping message gets sent every `HEARTBEAT_INTERVAL` seconds,
-    /// if a pong isn't received for `CLIENT_TIMEOUT` seconds, drop the connection i.e. stop the context
-    fn hb(&self, context: &mut ws::WebsocketContext<Self>) {
-        context.run_interval(HEARTBEAT_INTERVAL, |actor, context| {
-            if Instant::now().duration_since(actor.heartbeat) > CLIENT_TIMEOUT {
-                warn!(
-                    "{}",
-                    "Websocket client heartbeat failed, disconnecting".red()
-                );
-                context.stop();
-                return;
-            }
-            context.ping(b"");
-        });
-    }
-
-    /// Attempt to parse the 'domain' field of an incoming JSON message.
-    pub fn parse_domain(&self, message: &str) -> Result<String, WsError> {
-        let message: Value = serde_json::from_str(message).unwrap();
-        let domain = &message["domain"];
-        domain.as_str().map_or_else(
-            || {
-                Err(WsError::MalformedDomain(
-                    "Domain malformed, make sure to specify it on the top level of the message"
-                        .to_string(),
-                ))
-            },
-            |val| Ok(val.to_string()),
-        )
-    }
 
     /// Register a callback for messages received in the specified domain. The [ws_register]
     /// macro makes life easier and you should probably use that.
@@ -181,6 +150,34 @@ impl WsSession {
             None => Err(WsError::EventNotImplemented(domain.to_string())),
         }
     }
+
+    /// A ping message gets sent every `HEARTBEAT_INTERVAL` seconds,
+    /// if a pong isn't received for `CLIENT_TIMEOUT` seconds, drop the connection i.e. stop the context
+    fn hb(&self, context: &mut ws::WebsocketContext<Self>) {
+        context.run_interval(HEARTBEAT_INTERVAL, |actor, context| {
+            if Instant::now().duration_since(actor.heartbeat) > CLIENT_TIMEOUT {
+                warn!("Websocket client heartbeat failed, disconnecting");
+                context.stop();
+                return;
+            }
+            context.ping(b"");
+        });
+    }
+
+    /// Attempt to parse the 'domain' field of an incoming JSON message.
+    fn parse_domain(&self, message: &str) -> Result<String, WsError> {
+        let message: Value = serde_json::from_str(message).unwrap();
+        let domain = &message["domain"];
+        domain.as_str().map_or_else(
+            || {
+                Err(WsError::MalformedDomain(
+                    "Domain malformed, make sure to specify it on the top level of the message"
+                        .to_string(),
+                ))
+            },
+            |val| Ok(val.to_string()),
+        )
+    }
 }
 
 impl Actor for WsSession {
@@ -189,11 +186,11 @@ impl Actor for WsSession {
     fn started(&mut self, context: &mut Self::Context) {
         // Start the heartbeat process on session start.
         self.hb(context);
-        info!("{}{:?}", "Started session actor with id: ".green(), self.id);
+        info!("Started session actor with id: {}", self.id);
     }
 
     fn stopping(&mut self, _: &mut Self::Context) -> Running {
-        info!("{}{:?}", "Stopping session actor with id: ".red(), self.id);
+        info!("Stopping session actor with id: {}", self.id);
         Running::Stop
     }
 }

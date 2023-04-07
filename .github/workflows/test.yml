@@ -2,7 +2,10 @@ permissions:
   contents: read
 on:
   push:
-    branches: [main]
+    branches: 
+      - "main"
+      - "feature/**"
+      - "bugfix/**"
   pull_request:
 name: test
 jobs:

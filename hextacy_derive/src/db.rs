@@ -1,14 +1,54 @@
-pub mod acid_repo;
 pub mod repository;
 
-use crate::ALLOWED_CLIENTS;
+use lazy_static::lazy_static;
+use proc_macro2::Span;
+use proc_macro_error::abort;
 use std::collections::HashMap;
 use syn::{
     punctuated::Punctuated,
     spanned::Spanned,
     token::{Add, Comma},
-    GenericParam, Generics, TypeParamBound,
+    GenericParam, Generics, Ident, TypeParamBound,
 };
+
+const DIESEL_CONNECTION: &str = "PgPoolConnection";
+const SEAORM_CONNECTION: &str = "DatabaseConnection";
+const MONGO_CONNECTION: &str = "ClientSession";
+const DRIVERS: [&str; 3] = ["diesel", "mongo", "seaorm"];
+const _CONNECTIONS: [&str; 3] = ["PgPoolConnection", "ClientSession", "DatabaseConnection"];
+
+lazy_static! {
+    pub static ref CONNECTIONS: HashMap<&'static str, &'static str> = {
+        DRIVERS
+            .iter()
+            .zip(_CONNECTIONS)
+            .map(|(driver, connection)| (*driver, connection))
+            .collect()
+    };
+}
+
+/// Modifies the generics in a way that excludes generics bounds from the initial impl scoping
+/// and concretises bounds in the where clause to the concrete connections.
+fn process_generics(
+    ast: &mut syn::DeriveInput,
+    replacements: &HashMap<String, Ident>,
+) -> (Vec<(usize, GenericParam)>, Generics) {
+    // Clone the generics as we do not want to modify the input
+    let mut generics = ast.generics.clone();
+
+    // Modify the type generics by taking out the specified connection generic from the impl and substitute
+    // it in the following bounds with whatever they are paired with
+    let replaced = modify_type_generics(&mut generics, &replacements);
+    if replaced.is_empty() {
+        abort!(
+            ast.ident.span(),
+            format!("[Acid]Repository needs at least one driver field");
+            help = "Annotate the Driver field with one of the available drivers: diesel, mongo, seaorm"
+        );
+    }
+
+    (replaced, generics)
+}
 
 /// Modifies the generic connection type to the concrete implementation
 /// given by `conn_replace` and returns the replaced trait bounds and their indices.
@@ -17,8 +57,7 @@ use syn::{
 /// `impl`.
 fn modify_type_generics(
     generics: &mut Generics,
-
-    replacements: &HashMap<String, String>,
+    replacements: &HashMap<String, Ident>,
 ) -> Vec<(usize, GenericParam)> {
     let keys = replacements.keys().collect::<Vec<_>>();
 
@@ -39,12 +78,7 @@ fn modify_type_generics(
                 // so we clone and keep track of where in the impl we concretised
                 let mut param = param.clone();
                 let replace = replacements.get(&param.ident.to_string()).unwrap();
-                let replace = match replace.as_str() {
-                    "mongo" => "ClientSession",
-                    "postgres" => "PgPoolConnection",
-                    _ => unreachable!(),
-                };
-                param.ident = syn::Ident::new(replace, param.span());
+                param.ident = replace.clone();
                 replaced.push((i, GenericParam::Type(param)));
                 None
             }
@@ -63,7 +97,7 @@ fn insert_replaced(generics: &mut Generics, replaced: Vec<(usize, GenericParam)>
 }
 
 /// Modify the where clause of the impl by substituting generic connection bounds with the concrete one
-fn modify_where_clause(generics: &mut Generics, replacements: &HashMap<String, String>) {
+fn modify_where_clause(generics: &mut Generics, replacements: &HashMap<String, Ident>) {
     let where_predicates = &mut generics.make_where_clause().predicates;
 
     for pred in where_predicates.iter_mut() {
@@ -75,7 +109,7 @@ fn modify_where_clause(generics: &mut Generics, replacements: &HashMap<String, S
 /// Replace `target_conn_bound` generic bounds with the concrete one
 fn concretise_bounds(
     bounds: &mut Punctuated<TypeParamBound, Add>,
-    replacements: &HashMap<String, String>,
+    replacements: &HashMap<String, Ident>,
 ) {
     for bound in bounds.iter_mut() {
         // We care only about trait bounds
@@ -84,11 +118,7 @@ fn concretise_bounds(
         for seg in trait_bound.path.segments.iter_mut() {
             // Concretises `T: Connection`
             if let Some(target) = replacements.get(&seg.ident.to_string()) {
-                match target.as_str() {
-                    "mongo" => seg.ident = syn::Ident::new("ClientSession", seg.span()),
-                    "postgres" => seg.ident = syn::Ident::new("PgPoolConnection", seg.span()),
-                    _ => unreachable!(),
-                }
+                seg.ident = target.clone();
             }
 
             let syn::PathArguments::AngleBracketed(ref mut ab_args) = seg.arguments else { continue; };
@@ -100,16 +130,7 @@ fn concretise_bounds(
                         syn::Type::Path(ref mut p) => {
                             for seg in p.path.segments.iter_mut() {
                                 if let Some(target) = replacements.get(&seg.ident.to_string()) {
-                                    match target.as_str() {
-                                        "mongo" => {
-                                            seg.ident = syn::Ident::new("ClientSession", seg.span())
-                                        }
-                                        "postgres" => {
-                                            seg.ident =
-                                                syn::Ident::new("PgPoolConnection", seg.span())
-                                        }
-                                        _ => unreachable!(),
-                                    }
+                                    seg.ident = target.clone();
                                 }
                             }
                         }
@@ -120,16 +141,7 @@ fn concretise_bounds(
                         syn::Type::Path(ref mut path) => {
                             for seg in path.path.segments.iter_mut() {
                                 if let Some(target) = replacements.get(&seg.ident.to_string()) {
-                                    match target.as_str() {
-                                        "mongo" => {
-                                            seg.ident = syn::Ident::new("ClientSession", seg.span())
-                                        }
-                                        "postgres" => {
-                                            seg.ident =
-                                                syn::Ident::new("PgPoolConnection", seg.span())
-                                        }
-                                        _ => unreachable!(),
-                                    }
+                                    seg.ident = target.clone();
                                 }
                             }
                         }
@@ -145,34 +157,43 @@ fn concretise_bounds(
     }
 }
 
-fn extract_conn_attrs(ast: &syn::DeriveInput) -> syn::Result<HashMap<String, String>> {
-    let attributes = ast
-        .attrs
-        .iter()
-        .filter_map(|a| {
-            let ident_token = a.tokens.clone().into_iter().last();
-            ident_token.and_then(|token| {
-                for name in ALLOWED_CLIENTS {
-                    if a.path.is_ident(name) {
-                        let token = token.to_string().replace("(", "").replace(")", "");
-                        return Some((token, name.to_string()));
+fn scan_fields(ast: &syn::DeriveInput) -> Fields {
+    match ast.data {
+        syn::Data::Struct(ref strct) => {
+            let mut fields = Fields {
+                driver_fields: HashMap::new(),
+                replacements: HashMap::new(),
+            };
+
+            for field in strct.fields.iter() {
+                for attr in field.attrs.iter() {
+                    for seg in attr.path.segments.iter() {
+                        if let Some(concretised) = CONNECTIONS.get(seg.ident.to_string().as_str()) {
+                            let generic = attr.tokens.to_string().replace("(", "").replace(")", "");
+                            fields
+                                .replacements
+                                .insert(generic, Ident::new(concretised, Span::call_site()));
+                            fields.driver_fields.insert(
+                                concretised.to_string(),
+                                field.ident.clone().expect("Ident required"),
+                            );
+                        }
                     }
                 }
-                None
-            })
-        })
-        .collect::<HashMap<String, String>>();
-    Ok(attributes)
+            }
+            fields
+        }
+        _ => {
+            abort!(
+                ast.span(),
+                "Driver and transaction attributes can only be used on field structs"
+            )
+        }
+    }
 }
 
-fn has_connections(map: &HashMap<String, String>) -> (bool, bool) {
-    let inverse = map
-        .clone()
-        .into_iter()
-        .map(|(key, val)| (val, key))
-        .collect::<HashMap<_, _>>();
-    (
-        inverse.contains_key(ALLOWED_CLIENTS[0]),
-        inverse.contains_key(ALLOWED_CLIENTS[1]),
-    )
+#[derive(Debug)]
+struct Fields {
+    driver_fields: HashMap<String, Ident>,
+    replacements: HashMap<String, Ident>,
 }

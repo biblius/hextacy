@@ -3,20 +3,18 @@ use data_encoding::BASE32;
 use tracing::debug;
 
 /// Generates an OTP secret of length 160
-#[inline]
 pub fn generate_secret() -> String {
     debug!("Generating OTP secret");
     thotp::encoding::encode(&thotp::generate_secret(160), BASE32)
 }
 
 /// Generates a QR code svg with the given secret
-#[inline]
 pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, CryptoError> {
     debug!("Generating TOTP QR");
     let uri = thotp::qr::otp_uri(
         "totp",
         secret,
-        &format!("RPSChat:{}", user_email),
+        &format!("RPSChat:{user_email}"),
         "RPS Chat",
         None,
     )?;
@@ -24,7 +22,6 @@ pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, C
 }
 
 /// Verifies a timed OTP against the given secret
-#[inline]
 pub fn verify_otp(password: &str, secret: &str) -> Result<bool, CryptoError> {
     debug!("Verifying TOTP {password}");
     let secret = BASE32.decode(secret.as_bytes())?;

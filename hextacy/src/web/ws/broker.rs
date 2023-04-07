@@ -3,7 +3,6 @@
 use actix::Message;
 use actix::{prelude::*, Recipient};
 use actix::{Actor, Context, Handler};
-use colored::Colorize;
 use std::any::Any;
 use std::fmt::Debug;
 use std::{any::TypeId, collections::HashMap};
@@ -77,10 +76,10 @@ where
     fn handle(&mut self, msg: IssueAsync<M>, ctx: &mut Self::Context) -> Self::Result {
         let message = msg.get_inner();
 
-        trace!("{} -- received IssueAsync for: {:?}", self.id, message);
+        trace!("Broker {} - received IssueAsync for: {message:?}", self.id);
 
         if let Some((id, mut subs)) = self.take_subs() {
-            trace!("{}{}{:?}", self.id, " - Issuing async : ".purple(), id);
+            trace!("Broker {} - Issuing async : {id:?}", self.id);
 
             subs.drain(..).for_each(|rec| {
                 rec.send(message.clone())
@@ -102,10 +101,10 @@ where
     fn handle(&mut self, msg: IssueSync<M>, _ctx: &mut Self::Context) -> Self::Result {
         let message = msg.get_inner();
 
-        trace!("{} -- received IssueSync for: {:?}", self.id, message);
+        trace!("Broker {} - received IssueSync for: {message:?}", self.id);
 
         if let Some((id, mut subs)) = self.take_subs() {
-            trace!("{}{}{:?}", self.id, " - Issuing sync : ".purple(), id);
+            trace!("Broker {} - Issuing sync : {id:?}", self.id);
 
             subs.drain(..)
                 .for_each(|rec| match rec.try_send(message.clone()) {
