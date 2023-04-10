@@ -5,10 +5,8 @@ use proc_macro2::Span;
 use proc_macro_error::abort;
 use std::collections::HashMap;
 use syn::{
-    punctuated::Punctuated,
-    spanned::Spanned,
-    token::{Add, Comma},
-    GenericParam, Generics, Ident, TypeParamBound,
+    punctuated::Punctuated, spanned::Spanned, token::Comma, GenericParam, Generics, Ident, Token,
+    TypeParamBound,
 };
 
 const DIESEL_CONNECTION: &str = "PgPoolConnection";
@@ -42,7 +40,7 @@ fn process_generics(
     if replaced.is_empty() {
         abort!(
             ast.ident.span(),
-            format!("[Acid]Repository needs at least one driver field");
+            format!("Repository derive needs at least one driver field");
             help = "Annotate the Driver field with one of the available drivers: diesel, mongo, seaorm"
         );
     }
@@ -108,7 +106,7 @@ fn modify_where_clause(generics: &mut Generics, replacements: &HashMap<String, I
 
 /// Replace `target_conn_bound` generic bounds with the concrete one
 fn concretise_bounds(
-    bounds: &mut Punctuated<TypeParamBound, Add>,
+    bounds: &mut Punctuated<TypeParamBound, Token!(+)>,
     replacements: &HashMap<String, Ident>,
 ) {
     for bound in bounds.iter_mut() {
@@ -137,7 +135,7 @@ fn concretise_bounds(
                         _ => {}
                     },
                     // Concretises any connection in associated types, eg `T<Something = Connection>`
-                    syn::GenericArgument::Binding(ref mut bind) => match bind.ty {
+                    syn::GenericArgument::AssocType(ref mut bind) => match bind.ty {
                         syn::Type::Path(ref mut path) => {
                             for seg in path.path.segments.iter_mut() {
                                 if let Some(target) = replacements.get(&seg.ident.to_string()) {
@@ -150,7 +148,9 @@ fn concretise_bounds(
                     // This should theoretically be unreachable
                     syn::GenericArgument::Const(_)
                     | syn::GenericArgument::Lifetime(_)
-                    | syn::GenericArgument::Constraint(_) => unimplemented!(),
+                    | syn::GenericArgument::Constraint(_)
+                    | syn::GenericArgument::AssocConst(_) => unimplemented!(),
+                    _ => todo!(),
                 }
             }
         }
@@ -167,9 +167,18 @@ fn scan_fields(ast: &syn::DeriveInput) -> Fields {
 
             for field in strct.fields.iter() {
                 for attr in field.attrs.iter() {
-                    for seg in attr.path.segments.iter() {
+                    for seg in attr.path().segments.iter() {
                         if let Some(concretised) = CONNECTIONS.get(seg.ident.to_string().as_str()) {
-                            let generic = attr.tokens.to_string().replace("(", "").replace(")", "");
+                            let generic = attr
+                                .meta
+                                .require_list()
+                                .unwrap_or_else(|_| {
+                                    abort!(attr.span(), "Invalid attribute given for driver")
+                                })
+                                .tokens
+                                .to_string()
+                                .replace("(", "")
+                                .replace(")", "");
                             fields
                                 .replacements
                                 .insert(generic, Ident::new(concretised, Span::call_site()));

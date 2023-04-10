@@ -85,8 +85,8 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: hack
-          # Exclude xtc since it's a binary
-          args: --workspace --exclude xtc --feature-powerset check --lib --tests
+          # Exclude the workspace and xtcli since it's a binary
+          args: --workspace --exclude xtcli --exclude hxtc --feature-powerset check --lib --tests
 
   msrv:
     runs-on: ubuntu-latest

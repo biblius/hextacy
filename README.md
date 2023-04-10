@@ -331,11 +331,12 @@ Feature flags:
 ```bash
   - full - Enables all the feature below
 
-  - db - Enables mongo, diesel and redis
+  - db - Enables mongo, diesel, seaorm and redis
   - ws - Enable the WS session adapter and message broker
 
-  - diesel - Enables the diesel postgres driver and derive macros
-  - mongo - Enables the mongodb driver and derive macros
+  - postgres-diesel - Enables the diesel postgres driver
+  - postgres-seaorm - Enables the seaorm postgres driver
+  - mongo - Enables the mongodb driver
   - redis - Enables the redis driver and cache access trait
   - email - Enables the SMTP driver and lettre
 ```

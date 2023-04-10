@@ -1,4 +1,4 @@
-error: [Acid]Repository needs at least one driver field
+error: Repository derive needs at least one driver field
 
          = help: Annotate the Driver field with one of the available drivers: diesel, mongo, seaorm
 

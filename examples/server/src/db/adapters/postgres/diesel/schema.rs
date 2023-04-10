@@ -1,5 +1,5 @@
 // @generated automatically by Diesel CLI.
-
+#[rustfmt::skip]
 diesel::table! {
     oauth (id) {
         id -> Varchar,
@@ -56,8 +56,4 @@ diesel::table! {
 diesel::joinable!(oauth -> users (user_id));
 diesel::joinable!(sessions -> users (user_id));
 
-diesel::allow_tables_to_appear_in_same_query!(
-    oauth,
-    sessions,
-    users,
-);
+diesel::allow_tables_to_appear_in_same_query!(oauth, sessions, users,);

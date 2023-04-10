@@ -15,5 +15,5 @@ updates:
         # Patches and minor updates do not matter for libraries,
         # do not ignore this in binaries
         update-types:
-          - "version-update:semver-patch"
+          # - "version-update:semver-patch"
           - "version-update:semver-minor"
