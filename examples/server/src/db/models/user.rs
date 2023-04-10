@@ -68,7 +68,7 @@ impl User {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
 pub enum SortOptions {
     #[serde(rename = "username")]
     UsernameAsc,

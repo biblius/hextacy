@@ -33,7 +33,7 @@ pub enum DatabaseError {
     #[error("Error while attempting to establish connection: {0}")]
     Driver(#[from] super::drivers::DriverError),
 
-    #[cfg(any(feature = "db", feature = "full", feature = "diesel"))]
+    #[cfg(any(feature = "db", feature = "full", feature = "postgres-diesel"))]
     #[error("Diesel Error: {0}")]
     Diesel(#[from] diesel::result::Error),
 
@@ -41,7 +41,7 @@ pub enum DatabaseError {
     #[error("Mongo Error: {0}")]
     Mongo(#[from] mongodb::error::Error),
 
-    #[cfg(any(feature = "db", feature = "full", feature = "seaorm"))]
+    #[cfg(any(feature = "db", feature = "full", feature = "postgres-seaorm"))]
     #[error("SeaORM Error: {0}")]
     SeaORM(#[from] sea_orm::DbErr),
 }

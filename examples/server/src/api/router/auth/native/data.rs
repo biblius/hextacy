@@ -3,24 +3,22 @@ use derive_new::new;
 use hextacy::web::http::response::Response;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
-use validify::validify;
+use validify::Validify;
 
-#[derive(Debug, Clone, Deserialize)]
-#[validify]
+#[derive(Debug, Clone, Deserialize, Validify)]
 /// Received on initial login
 pub(super) struct Credentials {
-    #[validate(regex = "EMAIL_REGEX")]
+    #[validate(regex(EMAIL_REGEX))]
     pub email: String,
     #[validate(length(min = 1))]
     pub password: String,
     pub remember: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[validify]
+#[derive(Debug, Clone, Deserialize, Validify)]
 /// Received when registering
 pub(super) struct RegistrationData {
-    #[validate(regex = "EMAIL_REGEX")]
+    #[validate(regex(EMAIL_REGEX))]
     pub email: String,
     #[modify(trim)]
     #[validate(length(min = 4))]
@@ -29,16 +27,14 @@ pub(super) struct RegistrationData {
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when resending reg token
 pub(super) struct ResendRegToken {
-    #[validate(regex = "EMAIL_REGEX")]
+    #[validate(regex(EMAIL_REGEX))]
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when verifying a one time password
 pub(super) struct Otp {
     #[validate(length(equal = 6))]
@@ -47,38 +43,33 @@ pub(super) struct Otp {
     pub remember: bool,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when updating a password
 pub(super) struct ChangePassword {
     #[validate(length(min = 8))]
     pub password: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when a user forgot their password
 pub(super) struct ForgotPassword {
-    #[validate(regex = "EMAIL_REGEX")]
+    #[validate(regex(EMAIL_REGEX))]
     pub email: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when a user asks to reset their password via email
 pub(super) struct ResetPassword {
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when verifying registration token
 pub(super) struct EmailToken {
     pub token: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[validify]
+#[derive(Debug, Deserialize, Validify)]
 /// Received when verifying registration token
 pub(super) struct ForgotPasswordVerify {
     #[validate(length(min = 8))]
@@ -98,8 +89,7 @@ pub(super) enum OAuthProvider {
     Github,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[validify]
+#[derive(Debug, Clone, Deserialize, Validify)]
 pub(super) struct OAuthCodeExchange {
     #[modify(trim)]
     #[validate(length(min = 1))]

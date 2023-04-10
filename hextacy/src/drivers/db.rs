@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 #[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
 pub mod mongo;
+
 #[cfg(any(
     feature = "db",
     feature = "full",

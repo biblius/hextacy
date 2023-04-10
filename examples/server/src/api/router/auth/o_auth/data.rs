@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use validify::validify;
+use validify::Validify;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub(super) enum OAuthProvider {
@@ -7,8 +7,7 @@ pub(super) enum OAuthProvider {
     Github,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[validify]
+#[derive(Debug, Clone, Deserialize, Validify)]
 pub(super) struct OAuthCodeExchange {
     #[modify(trim)]
     #[validate(length(min = 1))]

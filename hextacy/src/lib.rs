@@ -6,7 +6,8 @@ pub mod cache;
 #[cfg(any(
     feature = "db",
     feature = "full",
-    feature = "diesel",
+    feature = "postgres-diesel",
+    feature = "postgres-seaorm",
     feature = "mongo"
 ))]
 pub mod db;

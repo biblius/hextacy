@@ -121,9 +121,9 @@ The service api is implemented by the service struct:
   }
   ```
 
-The service has a single field that is completely generic, however in the impl block we bind it to the api. This api serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryApi`. This helps with the generic bounds in the upcoming repository and makes testing the services a breeze!
+The service has a single field that is completely generic, however in the impl block we bind it to the api. This api serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryApi`. This helps with the generic bounds in the upcoming adapter and makes testing the services a breeze!
 
-Now we have to define our repository and is when we enter the esoteric realms of rust trait bounds:
+Now we have to define our adapter and is when we enter the esoteric realms of rust trait bounds:
 
 - **adapter.rs**
 
@@ -133,7 +133,6 @@ Now we have to define our repository and is when we enter the esoteric realms of
   use std::{marker::PhantomData, sync::Arc};
 
   #[derive(Debug, Clone, Repository)]
-  #[postgres(Connection)]
   pub struct ServiceAdapter<D, Connection, User>
   where
       D: DBConnect<Connection = Connection>,
@@ -191,7 +190,7 @@ As you can see, the driver's `D` parameter MUST implement `DBConnect` which take
 
 The `User` bound is simply a bound to a repository the service adapter will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
-So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation. It's called postgres because the derive macro has a specific set of fields on which it operates, this could be named anything in case of manual implementations.
+So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation.
 
 So pretty much, all the service has are calls to some generic drivers, connections and repositories.
 
@@ -331,11 +330,12 @@ Feature flags:
 ```bash
   - full - Enables all the feature below
 
-  - db - Enables mongo, diesel and redis
+  - db - Enables mongo, diesel, seaorm and redis
   - ws - Enable the WS session adapter and message broker
 
-  - diesel - Enables the diesel postgres driver and derive macros
-  - mongo - Enables the mongodb driver and derive macros
+  - postgres-diesel - Enables the diesel postgres driver
+  - postgres-seaorm - Enables the seaorm postgres driver
+  - mongo - Enables the mongodb driver
   - redis - Enables the redis driver and cache access trait
   - email - Enables the SMTP driver and lettre
 ```
