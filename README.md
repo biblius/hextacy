@@ -133,7 +133,6 @@ Now we have to define our repository and is when we enter the esoteric realms of
   use std::{marker::PhantomData, sync::Arc};
 
   #[derive(Debug, Clone, Repository)]
-  #[postgres(Connection)]
   pub struct ServiceAdapter<D, Connection, User>
   where
       D: DBConnect<Connection = Connection>,
