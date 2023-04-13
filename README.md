@@ -190,7 +190,7 @@ As you can see, the driver's `D` parameter MUST implement `DBConnect` which take
 
 The `User` bound is simply a bound to a repository the service adapter will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
-So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation. It's called postgres because the derive macro has a specific set of fields on which it operates, this could be named anything in case of manual implementations.
+So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation.
 
 So pretty much, all the service has are calls to some generic drivers, connections and repositories.
 
