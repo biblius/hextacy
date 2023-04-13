@@ -121,9 +121,9 @@ The service api is implemented by the service struct:
   }
   ```
 
-The service has a single field that is completely generic, however in the impl block we bind it to the api. This api serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryApi`. This helps with the generic bounds in the upcoming repository and makes testing the services a breeze!
+The service has a single field that is completely generic, however in the impl block we bind it to the api. This api serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryApi`. This helps with the generic bounds in the upcoming adapter and makes testing the services a breeze!
 
-Now we have to define our repository and is when we enter the esoteric realms of rust trait bounds:
+Now we have to define our adapter and is when we enter the esoteric realms of rust trait bounds:
 
 - **adapter.rs**
 
