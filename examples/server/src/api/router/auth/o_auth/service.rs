@@ -6,7 +6,7 @@ use crate::{
     },
     config::constants::COOKIE_S_ID,
     error::{AuthenticationError, Error},
-    services::oauth::{OAuthAccount, TokenResponse},
+    services::oauth::{OAuthAccount, OAuthProvider, TokenResponse},
 };
 use crate::{
     db::models::{session::Session, user::User},
@@ -24,31 +24,32 @@ use reqwest::{
 };
 use tracing::info;
 
-pub(super) struct OAuthService<P, R, C>
+pub(super) struct OAuthService<R, C>
 where
-    P: OAuth,
     R: RepositoryApi,
     C: CacheApi,
 {
-    pub provider: P,
     pub repository: R,
     pub cache: C,
 }
 
 #[async_trait]
-impl<P, R, C> ServiceApi for OAuthService<P, R, C>
+impl<R, C> ServiceApi for OAuthService<R, C>
 where
-    P: OAuth + Send + Sync,
     R: RepositoryApi + Send + Sync,
     C: CacheApi + Send + Sync,
 {
-    async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error> {
+    async fn login<T: OAuth + Send + Sync>(
+        &self,
+        provider: T,
+        code: OAuthCodeExchange,
+    ) -> Result<HttpResponse, Error> {
         let OAuthCodeExchange { ref code } = code;
 
         // Get the tokens and obtain the account
-        let mut tokens = self.provider.exchange_code(code).await?;
-        let account = self.provider.get_account(&tokens).await?;
-        let provider = self.provider.provider_id();
+        let mut tokens = provider.exchange_code(code).await?;
+        let account = provider.get_account(&tokens).await?;
+        let provider_id = provider.provider_id();
         let email = match account.email() {
             Some(email) => email,
             None => return Err(AuthenticationError::EmailUnverified.into()),
@@ -63,51 +64,52 @@ where
                 email,
                 account.username(),
                 &tokens,
-                provider,
+                provider_id,
             )
             .await?;
 
         if oauth.expired() {
             if let Some(ref refresh_token) = oauth.refresh_token {
                 info!("OAuth access token expired, refreshing");
-                tokens = self.provider.refresh_access_token(refresh_token).await?;
+                tokens = provider.refresh_access_token(refresh_token).await?;
                 self.repository
-                    .refresh_oauth_and_session(&user.id, &tokens, provider)
+                    .refresh_oauth_and_session(&user.id, &tokens, provider_id)
                     .await?;
             } else {
                 self.repository
-                    .update_oauth(&user.id, &tokens, provider)
+                    .update_oauth(&user.id, &tokens, provider_id)
                     .await?;
             }
         }
 
-        self.establish_session(tokens, user).await
+        self.establish_session(provider_id, tokens, user).await
     }
 
-    async fn request_additional_scopes(
+    async fn request_additional_scopes<T: OAuth + Send + Sync>(
         &self,
+        provider: T,
         mut session: Session,
         code: OAuthCodeExchange,
     ) -> Result<HttpResponse, Error> {
         let _ = session
             .oauth_token
-            .ok_or_else(|| AuthenticationError::InvalidToken("OAuth"))?;
+            .ok_or(AuthenticationError::InvalidToken("OAuth"))?;
 
         // Obtain the new tokens with more scopes
         let OAuthCodeExchange { ref code } = code;
-        let tokens = self.provider.exchange_code(code).await?;
+        let tokens = provider.exchange_code(code).await?;
 
         let user_id = &session.user_id;
-        let provider = self.provider.provider_id();
+        let provider_id = provider.provider_id();
         let access_token = tokens.access_token();
 
         // Update existing sessions tied to the user and their auth provider
         // as well as the related oauth metadata
         self.repository
-            .update_session_access_tokens(access_token, user_id, provider)
+            .update_session_access_tokens(access_token, user_id, provider_id)
             .await?;
         self.repository
-            .update_oauth(user_id, &tokens, provider)
+            .update_oauth(user_id, &tokens, provider_id)
             .await?;
 
         // Update the existing session, sessions updated in the previous step will not update
@@ -123,6 +125,7 @@ where
 
     async fn establish_session<TR: TokenResponse>(
         &self,
+        provider_id: OAuthProvider,
         tokens: TR,
         user: User,
     ) -> Result<HttpResponse, Error> {
@@ -138,7 +141,7 @@ where
                 &csrf_token,
                 expiration,
                 Some(access_token),
-                Some(self.provider.provider_id()),
+                Some(provider_id),
             )
             .await?;
 

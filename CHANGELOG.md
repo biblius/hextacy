@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.1.2 - 2023-04-10
+## 0.1.3
+
+Change the `=>` in the `adapt!` macro to `as` because it makes more sense.
+
+## 0.1.2
 
 Remove all ACID related traits and drastically simplify how transactions are handled.
 

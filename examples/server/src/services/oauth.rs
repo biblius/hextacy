@@ -123,6 +123,8 @@ pub enum OAuthProviderError {
     InvalidJwt,
     #[error("Reqwest Header")]
     ToStr(#[from] ToStrError),
+    #[error("Invalid Provider")]
+    InvalidProvider,
 }
 
 #[derive(Debug, Clone, Copy, FromSqlRow, AsExpression, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,6 +150,17 @@ impl FromSql<Text, Pg> for OAuthProvider {
             b"google" => Ok(OAuthProvider::Google),
             b"github" => Ok(OAuthProvider::Github),
             _ => Err("Unrecognized provider".into()),
+        }
+    }
+}
+
+impl TryFrom<String> for OAuthProvider {
+    type Error = OAuthProviderError;
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        match value.as_str() {
+            "google" => Ok(Self::Google),
+            "github" => Ok(Self::Github),
+            _ => Err(OAuthProviderError::InvalidProvider),
         }
     }
 }

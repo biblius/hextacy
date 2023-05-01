@@ -1,10 +1,10 @@
 use hextacy::{
-    derive::Repository,
+    derive::Adapter,
     drivers::db::{postgres::diesel::PgPoolConnection, DBConnect, Driver},
 };
 trait UserRepository<C> {}
 
-#[derive(Repository)]
+#[derive(Adapter)]
 struct ServiceRepo<D, C, User>
 where
     D: DBConnect<Connection = C> + Send + Sync,

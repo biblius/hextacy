@@ -33,5 +33,7 @@ pub mod web;
 
 /// Derive macros for quick implementations of generic repository traits.
 pub mod derive {
-    pub use hextacy_derive::Repository;
+    pub use hextacy_derive::Adapter;
 }
+
+pub mod router;

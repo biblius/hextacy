@@ -8,6 +8,7 @@ use tracing::{info, trace};
 pub type RedisPool = Pool<Client>;
 pub type RedisPoolConnection = PooledConnection<redis::Client>;
 
+/// Contains a redis connection pool. An instance of this should be shared through the app with arcs.
 #[derive(Debug, Clone)]
 pub struct Redis {
     pool: RedisPool,

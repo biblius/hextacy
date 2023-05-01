@@ -110,12 +110,10 @@ impl UserRepository<ClientSession> for MgUserAdapter {
 
     async fn get_by_email(conn: &mut ClientSession, email: &str) -> Result<User, AdapterError> {
         let db = conn.client().database("xtc");
-        let user = db
-            .collection("users")
+        db.collection("users")
             .find_one(doc! {"email": email}, None)
             .await?
-            .ok_or_else(|| AdapterError::DoesNotExist);
-        user
+            .ok_or_else(|| AdapterError::DoesNotExist)
     }
 
     async fn update_password(

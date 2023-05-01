@@ -2,8 +2,6 @@ mod db;
 
 use proc_macro_error::proc_macro_error;
 
-#[proc_macro_derive(Repository, attributes(diesel, seaorm, mongo))]
-#[proc_macro_error]
 /// Provides an implementation of `RepositoryAccess<C>` depending on the provided attributes.
 ///
 /// Accepted field attributes are:
@@ -29,7 +27,9 @@ use proc_macro_error::proc_macro_error;
 ///     user: PhantomData<User>
 ///  }
 /// ```
+#[proc_macro_derive(Adapter, attributes(diesel, seaorm, mongo))]
+#[proc_macro_error]
 pub fn derive_repository(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut ast = syn::parse(input).unwrap();
-    db::repository::derive(&mut ast).into()
+    db::adapter::derive(&mut ast).into()
 }

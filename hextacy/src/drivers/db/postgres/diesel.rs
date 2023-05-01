@@ -4,8 +4,8 @@ use crate::{db::Atomic, drivers::db::DBConnect};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,
-    r2d2::{ConnectionManager, Pool, PooledConnection, State},
-    Connection, PgConnection,
+    r2d2::{ConnectionManager, Pool, PooledConnection},
+    PgConnection,
 };
 
 pub use diesel;
@@ -38,25 +38,12 @@ impl PostgresDiesel {
             .build(manager)
             .unwrap_or_else(|e| panic!("Failed to create postgres pool: {e}"));
 
+        tracing::debug!(
+            "Successfully initialised PG pool (diesel) at {}",
+            format!("postgressql://{user}:***@{host}:{port}/{db}")
+        );
+
         Self { pool }
-    }
-
-    /// Attempts to establish a pooled connection.
-    pub fn connect(&self) -> Result<PgPoolConnection, DriverError> {
-        match self.pool.get() {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::PgPoolConnection(e.to_string())),
-        }
-    }
-
-    /// Expects a url as postgresql://user:password@host:port/database
-    pub fn connect_direct(&self, db_url: &str) -> Result<PgConnection, DriverError> {
-        PgConnection::establish(&db_url).map_err(Into::into)
-    }
-
-    /// Returns the state of the pool
-    pub fn state(&self) -> State {
-        self.pool.state()
     }
 }
 

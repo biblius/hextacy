@@ -31,12 +31,11 @@ pub(in crate::api::router::auth) type Repo = ServiceAdapter<
 adapt! {
     ServiceAdapter,
 
-    Postgres => Connection,
-    postgres => seaorm;
+    use Postgres for Connection as driver : seaorm;
 
-    User => UserRepository<Connection>,
-    Session => SessionRepository<Connection>,
-    OAuth => OAuthRepository<Connection>
+    User    as UserRepository<Connection>,
+    Session as SessionRepository<Connection>,
+    OAuth   as OAuthRepository<Connection>
 }
 
 api_impl! {
@@ -44,9 +43,9 @@ api_impl! {
 
     Postgres => Connection : Atomic;
 
-    User => UserRepository : Connection,
-    Session => SessionRepository : Connection,
-    OAuth => OAuthRepository : Connection;
+    User    as UserRepository<Connection>,
+    Session as SessionRepository<Connection>,
+    OAuth   as OAuthRepository<Connection>;
 
     async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let mut conn = self.connect().await?;
@@ -140,17 +139,17 @@ api_impl! {
         let conn = self.connect().await?;
         let mut conn = conn.start_transaction().await?;
 
-        let user = match self.get_user_by_email(&email).await {
+        let user = match self.get_user_by_email(email).await {
             Ok(user) => User::update_oauth_id(&mut conn, &user.id, account_id, provider)
                 .await
                 .map_err(Error::new)?,
             Err(Error::Adapter(AdapterError::DoesNotExist)) => {
-                self.create_user_from_oauth(account_id, &email, username, provider)
+                self.create_user_from_oauth(account_id, email, username, provider)
                     .await?
             }
             Err(e) => {
                 <Connection as Atomic>::abort_transaction(conn).await?;
-                return Err(e.into());
+                return Err(e);
             }
         };
 
@@ -165,7 +164,7 @@ api_impl! {
                 }
                 e => {
                     <Connection as Atomic>::abort_transaction(conn).await?;
-                    return Err(e.into());
+                    return Err(e);
                 }
             },
         };

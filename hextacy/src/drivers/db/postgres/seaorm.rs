@@ -4,7 +4,9 @@ use crate::{
 };
 use async_trait::async_trait;
 use sea_orm::TransactionTrait;
-use sea_orm::{ConnectOptions, Database, DatabaseConnection, DatabaseTransaction};
+use sea_orm::{ConnectOptions, Database, DatabaseTransaction};
+
+pub use sea_orm::DatabaseConnection;
 
 /// Contains a connection pool for postgres with sea-orm. An instance of this
 /// should be shared through the app with Arcs
@@ -31,6 +33,11 @@ impl PostgresSea {
         let pool = Database::connect(options)
             .await
             .expect("Could not establish PostgresSea connection");
+
+        tracing::debug!(
+            "Successfully initialised PG pool (seaorm) at {}",
+            format!("postgressql://{user}:***@{host}:{port}/{db}")
+        );
 
         Self { pool }
     }

@@ -20,17 +20,17 @@ impl ProjectConfig {
         match format {
             ConfigFormat::Json => {
                 let config = serde_json::to_string_pretty(self)?;
-                fs::write(Path::new("server/alx_lock.json"), config)?;
+                fs::write(Path::new("alx_lock.json"), config)?;
             }
             ConfigFormat::Yaml => {
                 let config = serde_yaml::to_string(self)?;
-                fs::write(Path::new("server/alx_lock.yaml"), config)?;
+                fs::write(Path::new("alx_lock.yaml"), config)?;
             }
             ConfigFormat::Both => {
                 let config = serde_json::to_string_pretty(self)?;
-                fs::write(Path::new("server/alx_lock.json"), config)?;
+                fs::write(Path::new("alx_lock.json"), config)?;
                 let config = serde_yaml::to_string(self)?;
-                fs::write(Path::new("server/alx_lock.yaml"), config)?;
+                fs::write(Path::new("alx_lock.yaml"), config)?;
             }
         };
         Ok(())

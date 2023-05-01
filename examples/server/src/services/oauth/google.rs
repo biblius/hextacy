@@ -273,7 +273,7 @@ impl TokenResponse for GoogleTokenResponse {
     }
 
     fn refresh_token(&self) -> Option<&str> {
-        self.refresh_token.as_ref().map(|s| s.as_str())
+        self.refresh_token.as_deref()
     }
 
     fn expires_in(&self) -> Option<i64> {
@@ -281,6 +281,6 @@ impl TokenResponse for GoogleTokenResponse {
     }
 
     fn id_token(&self) -> Option<&str> {
-        self.id_token.as_ref().map(|s| s.as_str())
+        self.id_token.as_deref()
     }
 }

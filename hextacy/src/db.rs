@@ -28,24 +28,6 @@ pub trait Atomic: Sized {
     async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DatabaseError>;
 }
 
-#[derive(Debug, Error)]
-pub enum DatabaseError {
-    #[error("Error while attempting to establish connection: {0}")]
-    Driver(#[from] super::drivers::DriverError),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "postgres-diesel"))]
-    #[error("Diesel Error: {0}")]
-    Diesel(#[from] diesel::result::Error),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
-    #[error("Mongo Error: {0}")]
-    Mongo(#[from] mongodb::error::Error),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "postgres-seaorm"))]
-    #[error("SeaORM Error: {0}")]
-    SeaORM(#[from] sea_orm::DbErr),
-}
-
 #[macro_export]
 /// Generates a `Repository` struct (or a custom name) with `pub(super)` visibility and derives [RepositoryAccess].
 ///
@@ -64,8 +46,9 @@ pub enum DatabaseError {
 /// `field_ident => driver,`
 ///
 /// syntax, where DriverIdent and ConnectionIdent are arbitrary driver and connection generics that can be used
-/// to specify which repositories will use which drivers. Available drivers (for `field_ident`) are `diesel`, `seaorm` for postgres
-/// and `mongo`.
+/// to specify which repositories will use which drivers.
+///
+/// **Available drivers (for `driver`) are `diesel`, `seaorm` for postgres and `mongo`.**
 ///
 /// #### 3 - Repository ident - Repository path
 ///
@@ -100,61 +83,17 @@ pub enum DatabaseError {
 /// `DBConnect` is automatically added to the bounds as a generic parameter for the driver.
 macro_rules! adapt {
     (
+        $name:ident,
         $(
-            $driver:ident => $conn_name:ident,
-            $field:ident  => $driver_field:ident $(,)?
+            use $driver:ident for $conn_name:ident as $field:ident : $driver_field:ident $(,)?
         )+;
         $(
-            $id:ident     => $repo_bound:path
+            $id:ident     as $repo_bound:path
         ),*
         ) => {
                #[allow(non_snake_case)]
-               #[derive(Debug, Clone, hextacy::derive::Repository)]
-               pub struct Repository<$($driver),+, $($conn_name),+, $($id),*>
-               where
-                  $(
-                      $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name>,
-                  )+
-                   $($id: $repo_bound),*
-               {
-                  $(
-                      #[$driver_field($conn_name)]
-                      $field: hextacy::drivers::db::Driver<$driver, $conn_name>,
-                  )+
-                   $($id: ::std::marker::PhantomData<$id>),*
-               }
-
-               #[allow(non_snake_case)]
-               impl<$($driver),+, $($conn_name),+, $($id),*> Repository<$($driver),+, $($conn_name),+, $($id),*>
-               where
-                  $(
-                      $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name>,
-                  )+
-                   $($id: $repo_bound),*
-               {
-                   pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
-                       Self {
-                          $(
-                              $field: hextacy::drivers::db::Driver::new($driver),
-                          )+
-                           $($id: ::std::marker::PhantomData),*
-                       }
-                   }
-               }
-          };
-    (
-        $custom_name:ident,
-        $(
-            $driver:ident => $conn_name:ident,
-            $field:ident  => $driver_field:ident $(,)?
-        )+;
-        $(
-            $id:ident     => $repo_bound:path
-        ),*
-        ) => {
-               #[allow(non_snake_case)]
-               #[derive(Debug, Clone, hextacy::derive::Repository)]
-               pub struct $custom_name<$($driver),+, $($conn_name),+, $($id),*>
+               #[derive(Debug, hextacy::derive::Adapter)]
+               pub struct $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
@@ -169,7 +108,7 @@ macro_rules! adapt {
                }
 
                #[allow(non_snake_case)]
-               impl<$($driver),+, $($conn_name),+, $($id),*> $custom_name<$($driver),+, $($conn_name),+, $($id),*>
+               impl<$($driver),+, $($conn_name),+, $($id),*> $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
@@ -233,7 +172,7 @@ macro_rules! api_impl {
      $($driver:ident => $conn_name:ident : $($(+)? $conn_trait:path)+),+;
 
      // Generic param => Repository bound : connection bound
-     $($id:ident => $bound:ident : $conn_bound:ident),*;
+     $($id:ident as $bound:ident <$conn_bound:ident>),*;
 
      $($b:item)*
     ) => {
@@ -272,7 +211,7 @@ macro_rules! api_impl {
      $($driver:ident => $conn_name:ident),+;
 
      // Generic param => Repository bound : connection bound
-     $($id:ident => $bound:ident : $conn_bound:ident),*;
+     $($id:ident : $bound:ident <$conn_bound:ident>),*;
 
      $($b:item)*
     ) => {
@@ -286,14 +225,36 @@ macro_rules! api_impl {
 
             // Apply DBConnect bounds for drivers
             $(
-                $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name>,
+                $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
             )+
 
+            $(
+                $conn_name: Send
+            )+,
+
             // Apply repository bounds
-            $($id: $bound<$conn_bound>),*
+            $($id: $bound<$conn_bound> + Send + Sync),*
 
             {
                 $($b)*
             }
     };
+}
+
+#[derive(Debug, Error)]
+pub enum DatabaseError {
+    #[error("Error while attempting to establish connection: {0}")]
+    Driver(#[from] super::drivers::DriverError),
+
+    #[cfg(any(feature = "db", feature = "full", feature = "postgres-diesel"))]
+    #[error("Diesel Error: {0}")]
+    Diesel(#[from] diesel::result::Error),
+
+    #[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
+    #[error("Mongo Error: {0}")]
+    Mongo(#[from] mongodb::error::Error),
+
+    #[cfg(any(feature = "db", feature = "full", feature = "postgres-seaorm"))]
+    #[error("SeaORM Error: {0}")]
+    SeaORM(#[from] sea_orm::DbErr),
 }

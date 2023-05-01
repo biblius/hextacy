@@ -122,7 +122,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .set(dsl::revoked.eq(true))
             .load::<OAuthMeta>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist.into())
+            .ok_or_else(|| AdapterError::DoesNotExist)
     }
 
     async fn revoke_all(

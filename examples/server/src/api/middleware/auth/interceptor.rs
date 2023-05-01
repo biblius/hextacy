@@ -1,91 +1,64 @@
-use super::adapter::{Cache, Repository};
+use super::adapter::{Adapter, Cache};
 use super::api::{AuthGuardApi, CacheApi, RepositoryApi};
-use super::service::AuthenticationGuard;
+use crate::config::constants::COOKIE_S_ID;
 use crate::db::models::role::Role;
+use crate::db::models::session::Session;
 use crate::db::repository::session::SessionRepository;
 use crate::error::{AuthenticationError, Error};
-use actix_web::dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform};
+use actix_web::cookie::Cookie;
+use actix_web::dev::ServiceRequest;
 use actix_web::HttpMessage;
-use futures_util::future::LocalBoxFuture;
+use async_trait::async_trait;
 use futures_util::FutureExt;
 use hextacy::drivers::cache::redis::Redis;
 use hextacy::drivers::db::DBConnect;
+use hextacy::{call, transform};
 use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, info};
+use tracing::{trace, warn};
 
 #[derive(Debug, Clone)]
-pub(crate) struct AuthGuard<Repo, Cache> {
-    guard: Rc<AuthenticationGuard<Repo, Cache>>,
-}
-
-impl<D, C, Session> AuthGuard<Repository<D, C, Session>, Cache>
-where
-    D: DBConnect<Connection = C>,
-    Session: SessionRepository<C>,
-{
-    pub fn new(pg: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {
-        Self {
-            guard: Rc::new(AuthenticationGuard::new(pg, rd, role)),
-        }
-    }
-}
-
-impl<Serv, Repo, Cache> Transform<Serv, ServiceRequest> for AuthGuard<Repo, Cache>
-where
-    Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
-    Serv::Future: 'static,
-    Repo: RepositoryApi + Send + Sync + 'static,
-    Cache: CacheApi + Send + Sync + 'static,
-{
-    type Response = ServiceResponse;
-    type Error = actix_web::Error;
-    type InitError = ();
-    type Transform = AuthMiddleware<Serv, Repo, Cache>;
-    type Future = Ready<Result<Self::Transform, Self::InitError>>;
-
-    fn new_transform(&self, service: Serv) -> Self::Future {
-        ready(Ok(AuthMiddleware {
-            service: Rc::new(service),
-            guard: self.guard.clone(),
-        }))
-    }
+struct AuthenticationGuardInner<R, C> {
+    pub repository: R,
+    pub cache: C,
+    pub auth_level: Role,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct AuthMiddleware<Serv, Repo, Cache> {
-    guard: Rc<AuthenticationGuard<Repo, Cache>>,
-    service: Rc<Serv>,
+pub struct AuthenticationGuard<R, C> {
+    inner: Rc<AuthenticationGuardInner<R, C>>,
 }
 
-impl<Serv, Repo, Cache> Service<ServiceRequest> for AuthMiddleware<Serv, Repo, Cache>
-where
-    Serv: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
-    Serv::Future: 'static,
-    Repo: RepositoryApi + Send + Sync + 'static,
-    Cache: CacheApi + Send + Sync + 'static,
-{
-    type Response = ServiceResponse;
-    type Error = actix_web::Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+#[derive(Debug, Clone)]
+pub struct AuthMiddleware<S, Repo, Cache> {
+    inner: Rc<AuthenticationGuardInner<Repo, Cache>>,
+    service: Rc<S>,
+}
 
-    forward_ready!(service);
+transform! {
+    AuthenticationGuard => AuthMiddleware,
+    R: RepositoryApi,
+    C: CacheApi
+}
+
+call! {
+    AuthMiddleware,
+    R: RepositoryApi,
+    C: CacheApi;
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         info!("Auth guard: Validating session");
 
-        let guard = self.guard.clone();
+        let guard = self.inner.clone();
         let service = self.service.clone();
 
         async move {
-            let error_response = /* Error response for brevity */
-                |e, r: ServiceRequest| ServiceResponse::from_err(e, r.request().to_owned());
-
             // Get the csrf header
             let csrf = match guard.get_csrf_header(&req) {
                 Ok(token) => token,
-                Err(e) => return Ok(error_response(e, req)),
+                Err(e) => return Err(e.into()),
             };
 
             debug!("Found csrf header: {csrf}");
@@ -93,18 +66,15 @@ where
             // Get the session ID
             let session_id = match guard.get_session_cookie(&req) {
                 Ok(id) => id,
-                Err(e) => return Ok(error_response(e, req)),
+                Err(e) => return Err(e.into()),
             };
 
             debug!("Found session ID cookie {session_id}");
 
             let user_sess = guard.get_valid_session(session_id.value(), csrf).await?;
 
-            if !guard.check_valid_role(&user_sess.role).await {
-                return Ok(error_response(
-                    Error::new(AuthenticationError::InsufficientRights),
-                    req,
-                ));
+            if !guard.check_valid_role(&user_sess.role) {
+                return Err(Error::new(AuthenticationError::InsufficientRights).into());
             }
 
             // Append the session to the request and call the next middleware
@@ -115,5 +85,94 @@ where
             Ok(res)
         }
         .boxed_local()
+    }
+}
+
+#[async_trait]
+impl<R, C> AuthGuardApi for AuthenticationGuardInner<R, C>
+where
+    R: RepositoryApi + Send + Sync,
+    C: CacheApi + Send + Sync,
+{
+    /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
+    /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
+    /// If it can't find a session returns an `Unauthenticated` error.
+    async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error> {
+        // Check cache
+        match self.cache.get_session_by_id(session_id) {
+            Ok(session) => {
+                if session.csrf != csrf {
+                    return Err(Error::new(AuthenticationError::InvalidCsrfHeader));
+                }
+
+                if !session.is_permanent() {
+                    self.cache.refresh_session(session_id)?;
+                }
+
+                Ok(session)
+            }
+            Err(e) => {
+                trace!("{e}");
+                // Check DB
+                if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
+                    debug!("Found valid session with id {session_id}");
+                    // Cache
+                    self.cache.cache_session(session_id, &session)?;
+                    debug!("Refreshing session {}", session.id);
+                    if !session.is_permanent() {
+                        self.repository.refresh_session(&session.id, csrf).await?;
+                    }
+                    Ok(session)
+                } else {
+                    warn!("No valid session found");
+                    Err(Error::new(AuthenticationError::Unauthenticated))
+                }
+            }
+        }
+    }
+
+    /// Extracts the x-csrf-token header from the request
+    fn get_csrf_header<'a>(&self, req: &'a ServiceRequest) -> Result<&'a str, Error> {
+        req.headers().get("x-csrf-token").map_or_else(
+            || Err(AuthenticationError::InvalidCsrfHeader.into()),
+            |value| value.to_str().map_err(Error::new),
+        )
+    }
+
+    /// Extracts the `S_ID` cookie from the request
+    fn get_session_cookie(&self, req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
+        req.cookie(COOKIE_S_ID)
+            .ok_or_else(|| AuthenticationError::Unauthenticated.into())
+    }
+
+    /// Returns true if the role is equal to or greater than the auth_level of this guard instance
+    fn check_valid_role(&self, role: &Role) -> bool {
+        role >= &self.auth_level
+    }
+}
+
+impl<D, Conn, Session> AuthenticationGuardInner<Adapter<D, Conn, Session>, Cache>
+where
+    D: DBConnect<Connection = Conn> + Send + Sync,
+    Session: SessionRepository<Conn> + Send + Sync,
+{
+    pub fn new(repository_driver: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {
+        Self {
+            cache: Cache { driver: rd },
+            repository: Adapter::new(repository_driver),
+            auth_level: role,
+        }
+    }
+}
+
+impl<D, Conn, Session> AuthenticationGuard<Adapter<D, Conn, Session>, Cache>
+where
+    D: DBConnect<Connection = Conn> + Send + Sync,
+    Session: SessionRepository<Conn> + Send + Sync,
+{
+    pub fn new(pg: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {
+        Self {
+            inner: Rc::new(AuthenticationGuardInner::new(pg, rd, role)),
+        }
     }
 }

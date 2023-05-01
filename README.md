@@ -2,6 +2,8 @@
 
 A repository designed to quick start web server development with [actix_web](https://actix.rs/) by providing an extensible infrastructure and a CLI tool to reduce manually writing boilerplate while maintaining best practices.
 
+Hextacy is a work in progress and the api may get absolutely breaking changes.
+
 The kind of project structure this repository uses is heavily based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
 ## **Architecture**
@@ -33,8 +35,7 @@ First things first, we have to define the data we'll use:
   ```rust
   // We expect this in the query params
   // Validify creates a GetUsersPaginatedPayload in the background
-  #[derive(Debug, Deserialize)]
-  #[validify]
+  #[derive(Debug, Deserialize, Validify)]
   #[serde(rename_all = "camelCase")]
   pub(super) struct GetUsersPaginated {
     #[validate(range(min = 1, max = 65_535))]
@@ -192,7 +193,7 @@ The `User` bound is simply a bound to a repository the service adapter will use,
 
 So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation.
 
-So pretty much, all the service has are calls to some generic drivers, connections and repositories.
+So pretty much, all the service has are calls to some generic drivers, connections and repositories, while the macros generate a concrete implementation for the driver of choice you can use in the setup.
 
 This fact is at the core of this architecture and is precisely what makes it so powerful. Not only does this make testing a piece of cake, but it also allows us to switch up our adapters any way we want without ever having to change the business logic. They are completely decoupled.
 

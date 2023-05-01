@@ -1,5 +1,5 @@
 use hextacy::{
-    derive::Repository,
+    derive::Adapter,
     drivers::{
         db::{DBConnect, Driver},
         DriverError,
@@ -18,7 +18,7 @@ impl DBConnect for SomeDriver {
     }
 }
 
-#[derive(Repository)]
+#[derive(Adapter)]
 struct ServiceRepo<D, C, User>
 where
     D: DBConnect<Connection = C>,

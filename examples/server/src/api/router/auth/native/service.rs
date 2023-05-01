@@ -129,6 +129,7 @@ where
                 .to_response(StatusCode::OK)
                 .finish());
         }
+
         self.establish_session(user, remember).await
     }
 
@@ -209,7 +210,7 @@ where
         match user {
             Ok(_) => return Ok(response()),
             Err(Error::Adapter(AdapterError::DoesNotExist)) => {}
-            Err(e) => return Err(e.into()),
+            Err(e) => return Err(e),
         }
 
         let hashed = bcrypt_hash(password)?;

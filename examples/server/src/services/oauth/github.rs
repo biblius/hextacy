@@ -199,11 +199,11 @@ impl OAuthAccount for GithubAccount {
     }
 
     fn email(&self) -> Option<&str> {
-        self.email.as_ref().map(|s| s.as_str())
+        self.email.as_deref()
     }
 
     fn name(&self) -> Option<&str> {
-        self.name.as_ref().map(|s| s.as_str())
+        self.name.as_deref()
     }
 }
 

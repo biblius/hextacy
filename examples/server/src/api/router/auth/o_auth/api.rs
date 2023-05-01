@@ -1,7 +1,7 @@
 use super::data::OAuthCodeExchange;
 use crate::db::models::{session::Session, user::User};
 use crate::error::Error;
-use crate::services::oauth::TokenResponse;
+use crate::services::oauth::{OAuth, OAuthProvider, TokenResponse};
 use actix_web::HttpResponse;
 use async_trait::async_trait;
 
@@ -16,20 +16,30 @@ pub(super) trait ServiceApi {
     /// the existing ones using the refresh token and establish a session based
     /// on that, as we always want to keep only a single entry per user and provider
     /// in the `oauth` table. Multiple sessions with the same access token are allowed.
-    async fn login(&self, code: OAuthCodeExchange) -> Result<HttpResponse, Error>;
+    async fn login<T: OAuth + Send + Sync>(
+        &self,
+        provider: T,
+        code: OAuthCodeExchange,
+    ) -> Result<HttpResponse, Error>;
 
     /// Mainly used for incremental authorization. When the user wants to perform an action
     /// not permitted by their current scopes, the frontend should perform another authorization request
     /// with additional scopes and send the code here to exchange it for a token. The newly obtained token
     /// should replace the old one, as it will contain all the previously granted scopes and the session
     /// (and cookies) should be updated to reflect the change.
-    async fn request_additional_scopes(
+    async fn request_additional_scopes<T: OAuth + Send + Sync>(
         &self,
+        provider: T,
         mut session: Session,
         code: OAuthCodeExchange,
     ) -> Result<HttpResponse, Error>;
 
-    async fn establish_session<T>(&self, tokens: T, user: User) -> Result<HttpResponse, Error>
+    async fn establish_session<TR>(
+        &self,
+        provider: OAuthProvider,
+        tokens: TR,
+        user: User,
+    ) -> Result<HttpResponse, Error>
     where
-        T: TokenResponse + Send + Sync + 'static;
+        TR: TokenResponse + Send + Sync + 'static;
 }

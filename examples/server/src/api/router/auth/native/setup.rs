@@ -6,9 +6,9 @@ use crate::api::middleware::auth::{
 use crate::api::router::auth::adapters::{cache::Cache, email::Email, repository::Repo};
 use crate::db::models::role::Role;
 use actix_web::web::{self, Data};
-use hextacy::drivers::db::mongo::Mongo;
 use hextacy::drivers::{cache::redis::Redis, db::postgres::seaorm::PostgresSea};
 use hextacy::drivers::{db::postgres::diesel::PostgresDiesel, email::Email as EmailClient};
+use hextacy::{drivers::db::mongo::Mongo, route};
 use std::sync::Arc;
 
 pub(crate) fn routes(
@@ -20,67 +20,39 @@ pub(crate) fn routes(
     cfg: &mut web::ServiceConfig,
 ) {
     let service = Authentication {
-        repository: Repo::new(pg.clone()),
+        repository: Repo::new(pg),
         cache: Cache { driver: rd.clone() },
         email: Email { driver: email },
     };
-    let auth_guard = interceptor::AuthGuard::<MwRepo, MwCache>::new(_pg, rd, Role::User);
+
+    let session_guard =
+        interceptor::AuthenticationGuard::<MwRepo, MwCache>::new(_pg, rd, Role::User);
 
     cfg.app_data(Data::new(service));
 
-    cfg.service(
-        web::resource("/auth/login")
-            .route(web::post().to(handler::login::<Authentication<Repo, Cache, Email>>)),
-    );
+    route!(
+        Authentication<Repo, Cache, Email>, cfg,
 
-    cfg.service(
-        web::resource("/auth/register").route(
-            web::post().to(handler::start_registration::<Authentication<Repo, Cache, Email>>),
-        ),
-    );
+        post => "/auth/login" => login;
 
-    cfg.service(web::resource("/auth/verify-registration-token").route(
-        web::get().to(handler::verify_registration_token::<Authentication<Repo, Cache, Email>>),
-    ));
+        post => "/auth/register" => start_registration;
 
-    cfg.service(web::resource("/auth/resend-registration-token").route(
-        web::post().to(handler::resend_registration_token::<Authentication<Repo, Cache, Email>>),
-    ));
+        get => "/auth/verify-registration-token" => verify_registration_token;
 
-    cfg.service(
-        web::resource("/auth/set-otp")
-            .route(web::get().to(handler::set_otp_secret::<Authentication<Repo, Cache, Email>>))
-            .wrap(auth_guard.clone()),
-    );
+        post => "/auth/resend-registration-token" => resend_registration_token;
 
-    cfg.service(
-        web::resource("/auth/verify-otp")
-            .route(web::post().to(handler::verify_otp::<Authentication<Repo, Cache, Email>>)),
-    );
+        get => "/auth/set-otp" => set_otp_secret;
 
-    cfg.service(
-        web::resource("/auth/change-password")
-            .route(web::post().to(handler::change_password::<Authentication<Repo, Cache, Email>>))
-            .wrap(auth_guard.clone()),
-    );
+        post => "/auth/verify-otp" => verify_otp;
 
-    cfg.service(
-        web::resource("/auth/forgot-password")
-            .route(web::post().to(handler::forgot_password::<Authentication<Repo, Cache, Email>>)),
-    );
+        post => "/auth/change-password" => change_password | session_guard;
 
-    cfg.service(web::resource("/auth/verify-forgot-password").route(
-        web::post().to(handler::verify_forgot_password::<Authentication<Repo, Cache, Email>>),
-    ));
+        post => "/auth/forgot-password" => forgot_password;
 
-    cfg.service(
-        web::resource("/auth/reset-password")
-            .route(web::get().to(handler::reset_password::<Authentication<Repo, Cache, Email>>)),
-    );
+        post => "/auth/verify-forgot-password" => verify_forgot_password;
 
-    cfg.service(
-        web::resource("/auth/logout")
-            .route(web::post().to(handler::logout::<Authentication<Repo, Cache, Email>>))
-            .wrap(auth_guard),
+        get => "/auth/reset-password" => reset_password;
+
+        post => "/auth/logout" => logout | session_guard;
     );
 }

@@ -60,21 +60,15 @@ pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
         state.mongo.clone(),
         cfg,
     );
-    router::auth::o_auth::setup::google::routes(
+
+    router::auth::o_auth::setup::routes(
         state.pg_diesel.clone(),
         state.pg_sea.clone(),
         state.redis.clone(),
         state.mongo.clone(),
         cfg,
     );
-    router::auth::o_auth::setup::github::routes(
-        state.pg_diesel.clone(),
-        state.pg_sea.clone(),
-        state.redis.clone(),
-        state.mongo.clone(),
-        cfg,
-    );
-    router::users::setup::routes(state.pg_sea.clone(), state.redis.clone(), cfg);
+    router::users::setup::routes(state.pg_diesel.clone(), state.redis.clone(), cfg);
     router::health::route(cfg);
     router::resources::setup::routes(cfg);
 }
@@ -136,22 +130,22 @@ fn init_diesel_pg() -> Arc<PostgresDiesel> {
 
 fn init_mongo() -> Arc<Mongo> {
     let mut params = hextacy::env::get_multiple(&[
-        "PG_USER",
-        "PG_PASSWORD",
-        "PG_HOST",
-        "PG_PORT",
-        "PG_DATABASE",
+        "MONGO_USER",
+        "MONGO_PASSWORD",
+        "MONGO_HOST",
+        "MONGO_PORT",
+        "MONGO_DATABASE",
     ]);
 
-    let db = params.pop().expect("PG_DATABASE must be set");
-    let port = params.pop().expect("PG_PORT must be set");
-    let host = params.pop().expect("PG_HOST must be set");
-    let pw = params.pop().expect("PG_PASSWORD must be set");
-    let user = params.pop().expect("PG_USER must be set");
+    let db = params.pop().expect("MONGO_DATABASE must be set");
+    let port = params.pop().expect("MONGO_PORT must be set");
+    let host = params.pop().expect("MONGO_HOST must be set");
+    let pw = params.pop().expect("MONGO_PASSWORD must be set");
+    let user = params.pop().expect("MONGO_USER must be set");
 
     Arc::new(Mongo::new(
         &host,
-        port.parse().expect("Invalid PG_PORT"),
+        port.parse().expect("Invalid MONGO_PORT"),
         &user,
         &pw,
         &db,

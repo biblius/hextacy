@@ -17,13 +17,12 @@ use tracing::info;
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let log = std::env::args().nth(1);
-    let log = log.as_ref().map(|l| l.as_str()).unwrap_or("debug");
+    let log = log.as_deref().unwrap_or("debug");
+
+    info!("Starting with: {:?}", std::env::args());
 
     let env = std::env::args().nth(2);
-    let env_path = env
-        .as_ref()
-        .map(|p| p.as_str())
-        .unwrap_or("examples/server");
+    let env_path = env.as_deref().unwrap_or("examples/server");
 
     env::load_from_file(&format!("{env_path}/.env")).unwrap();
 

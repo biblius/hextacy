@@ -76,7 +76,8 @@ pub fn handle(opts: AnalyzeOptions, api_path: &str) {
 
     let path = format!("{api_path}/router");
 
-    router_read_recursive(Path::new(&path), &mut scan, &analyze, None).unwrap();
+    router_read_recursive(Path::new(&path), &mut scan, &analyze, None)
+        .unwrap_or_else(|_| panic!("Path not found:  {path}"));
 
     // println!("MY CURRENT CONFIG {:?}", scan);
 

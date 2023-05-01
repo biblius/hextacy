@@ -1,4 +1,4 @@
-pub mod repository;
+pub mod adapter;
 
 use lazy_static::lazy_static;
 use proc_macro2::Span;
@@ -36,7 +36,7 @@ fn process_generics(
 
     // Modify the type generics by taking out the specified connection generic from the impl and substitute
     // it in the following bounds with whatever they are paired with
-    let replaced = modify_type_generics(&mut generics, &replacements);
+    let replaced = modify_type_generics(&mut generics, replacements);
     if replaced.is_empty() {
         abort!(
             ast.ident.span(),
@@ -124,27 +124,28 @@ fn concretise_bounds(
             for arg in ab_args.args.iter_mut() {
                 match arg {
                     // Concretises the bound argoument `T: Something<Connection>`
-                    syn::GenericArgument::Type(ref mut ty) => match ty {
-                        syn::Type::Path(ref mut p) => {
-                            for seg in p.path.segments.iter_mut() {
-                                if let Some(target) = replacements.get(&seg.ident.to_string()) {
-                                    seg.ident = target.clone();
-                                }
+                    syn::GenericArgument::Type(ref mut ty) => {
+                        let syn::Type::Path(ref mut p) = ty else {
+                            continue;
+                        };
+                        for seg in p.path.segments.iter_mut() {
+                            if let Some(target) = replacements.get(&seg.ident.to_string()) {
+                                seg.ident = target.clone();
                             }
                         }
-                        _ => {}
-                    },
+                    }
                     // Concretises any connection in associated types, eg `T<Something = Connection>`
-                    syn::GenericArgument::AssocType(ref mut bind) => match bind.ty {
-                        syn::Type::Path(ref mut path) => {
-                            for seg in path.path.segments.iter_mut() {
-                                if let Some(target) = replacements.get(&seg.ident.to_string()) {
-                                    seg.ident = target.clone();
-                                }
+                    syn::GenericArgument::AssocType(ref mut bind) => {
+                        let syn::Type::Path(ref mut path) = bind.ty else {
+                            continue;
+                        };
+
+                        for seg in path.path.segments.iter_mut() {
+                            if let Some(target) = replacements.get(&seg.ident.to_string()) {
+                                seg.ident = target.clone();
                             }
                         }
-                        _ => {}
-                    },
+                    }
                     // This should theoretically be unreachable
                     syn::GenericArgument::Const(_)
                     | syn::GenericArgument::Lifetime(_)
@@ -177,8 +178,7 @@ fn scan_fields(ast: &syn::DeriveInput) -> Fields {
                                 })
                                 .tokens
                                 .to_string()
-                                .replace("(", "")
-                                .replace(")", "");
+                                .replace(['(', ')'], "");
                             fields
                                 .replacements
                                 .insert(generic, Ident::new(concretised, Span::call_site()));

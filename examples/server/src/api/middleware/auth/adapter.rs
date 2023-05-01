@@ -5,45 +5,41 @@ use crate::{
     config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
     error::Error,
 };
-use async_trait::async_trait;
 use chrono::Utc;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisPoolConnection};
-use hextacy::drivers::db::{DBConnect, Driver};
+use hextacy::drivers::db::DBConnect;
+use hextacy::{adapt, api_impl};
 use hextacy::{
     cache::redis::CacheAccess,
     cache::redis::CacheError,
     drivers::db::postgres::{diesel::PgPoolConnection, diesel::PostgresDiesel},
 };
-use std::marker::PhantomData;
 use std::sync::Arc;
 
-pub type Repo = Repository<PostgresDiesel, PgPoolConnection, PgSessionAdapter>;
-
-#[derive(Debug)]
-pub struct Repository<D, C, Session>
-where
-    D: DBConnect<Connection = C>,
-{
-    pub driver: Driver<D, C>,
-    pub _session: PhantomData<Session>,
-}
+pub type Repo = Adapter<PostgresDiesel, PgPoolConnection, PgSessionAdapter>;
 
 impl Clone for Repo {
     fn clone(&self) -> Self {
         Self {
             driver: self.driver.clone(),
-            _session: self._session.clone(),
+            ..*self
         }
     }
 }
 
-#[async_trait]
-impl<D, C, Session> RepositoryApi for Repository<D, C, Session>
-where
-    Session: SessionRepository<C> + Send + Sync,
-    D: DBConnect<Connection = C> + Send + Sync,
-    C: Send,
-{
+adapt! {
+    Adapter,
+    use Driver for Connection as driver: diesel;
+    S as SessionRepository<Connection>
+}
+
+api_impl! {
+    Adapter : RepositoryApi,
+
+    Driver => Connection;
+
+    Session : SessionRepository<Connection>;
+
     async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
         Session::refresh(&mut conn, id, csrf)

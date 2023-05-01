@@ -3,14 +3,14 @@ use crate::db::{
     insert_replaced, modify_where_clause, process_generics, scan_fields, DIESEL_CONNECTION,
     MONGO_CONNECTION, SEAORM_CONNECTION,
 };
-use proc_macro2::{Ident, Span};
+use proc_macro2::Ident;
 use quote::quote;
-use syn::{Generics, ImplGenerics};
+use syn::{Generics, ImplGenerics, TypePath};
 
 pub fn derive(ast: &mut syn::DeriveInput) -> proc_macro2::TokenStream {
     let ident = ast.ident.clone();
 
-    let fields = scan_fields(&ast);
+    let fields = scan_fields(ast);
     let replacements = &fields.replacements;
 
     let (replaced, mut generics) = process_generics(ast, replacements);
@@ -19,7 +19,7 @@ pub fn derive(ast: &mut syn::DeriveInput) -> proc_macro2::TokenStream {
     let (impl_generics, _, _) = trimmed_impls.split_for_impl();
 
     insert_replaced(&mut generics, replaced);
-    modify_where_clause(&mut generics, &replacements);
+    modify_where_clause(&mut generics, replacements);
 
     let mut tokens = vec![];
 
@@ -61,7 +61,9 @@ fn quote_repo_access(
 ) -> proc_macro2::TokenStream {
     let Some(driver_field) = fields.driver_fields.get(connection) else { return quote!() };
 
-    let _type = syn::Ident::new(connection, Span::call_site());
+    let _type: TypePath = syn::parse_str(connection).unwrap();
+
+    dbg!(&_type);
 
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 

@@ -37,7 +37,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
         let new = NewSession {
             user_id: &user.id,
             username: &user.username,
-            phone: user.phone.as_ref().map(|s| s.as_str()),
+            phone: user.phone.as_deref(),
             role: &user.role,
             email: &user.email,
             csrf,
@@ -46,7 +46,7 @@ impl SessionRepository<PgPoolConnection> for PgSessionAdapter {
                 || NaiveDateTime::MAX,
                 |after| (Utc::now() + Duration::seconds(after)).naive_utc(),
             ),
-            auth_type: provider.map_or(AuthType::Native, |p| AuthType::OAuth(p)),
+            auth_type: provider.map_or(AuthType::Native, AuthType::OAuth),
         };
 
         diesel::insert_into(dsl::sessions)

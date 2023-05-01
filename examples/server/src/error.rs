@@ -60,7 +60,7 @@ impl Error {
         match self {
             Self::Authentication(e) => e.describe(),
             Self::Adapter(crate::db::adapters::AdapterError::DoesNotExist) => {
-                ("NOT_FOUND", format!("Resource does not exist"))
+                ("NOT_FOUND", "Resource does not exist".to_string())
             }
             Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),
             _ => ("INTERNAL_SERVER_ERROR", "Internal server error".to_string()),
@@ -101,6 +101,7 @@ pub struct ErrorResponse<'a> {
     code: u16,
     message: &'a str,
     description: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
     validation_errors: Option<Vec<ValidationError>>,
 }
 

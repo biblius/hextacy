@@ -6,8 +6,7 @@ use async_trait::async_trait;
 #[async_trait]
 pub(crate) trait AuthGuardApi {
     async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error>;
-    async fn check_valid_role(&self, role: &Role) -> bool;
-    async fn extract_user_session(&self, id: &str, csrf: &str) -> Result<Session, Error>;
+    fn check_valid_role(&self, role: &Role) -> bool;
     fn get_csrf_header<'a>(&self, reg: &'a ServiceRequest) -> Result<&'a str, Error>;
     fn get_session_cookie(&self, reg: &ServiceRequest) -> Result<Cookie, Error>;
 }
