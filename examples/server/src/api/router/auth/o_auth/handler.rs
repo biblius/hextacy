@@ -1,6 +1,8 @@
-use super::{api::ServiceApi, data::OAuthCodeExchangePayload};
+use super::{
+    super::data::{OAuthCodeExchange, OAuthCodeExchangePayload},
+    service::OAuthServiceApi,
+};
 use crate::{
-    api::router::auth::o_auth::data::OAuthCodeExchange,
     error::Error,
     helpers::request::extract_session,
     services::oauth::{github::GithubOAuth, google::GoogleOAuth, OAuthProvider},
@@ -9,9 +11,7 @@ use actix_web::{web, HttpRequest, Responder};
 use tracing::info;
 use validify::Validify;
 
-/// Verifies the user's login credentials and either establishes a session if the user
-/// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
-pub(super) async fn login<T: ServiceApi>(
+pub(super) async fn login<T: OAuthServiceApi>(
     path: web::Path<String>,
     data: web::Json<OAuthCodeExchangePayload>,
     service: web::Data<T>,
@@ -25,9 +25,7 @@ pub(super) async fn login<T: ServiceApi>(
     }
 }
 
-/// Verifies the user's login credentials and either establishes a session if the user
-/// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
-pub(super) async fn request_scopes<T: ServiceApi>(
+pub(super) async fn request_scopes<T: OAuthServiceApi>(
     req: HttpRequest,
     path: web::Path<String>,
     data: web::Json<OAuthCodeExchangePayload>,

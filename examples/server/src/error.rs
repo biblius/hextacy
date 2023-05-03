@@ -7,7 +7,7 @@ use thiserror::{self, Error};
 use validify::{ValidationError, ValidationErrors};
 
 #[derive(Debug, Error)]
-pub(crate) enum Error {
+pub enum Error {
     #[error("Authentication Error: {0}")]
     Authentication(#[from] AuthenticationError),
     #[error("Env var Error: {0}")]
@@ -132,7 +132,7 @@ impl Display for ErrorResponse<'_> {
 }
 
 #[derive(Debug, Error)]
-pub(crate) enum AuthenticationError {
+pub enum AuthenticationError {
     #[error("Session not found")]
     Unauthenticated,
     #[error("Invalid credentials")]

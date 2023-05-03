@@ -63,8 +63,6 @@ fn quote_repo_access(
 
     let _type: TypePath = syn::parse_str(connection).unwrap();
 
-    dbg!(&_type);
-
     let (_, ty_generics, where_clause) = generics.split_for_impl();
 
     quote!(

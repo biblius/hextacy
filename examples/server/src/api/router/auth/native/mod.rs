@@ -1,5 +1,3 @@
-pub(super) mod api;
-pub(super) mod data;
 pub(super) mod handler;
 pub(super) mod service;
 pub(crate) mod setup;
@@ -9,12 +7,14 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        api::{MockServiceApi, ServiceApi},
         data::{
             ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Otp,
             RegistrationData, ResendRegToken, ResetPassword,
         },
         service::Authentication,
+    };
+    use crate::api::router::auth::native::service::{
+        AuthenticationApi as ServiceApi, MockAuthenticationApi as MockServiceApi,
     };
     use crate::db::{
         adapters::AdapterError,

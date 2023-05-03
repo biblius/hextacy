@@ -1,4 +1,3 @@
-use super::super::api::CacheApi;
 use crate::config::cache::AuthCache;
 use crate::config::constants::{
     EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, SESSION_CACHE_DURATION,
@@ -10,6 +9,7 @@ use chrono::Utc;
 use hextacy::cache::redis::{CacheAccess, CacheError};
 use hextacy::drivers::cache::redis::RedisPoolConnection;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis};
+use hextacy::service_component;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -27,7 +27,8 @@ impl CacheAccess for Cache {
     }
 }
 
-impl CacheApi for Cache {
+#[service_component(crate::api::router::auth)]
+impl Cache {
     /// Sessions get cached behind the user's csrf token.
     fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
         debug!("Caching session with ID {session_id}");

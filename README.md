@@ -223,7 +223,7 @@ Finally, we'll concretise everything in the setup:
 
 I'll admit it, the trait bounds do look kind of ugly, but seeing as this is the only place where we concretise our types, we never have to worry about the rest of the service breaking when we makes changes in our adapters. The concrete repository can be extracted to a type definition to reduce the amount of places where it needs to be changed and for visibility.
 
-To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `adapt!` and `api_impl!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
+To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `adapt!` and `implement!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
 
 - **_adapter.rs_**
 
@@ -236,7 +236,7 @@ To reduce some of the unpleasentness with dealing with so many generics, macros 
       User => UserRepository<Connection>
   }
 
-  api_impl! {
+  implement! {
       Repository : RepositoryApi,
 
       D => Connection;
@@ -305,7 +305,7 @@ The `Atomic` trait normalises the API; For diesel we simply return the connectio
 
 The API is normalised because anything that's returned is in `Atomic::TransactionResult`. If you take a look at the above code block, you'll notice we've bound `User` to a repository that now must operate on both the connection and its transaction result.
 
-For connection based transactions (like diesel and mongo), the `Atomic::TransactionResult` will be the very same connection, meaning we do not have to create an additional implementation for the transaction. In seaorm however, we need to crate an implementation specifically for the transaction (basically a copy of the impl, but substituting all `DatabaseConnection`s to `DatabaseTransaction`s).
+For connection based transactions (like diesel and mongo), the `Atomic::TransactionResult` will be the very same connection, meaning we do not have to create an additional implementation for the transaction. In seaorm however, we need to create an implementation for the transaction as well. Usually ORMs provide a trait that represents a connection, so we can just implement the repository with it.
 
 To elaborate further, here's what a repository would look like:
 

@@ -1,4 +1,3 @@
-use super::api::{CacheApi, RepositoryApi};
 use crate::db::adapters::postgres::diesel::session::PgSessionAdapter;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{
@@ -6,9 +5,10 @@ use crate::{
     error::Error,
 };
 use chrono::Utc;
+use hextacy::adapt;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisPoolConnection};
 use hextacy::drivers::db::DBConnect;
-use hextacy::{adapt, api_impl};
+use hextacy::service_component;
 use hextacy::{
     cache::redis::CacheAccess,
     cache::redis::CacheError,
@@ -29,29 +29,25 @@ impl Clone for Repo {
 
 adapt! {
     Adapter,
+
     use Driver for Connection as driver: diesel;
-    S as SessionRepository<Connection>
-}
 
-api_impl! {
-    Adapter : RepositoryApi,
+    Session as SessionRepository<Connection>;
 
-    Driver => Connection;
+    {
+        async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+            let mut conn = self.driver.connect().await?;
+            Session::refresh(&mut conn, id, csrf)
+                .await
+                .map_err(Error::new)
+        }
 
-    Session : SessionRepository<Connection>;
-
-    async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
-        let mut conn = self.driver.connect().await?;
-        Session::refresh(&mut conn, id, csrf)
-            .await
-            .map_err(Error::new)
-    }
-
-    async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
-        let mut conn = self.driver.connect().await?;
-        Session::get_valid_by_id(&mut conn, id, csrf)
-            .await
-            .map_err(Error::new)
+        async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+            let mut conn = self.driver.connect().await?;
+            Session::get_valid_by_id(&mut conn, id, csrf)
+                .await
+                .map_err(Error::new)
+        }
     }
 }
 
@@ -70,7 +66,8 @@ impl CacheAccess for Cache {
     }
 }
 
-impl CacheApi for Cache {
+#[service_component(super)]
+impl Cache {
     fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         self.get_json(AuthCache::Session, id).map_err(Error::new)
     }

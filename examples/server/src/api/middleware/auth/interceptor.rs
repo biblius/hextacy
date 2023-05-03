@@ -1,5 +1,4 @@
-use super::adapter::{Adapter, Cache};
-use super::api::{AuthGuardApi, CacheApi, RepositoryApi};
+use super::adapter::{Adapter, AdapterApi, Cache, CacheApi};
 use crate::config::constants::COOKIE_S_ID;
 use crate::db::models::role::Role;
 use crate::db::models::session::Session;
@@ -8,10 +7,10 @@ use crate::error::{AuthenticationError, Error};
 use actix_web::cookie::Cookie;
 use actix_web::dev::ServiceRequest;
 use actix_web::HttpMessage;
-use async_trait::async_trait;
 use futures_util::FutureExt;
 use hextacy::drivers::cache::redis::Redis;
 use hextacy::drivers::db::DBConnect;
+use hextacy::service_component;
 use hextacy::{call, transform};
 use std::future::{ready, Ready};
 use std::rc::Rc;
@@ -39,13 +38,13 @@ pub struct AuthMiddleware<S, Repo, Cache> {
 
 transform! {
     AuthenticationGuard => AuthMiddleware,
-    R: RepositoryApi,
+    R: AdapterApi,
     C: CacheApi
 }
 
 call! {
     AuthMiddleware,
-    R: RepositoryApi,
+    R: AdapterApi,
     C: CacheApi;
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
@@ -88,10 +87,10 @@ call! {
     }
 }
 
-#[async_trait]
-impl<R, C> AuthGuardApi for AuthenticationGuardInner<R, C>
+#[service_component]
+impl<R, C> AuthenticationGuardInner<R, C>
 where
-    R: RepositoryApi + Send + Sync,
+    R: AdapterApi + Send + Sync,
     C: CacheApi + Send + Sync,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.

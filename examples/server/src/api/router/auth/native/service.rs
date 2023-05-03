@@ -1,9 +1,16 @@
-use super::{
-    api::ServiceApi,
-    data::{
-        ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify,
-        FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
-        ResendRegToken, ResetPassword, TwoFactorAuthResponse,
+use super::super::adapters::{
+    cache::CacheApi, email::EmailApi, repository::ServiceAdapterApi as RepositoryApi,
+};
+use super::super::data::{
+    ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify,
+    FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
+    ResendRegToken, ResetPassword, TwoFactorAuthResponse,
+};
+use crate::config::{
+    cache::AuthCache,
+    constants::{
+        COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, OTP_TOKEN_DURATION,
+        REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_DURATION,
     },
 };
 use crate::db::{
@@ -11,21 +18,10 @@ use crate::db::{
     models::{session::Session, user::User},
 };
 use crate::{
-    api::router::auth::api::{CacheApi, EmailApi},
-    config::{
-        cache::AuthCache,
-        constants::{
-            COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, OTP_TOKEN_DURATION,
-            REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_DURATION,
-        },
-    },
-};
-use crate::{
-    api::router::auth::{api::RepositoryApi, data::AuthenticationSuccessResponse},
+    api::router::auth::data::AuthenticationSuccessResponse,
     error::{AuthenticationError, Error},
 };
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
-use async_trait::async_trait;
 use data_encoding::{BASE32, BASE64URL};
 use hextacy::{
     crypto::{
@@ -33,6 +29,7 @@ use hextacy::{
         hmac::{generate_hmac, verify_hmac},
         {bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
+    service_component,
     web::http::response::{MessageResponse, Response},
 };
 use reqwest::{
@@ -47,14 +44,15 @@ pub(super) struct Authentication<R, C, E> {
     pub email: E,
 }
 
-#[async_trait]
-impl<R, C, E> ServiceApi for Authentication<R, C, E>
+#[service_component(super)]
+impl<R, C, E> Authentication<R, C, E>
 where
     R: RepositoryApi + Send + Sync,
     C: CacheApi + Send + Sync,
     E: EmailApi + Send + Sync,
 {
-    /// Verifies the user's credentials and returns a response based on their 2fa status
+    /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`
+    /// flag is true the session established will be permanent (applies for `verify_otp` as well).
     async fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
         let Credentials {
             ref email,

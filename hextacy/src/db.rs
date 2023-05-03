@@ -83,22 +83,30 @@ pub trait Atomic: Sized {
 /// `DBConnect` is automatically added to the bounds as a generic parameter for the driver.
 macro_rules! adapt {
     (
-        $name:ident,
+        $name:ident $(in $vis:path)?,
         $(
-            use $driver:ident for $conn_name:ident as $field:ident : $driver_field:ident $(,)?
+            use $driver:ident
+            for $conn_name:ident $(: $atomic_conn:path )?
+            as $field:ident
+            : $driver_field:ident $(,)?
         )+;
         $(
-            $id:ident     as $repo_bound:path
+            $id:ident     as $repository:ident < $connection:ident $(: $conn_trait:path )? >
         ),*
+        $(,)? ;
+        {
+            $($b:item)*
+        }
+
         ) => {
                #[allow(non_snake_case)]
                #[derive(Debug, hextacy::derive::Adapter)]
-               pub struct $name<$($driver),+, $($conn_name),+, $($id),*>
+               pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
                   )+
-                   $($id: $repo_bound + Send + Sync),*
+                   $($id: $repository <$connection> + Send + Sync),*
                {
                   $(
                       #[$driver_field($conn_name)]
@@ -108,12 +116,12 @@ macro_rules! adapt {
                }
 
                #[allow(non_snake_case)]
-               impl<$($driver),+, $($conn_name),+, $($id),*> $name<$($driver),+, $($conn_name),+, $($id),*>
+               impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
                   )+
-                   $($id: $repo_bound + Send + Sync),*
+                   $($id: $repository <$connection> + Send + Sync),*
                {
                    pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
                        Self {
@@ -124,121 +132,37 @@ macro_rules! adapt {
                        }
                    }
                }
+
+               #[hextacy::service_component$(($vis))?]
+               impl
+                   <$($driver),+, $($conn_name),+, $($id),*>
+
+                   $name
+
+                   <$($driver),+, $($conn_name),+, $($id),*>
+               where
+                   Self: $(hextacy::db::RepositoryAccess<$conn_name> +)+,
+
+                   // Apply DBConnect bounds for drivers
+                   $(
+                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
+                   )+
+
+                   // Apply connection bounds
+                   $(
+                       $conn_name: $( $atomic_conn + )? Send
+                   )+,
+
+                   // Apply repository bounds
+                   $(
+                        $id: $repository <$connection> $(+ $repository< <$connection as $conn_trait>::TransactionResult> )? + Send + Sync
+                    ),*
+
+                    // Impl items
+                   {
+                       $($b)*
+                   }
           };
-}
-
-#[macro_export]
-/// Used to implement an api for any adapter used by business level services and reducing boilerplate
-/// associated with adapter generics.
-///
-/// The following syntax, similar to the [adapt] macro, is accepted:
-///
-/// ```ignore
-/// api_impl! {
-///     // Implements API for Implementor
-///     Implementor => API;
-///
-///     // Specifies which drivers will use which type of connections
-///     Driver => Connection ();
-///
-///     // Naming the bounds through which the repository methods can be called
-///     // and the connections they will use
-///     User => UserRepository : Connection,
-///     /* ... */
-/// }
-///
-/// ```
-/// The first `ident => path` pair specifies the api to implement (right) and the struct on which
-/// to implement it (left).
-///
-/// The second pair of parameters are any number of `ident => path` pairs representing how the repositories will be named in the impl block.
-/// From the example above, a `U` generic will be created in place of a `UserRepository`, therefore accessing its methods
-/// is done via `U::method(/* .. */)`.
-///
-/// The last pair of parameters are any number of function items for the trait implementation.
-///
-/// The first three pairs of arguments are used for the bounds in the api implementation, while the fourth (the function items)
-/// are used to generate the impl block.
-///
-/// This macro is mostly for utility and hiding the wall of bounds required for service adapters and for standard
-/// cases where you just need repositories with and without atomic connections.
-macro_rules! api_impl {
-    // This one's for connections that need to have Atomic
-    (
-     // Implementing struct : API to implement
-     $struct:ident : $api:path,
-
-     // Driver => Connection generic, connection bounds
-     $($driver:ident => $conn_name:ident : $($(+)? $conn_trait:path)+),+;
-
-     // Generic param => Repository bound : connection bound
-     $($id:ident as $bound:ident <$conn_bound:ident>),*;
-
-     $($b:item)*
-    ) => {
-        #[async_trait::async_trait]
-        impl
-            <$($driver),+, $($conn_name),+, $($id),*> $api
-        for
-            $struct<$($driver),+, $($conn_name),+, $($id),*>
-        where
-            Self: $(hextacy::db::RepositoryAccess<$conn_name> +)+,
-
-            // Apply DBConnect bounds for drivers
-            $(
-                $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
-            )+
-
-            // Apply connection bounds
-            $(
-                $conn_name: $($conn_trait)+ + Send
-            )+,
-
-            // Apply repository bounds
-            $($id: $bound<$conn_bound> + $bound<<$conn_bound as hextacy::db::Atomic>::TransactionResult> + Send + Sync),*
-
-            {
-                $($b)*
-            }
-    };
-
-    // For repositories without atomic connections.
-    (
-     // Implementing struct : API to implement
-     $struct:ident : $api:path,
-
-     // Driver => Connection generic, connection bounds
-     $($driver:ident => $conn_name:ident),+;
-
-     // Generic param => Repository bound : connection bound
-     $($id:ident : $bound:ident <$conn_bound:ident>),*;
-
-     $($b:item)*
-    ) => {
-        #[async_trait::async_trait]
-        impl
-            <$($driver),+, $($conn_name),+, $($id),*> $api
-        for
-            $struct<$($driver),+, $($conn_name),+, $($id),*>
-        where
-            Self: $(hextacy::db::RepositoryAccess<$conn_name> +)+,
-
-            // Apply DBConnect bounds for drivers
-            $(
-                $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
-            )+
-
-            $(
-                $conn_name: Send
-            )+,
-
-            // Apply repository bounds
-            $($id: $bound<$conn_bound> + Send + Sync),*
-
-            {
-                $($b)*
-            }
-    };
 }
 
 #[derive(Debug, Error)]
