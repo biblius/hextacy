@@ -37,5 +37,3 @@ pub mod derive {
 }
 
 pub use hextacy_derive::service_component;
-
-pub mod router;

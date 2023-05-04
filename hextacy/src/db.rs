@@ -91,12 +91,11 @@ macro_rules! adapt {
             : $driver_field:ident $(,)?
         )+;
         $(
-            $id:ident     as $repository:ident < $connection:ident $(: $conn_trait:path )? >
+            $repository:ident < $connection:ident $(: $conn_trait:path )? > as $id:ident
         ),*
         $(,)? ;
-        {
-            $($b:item)*
-        }
+
+        $($b:item)*
 
         ) => {
                #[allow(non_snake_case)]

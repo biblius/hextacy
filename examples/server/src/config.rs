@@ -16,12 +16,12 @@ use std::sync::Arc;
 use tracing::info;
 
 #[derive(Debug, Clone)]
-pub(super) struct AppState {
-    pg_diesel: Arc<PostgresDiesel>,
-    pg_sea: Arc<PostgresSea>,
-    redis: Arc<Redis>,
-    smtp: Arc<Email>,
-    mongo: Arc<Mongo>,
+pub struct AppState {
+    pub pg_diesel: Arc<PostgresDiesel>,
+    pub pg_sea: Arc<PostgresSea>,
+    pub redis: Arc<Redis>,
+    pub smtp: Arc<Email>,
+    pub mongo: Arc<Mongo>,
 }
 
 impl AppState {
@@ -52,22 +52,9 @@ impl AppState {
 }
 
 pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
-    router::auth::native::setup::routes(
-        state.pg_diesel.clone(),
-        state.pg_sea.clone(),
-        state.redis.clone(),
-        state.smtp.clone(),
-        state.mongo.clone(),
-        cfg,
-    );
+    router::auth::native::setup::routes(state, cfg);
 
-    router::auth::o_auth::setup::routes(
-        state.pg_diesel.clone(),
-        state.pg_sea.clone(),
-        state.redis.clone(),
-        state.mongo.clone(),
-        cfg,
-    );
+    router::auth::o_auth::setup::routes(state, cfg);
     router::users::setup::routes(state.pg_diesel.clone(), state.redis.clone(), cfg);
     router::health::route(cfg);
     router::resources::setup::routes(cfg);

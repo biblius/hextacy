@@ -1,41 +1,69 @@
-use super::{handler, service::Authentication};
-use crate::api::middleware::auth::{
-    adapter::{Cache as MwCache, Repo as MwRepo},
-    interceptor,
+use super::{
+    handler::{
+        change_password, forgot_password, login, logout, resend_registration_token, reset_password,
+        set_otp_secret, start_registration, verify_forgot_password, verify_otp,
+        verify_registration_token,
+    },
+    service::Authentication,
 };
-use crate::api::router::auth::adapters::{cache::Cache, email::Email, repository::Repo};
 use crate::db::models::role::Role;
+use crate::{
+    api::middleware::auth::{
+        adapter::{Cache as MwCache, Repo as MwRepo},
+        interceptor,
+    },
+    api::router::auth::adapters::{cache::Cache, email::Email, repository::ServiceAdapter},
+    config::AppState,
+    db::adapters::postgres::seaorm::{
+        oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter,
+    },
+};
 use actix_web::web::{self, Data};
-use hextacy::drivers::{cache::redis::Redis, db::postgres::seaorm::PostgresSea};
-use hextacy::drivers::{db::postgres::diesel::PostgresDiesel, email::Email as EmailClient};
-use hextacy::{drivers::db::mongo::Mongo, route};
-use std::sync::Arc;
+use hextacy::{drivers::db::postgres::seaorm::PostgresSea, route};
+use sea_orm::DatabaseConnection;
+
+type RepoComponent = ServiceAdapter<
+    PostgresSea,
+    DatabaseConnection,
+    PgUserAdapter,
+    PgSessionAdapter,
+    PgOAuthAdapter,
+>;
 
 pub(crate) fn routes(
-    _pg: Arc<PostgresDiesel>,
-    pg: Arc<PostgresSea>,
-    rd: Arc<Redis>,
-    email: Arc<EmailClient>,
-    _mg: Arc<Mongo>,
+    AppState {
+        pg_diesel,
+        pg_sea,
+        redis,
+        smtp,
+        ..
+    }: &AppState,
     cfg: &mut web::ServiceConfig,
 ) {
     let service = Authentication {
-        repository: Repo::new(pg),
-        cache: Cache { driver: rd.clone() },
-        email: Email { driver: email },
+        repository: RepoComponent::new(pg_sea.clone()),
+        cache: Cache {
+            driver: redis.clone(),
+        },
+        email: Email {
+            driver: smtp.clone(),
+        },
     };
 
-    let session_guard =
-        interceptor::AuthenticationGuard::<MwRepo, MwCache>::new(_pg, rd, Role::User);
+    let session_guard = interceptor::AuthenticationGuard::<MwRepo, MwCache>::new(
+        pg_diesel.clone(),
+        redis.clone(),
+        Role::User,
+    );
 
     cfg.app_data(Data::new(service));
 
     route!(
-        Authentication<Repo, Cache, Email>, cfg,
+        Authentication<RepoComponent, Cache, Email>, cfg,
 
         post => "/auth/login" => login;
 
-        post => "/auth/register" => start_registration;
+        post => "/auth/register" =>  start_registration;
 
         get => "/auth/verify-registration-token" => verify_registration_token;
 
@@ -45,7 +73,7 @@ pub(crate) fn routes(
 
         post => "/auth/verify-otp" => verify_otp;
 
-        post => "/auth/change-password" => change_password | session_guard;
+        post => "/auth/change-password" => |session_guard => change_password;
 
         post => "/auth/forgot-password" => forgot_password;
 
@@ -53,6 +81,6 @@ pub(crate) fn routes(
 
         get => "/auth/reset-password" => reset_password;
 
-        post => "/auth/logout" => logout | session_guard;
+        post => "/auth/logout" => | session_guard => logout;
     );
 }

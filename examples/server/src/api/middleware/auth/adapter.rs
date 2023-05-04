@@ -30,25 +30,24 @@ impl Clone for Repo {
 adapt! {
     Adapter,
 
-    use Driver for Connection as driver: diesel;
+    use Diesel for Connection as driver: diesel;
 
-    Session as SessionRepository<Connection>;
+    SessionRepository<Connection> as Session;
 
-    {
-        async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
-            let mut conn = self.driver.connect().await?;
-            Session::refresh(&mut conn, id, csrf)
-                .await
-                .map_err(Error::new)
-        }
-
-        async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
-            let mut conn = self.driver.connect().await?;
-            Session::get_valid_by_id(&mut conn, id, csrf)
-                .await
-                .map_err(Error::new)
-        }
+    async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+        let mut conn = self.driver.connect().await?;
+        Session::refresh(&mut conn, id, csrf)
+            .await
+            .map_err(Error::new)
     }
+
+    async fn get_valid_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
+        let mut conn = self.driver.connect().await?;
+        Session::get_valid_by_id(&mut conn, id, csrf)
+            .await
+            .map_err(Error::new)
+    }
+
 }
 
 #[derive(Debug, Clone)]
