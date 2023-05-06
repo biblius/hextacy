@@ -24,15 +24,7 @@ type RepoComponent = ServiceAdapter<
     PgOAuthAdapter,
 >;
 
-pub(crate) fn routes(
-    AppState {
-        pg_diesel,
-        pg_sea,
-        redis,
-        ..
-    }: &AppState,
-    cfg: &mut web::ServiceConfig,
-) {
+pub(crate) fn routes(AppState { pg_sea, redis, .. }: &AppState, cfg: &mut web::ServiceConfig) {
     let service = OAuthService {
         repository: RepoComponent::new(pg_sea.clone()),
         cache: Cache {
@@ -41,7 +33,7 @@ pub(crate) fn routes(
     };
 
     let auth_guard =
-        AuthenticationGuard::<MwRepo, MwCache>::new(pg_diesel.clone(), redis.clone(), Role::User);
+        AuthenticationGuard::<MwRepo, MwCache>::new(pg_sea.clone(), redis.clone(), Role::User);
 
     cfg.app_data(Data::new(service));
 

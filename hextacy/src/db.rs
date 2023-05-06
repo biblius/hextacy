@@ -29,7 +29,7 @@ pub trait Atomic: Sized {
 }
 
 #[macro_export]
-/// Generates a `Repository` struct (or a custom name) with `pub(super)` visibility and derives [RepositoryAccess].
+/// Generates a struct with the given name and visibility and derives [RepositoryAccess].
 ///
 /// Useful for reducing overall boilerplate in repository adapters.
 ///
@@ -132,7 +132,7 @@ macro_rules! adapt {
                    }
                }
 
-               #[hextacy::service_component$(($vis))?]
+               #[hextacy::component$(($vis))?]
                impl
                    <$($driver),+, $($conn_name),+, $($id),*>
 

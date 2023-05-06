@@ -7,9 +7,9 @@ use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
 use hextacy::cache::redis::{CacheAccess, CacheError};
+use hextacy::component;
 use hextacy::drivers::cache::redis::RedisPoolConnection;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis};
-use hextacy::service_component;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -27,7 +27,7 @@ impl CacheAccess for Cache {
     }
 }
 
-#[service_component(crate::api::router::auth)]
+#[component(crate::api::router::auth)]
 impl Cache {
     /// Sessions get cached behind the user's csrf token.
     fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {

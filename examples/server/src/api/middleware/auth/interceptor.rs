@@ -8,11 +8,10 @@ use actix_web::cookie::Cookie;
 use actix_web::dev::ServiceRequest;
 use actix_web::HttpMessage;
 use futures_util::FutureExt;
+use hextacy::component;
 use hextacy::drivers::cache::redis::Redis;
 use hextacy::drivers::db::DBConnect;
-use hextacy::service_component;
 use hextacy::{call, transform};
-use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -87,7 +86,7 @@ call! {
     }
 }
 
-#[service_component]
+#[component]
 impl<R, C> AuthenticationGuardInner<R, C>
 where
     R: AdapterApi + Send + Sync,

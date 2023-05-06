@@ -9,14 +9,29 @@ use syn::{
     TypeParamBound,
 };
 
-const DIESEL_CONNECTION: &str = "PgPoolConnection";
-const SEAORM_CONNECTION: &str = "DatabaseConnection";
-const MONGO_CONNECTION: &str = "ClientSession";
+pub struct Connection {
+    name: &'static str,
+    full_path: &'static str,
+}
+
+pub const DIESEL_CONNECTION: Connection = Connection {
+    name: "PgPoolConnection",
+    full_path: "hextacy::drivers::db::postgres::diesel::PgPoolConnection",
+};
+pub const SEAORM_CONNECTION: Connection = Connection {
+    name: "DatabaseConnection",
+    full_path: "hextacy::drivers::db::postgres::seaorm::DatabaseConnection",
+};
+pub const MONGO_CONNECTION: Connection = Connection {
+    name: "ClientSession",
+    full_path: "hextacy::drivers::db::mongo::PgPoolConnection",
+};
+
 const DRIVERS: [&str; 3] = ["diesel", "mongo", "seaorm"];
-const _CONNECTIONS: [&str; 3] = ["PgPoolConnection", "ClientSession", "DatabaseConnection"];
+const _CONNECTIONS: [Connection; 3] = [DIESEL_CONNECTION, MONGO_CONNECTION, SEAORM_CONNECTION];
 
 lazy_static! {
-    pub static ref CONNECTIONS: HashMap<&'static str, &'static str> = {
+    pub static ref CONNECTIONS: HashMap<&'static str, Connection> = {
         DRIVERS
             .iter()
             .zip(_CONNECTIONS)
@@ -65,6 +80,7 @@ fn modify_type_generics(
         .type_params_mut()
         .enumerate()
         .filter_map(|(i, param)| {
+            dbg!(&param.ident);
             // For the initial impl scoping we want to exclude the generic connection
             // as it will be concrete
             if !keys.contains(&&param.ident.to_string()) {
@@ -84,6 +100,8 @@ fn modify_type_generics(
         .collect::<Punctuated<GenericParam, Comma>>();
 
     generics.params = types;
+    dbg!(generics);
+    dbg!(&replaced);
     replaced
 }
 
@@ -169,24 +187,28 @@ fn scan_fields(ast: &syn::DeriveInput) -> Fields {
             for field in strct.fields.iter() {
                 for attr in field.attrs.iter() {
                     for seg in attr.path().segments.iter() {
-                        if let Some(concretised) = CONNECTIONS.get(seg.ident.to_string().as_str()) {
-                            let generic = attr
-                                .meta
-                                .require_list()
-                                .unwrap_or_else(|_| {
-                                    abort!(attr.span(), "Invalid attribute given for driver")
-                                })
-                                .tokens
-                                .to_string()
-                                .replace(['(', ')'], "");
-                            fields
-                                .replacements
-                                .insert(generic, Ident::new(concretised, Span::call_site()));
-                            fields.driver_fields.insert(
-                                concretised.to_string(),
-                                field.ident.clone().expect("Ident required"),
-                            );
-                        }
+                        let Some(concretised) = CONNECTIONS.get(seg.ident.to_string().as_str()) else {
+                            continue;
+                        };
+
+                        let generic = attr
+                            .meta
+                            .require_list()
+                            .unwrap_or_else(|_| {
+                                abort!(attr.span(), "Invalid attribute given for driver")
+                            })
+                            .tokens
+                            .to_string()
+                            .replace(['(', ')'], "");
+
+                        fields
+                            .replacements
+                            .insert(generic, Ident::new(concretised.name, Span::call_site()));
+
+                        fields.driver_fields.insert(
+                            concretised.name.to_string(),
+                            field.ident.clone().expect("Ident required"),
+                        );
                     }
                 }
             }

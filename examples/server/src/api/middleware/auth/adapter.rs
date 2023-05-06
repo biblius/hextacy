@@ -1,4 +1,4 @@
-use crate::db::adapters::postgres::diesel::session::PgSessionAdapter;
+use crate::db::adapters::postgres::seaorm::session::PgSessionAdapter;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{
     config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
@@ -7,16 +7,16 @@ use crate::{
 use chrono::Utc;
 use hextacy::adapt;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisPoolConnection};
-use hextacy::drivers::db::DBConnect;
-use hextacy::service_component;
+// use hextacy::drivers::db::DBConnect;
+use hextacy::component;
 use hextacy::{
     cache::redis::CacheAccess,
     cache::redis::CacheError,
-    drivers::db::postgres::{diesel::PgPoolConnection, diesel::PostgresDiesel},
+    drivers::db::postgres::{seaorm::DatabaseConnection, seaorm::PostgresSea},
 };
 use std::sync::Arc;
 
-pub type Repo = Adapter<PostgresDiesel, PgPoolConnection, PgSessionAdapter>;
+pub type Repo = Adapter<PostgresSea, DatabaseConnection, PgSessionAdapter>;
 
 impl Clone for Repo {
     fn clone(&self) -> Self {
@@ -30,7 +30,7 @@ impl Clone for Repo {
 adapt! {
     Adapter,
 
-    use Diesel for Connection as driver: diesel;
+    use Diesel for Connection as driver: seaorm;
 
     SessionRepository<Connection> as Session;
 
@@ -65,7 +65,7 @@ impl CacheAccess for Cache {
     }
 }
 
-#[service_component(super)]
+#[component(super)]
 impl Cache {
     fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         self.get_json(AuthCache::Session, id).map_err(Error::new)

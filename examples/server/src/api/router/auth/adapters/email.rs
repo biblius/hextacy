@@ -1,7 +1,7 @@
 use crate::config::constants::EMAIL_DIRECTORY;
 use crate::error::Error;
+use hextacy::component;
 use hextacy::drivers::email;
-use hextacy::service_component;
 use std::sync::Arc;
 use tracing::debug;
 
@@ -9,7 +9,7 @@ pub(in crate::api::router::auth) struct Email {
     pub driver: Arc<email::Email>,
 }
 
-#[service_component(crate::api::router::auth)]
+#[component(crate::api::router::auth)]
 impl Email {
     fn send_registration_token(
         &self,

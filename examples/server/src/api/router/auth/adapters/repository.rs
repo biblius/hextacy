@@ -11,7 +11,7 @@ use hextacy::db::{Atomic, RepositoryAccess};
 use hextacy::adapt;
 #[allow(unused_imports)]
 use hextacy::drivers::db::postgres::diesel::{PgPoolConnection, PostgresDiesel};
-use hextacy::drivers::db::DBConnect;
+//use hextacy::drivers::db::DBConnect;
 use sea_orm::DatabaseConnection;
 use tracing::info;
 

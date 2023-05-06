@@ -7,32 +7,41 @@ use syn::{spanned::Spanned, Ident, ItemImpl, TypePath};
 
 /// Provides an implementation of `RepositoryAccess<C>` depending on the provided attributes.
 ///
-/// Accepted field attributes are:
+/// Intended to be derived on service components that contain a generic connection that needs to
+/// be concretised. The macro will essentially replace the generic connection with a concrete one
+/// used by the driver in the aformentioned implementation.
+///
+/// Multiple driver fields on the same struct are allowed.
+///
+/// Accepted field attributes (drivers) are:
 ///
 /// `diesel`,
 /// `mongo`,
 /// `seaorm`
 ///
-/// Useful for deriving on repository structs with generic connections.
+/// Useful for deriving on repository components with generic connections.
 /// The `driver` field attribute must be specified on a `Driver` field and match
-/// the generic connection parameter of the repository, e.g. if the generic connection
+/// the generic connection parameter of the component, e.g. if the generic connection
 /// is specified as `C` then the field attribute must be `#[driver(C)]`.
 ///
+/// If using the `component!` macro, this will be done automatically behind the scenes
+/// for whatever drivers are passed in as the parameters to the macro.
+///
 /// ```ignore
-/// #[derive(Debug, Repository)]
-/// #[postgres(Connection)]
-/// pub(super) struct Repository<C, Connection, User>
+/// #[derive(Debug, Adapter)]
+/// pub(super) struct RepositoryComponent<C, Connection, User>
 ///   where
 ///     C: DBConnect<Connection = Connection>,
 ///     User: UserRepository<Connection>
 ///  {
-///     postgres: Driver<C, Connection>,
+///     #[diesel(Connection)]
+///     driver: Driver<C, Connection>,
 ///     user: PhantomData<User>
 ///  }
 /// ```
 #[proc_macro_derive(Adapter, attributes(diesel, seaorm, mongo))]
 #[proc_macro_error]
-pub fn derive_repository(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+pub fn derive_adapter(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let mut ast = syn::parse(input).unwrap();
     db::adapter::derive(&mut ast).into()
 }
@@ -46,8 +55,8 @@ pub fn derive_repository(input: proc_macro::TokenStream) -> proc_macro::TokenStr
 /// This allows for easy mocking of component APIs for unit testing, as well as for DI through bounds
 /// on services.
 ///
-/// Visibility can be provided for the generated trait, e.g. `#[service_component(crate)]`
-pub fn service_component(
+/// Visibility can be provided for the generated trait, e.g. `#[component(crate)]`
+pub fn component(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -60,16 +69,10 @@ pub fn service_component(
             let struct_name = &path.segments[0].ident;
             (
                 struct_name,
-                Ident::new(
-                    &format!("{}Api", struct_name.to_string()),
-                    Span::call_site(),
-                ),
+                Ident::new(&format!("{}Api", struct_name), Span::call_site()),
             )
         }
-        _ => abort!(
-            ast.span(),
-            "service_component not supported for this type of impl"
-        ),
+        _ => abort!(ast.span(), "component not supported for this type of impl"),
     };
 
     let mut fn_defs = vec![];
@@ -79,7 +82,7 @@ pub fn service_component(
         .iter()
         .map(|item| {
             let syn::ImplItem::Fn(func) = item else {
-                abort!(item.span(), "service_component not supported for this type of impl")
+                abort!(item.span(), "component not supported for this type of impl")
             };
             let sig = &func.sig;
             let tokens = quote!(#sig ;);

@@ -19,10 +19,10 @@ macro_rules! transform {
             type Error = actix_web::Error;
             type InitError = ();
             type Transform = $into<S, $($generic),*>;
-            type Future = Ready<Result<Self::Transform, Self::InitError>>;
+            type Future = std::future::Ready<Result<Self::Transform, Self::InitError>>;
 
             fn new_transform(&self, service: S) -> Self::Future {
-                ready(Ok(AuthMiddleware {
+                std::future::ready(Ok($into {
                     inner: self.inner.clone(),
                     service: Rc::new(service),
                 }))
@@ -54,7 +54,15 @@ macro_rules! call {
             type Error = actix_web::Error;
             type Future = futures_util::future::LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-            actix_web::dev::forward_ready!(service);
+            #[inline]
+            fn poll_ready(
+                &self,
+                cx: &mut ::core::task::Context<'_>,
+            ) -> ::core::task::Poll<Result<(), Self::Error>> {
+                self.service
+                    .poll_ready(cx)
+                    .map_err(::core::convert::Into::into)
+            }
 
             $b
         }

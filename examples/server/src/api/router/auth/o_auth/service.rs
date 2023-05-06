@@ -12,8 +12,8 @@ use crate::{
 };
 use actix_web::HttpResponse;
 use hextacy::{
+    component,
     crypto::uuid,
-    service_component,
     web::http::response::{MessageResponse, Response},
 };
 use reqwest::{
@@ -31,7 +31,7 @@ where
     pub cache: C,
 }
 
-#[service_component(super)]
+#[component(super)]
 impl<R, C> OAuthService<R, C>
 where
     R: RepositoryApi + Send + Sync,

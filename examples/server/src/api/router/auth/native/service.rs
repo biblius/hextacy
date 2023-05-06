@@ -24,12 +24,12 @@ use crate::{
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use data_encoding::{BASE32, BASE64URL};
 use hextacy::{
+    component,
     crypto::{
         self,
         hmac::{generate_hmac, verify_hmac},
         {bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
-    service_component,
     web::http::response::{MessageResponse, Response},
 };
 use reqwest::{
@@ -44,7 +44,7 @@ pub(super) struct Authentication<R, C, E> {
     pub email: E,
 }
 
-#[service_component(super)]
+#[component(super)]
 impl<R, C, E> Authentication<R, C, E>
 where
     R: RepositoryApi + Send + Sync,

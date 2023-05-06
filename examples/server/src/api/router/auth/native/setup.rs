@@ -32,7 +32,6 @@ type RepoComponent = ServiceAdapter<
 
 pub(crate) fn routes(
     AppState {
-        pg_diesel,
         pg_sea,
         redis,
         smtp,
@@ -51,7 +50,7 @@ pub(crate) fn routes(
     };
 
     let session_guard = interceptor::AuthenticationGuard::<MwRepo, MwCache>::new(
-        pg_diesel.clone(),
+        pg_sea.clone(),
         redis.clone(),
         Role::User,
     );
