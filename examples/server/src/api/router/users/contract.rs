@@ -5,11 +5,13 @@ use actix_web::HttpResponse;
 use async_trait::async_trait;
 
 #[async_trait]
-pub(super) trait ServiceApi {
+#[cfg_attr(test, mockall::automock)]
+pub(super) trait ServiceContract {
     async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error>;
 }
 #[async_trait]
-pub(super) trait RepositoryApi {
+#[cfg_attr(test, mockall::automock)]
+pub(super) trait RepositoryContract {
     async fn get_paginated(
         &self,
         page: u16,

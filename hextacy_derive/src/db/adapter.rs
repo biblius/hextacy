@@ -48,7 +48,6 @@ pub fn derive(ast: &mut syn::DeriveInput) -> proc_macro2::TokenStream {
     ));
 
     quote!(
-        use hextacy::drivers::db::DBConnect;
         #(#tokens)*
     )
 }

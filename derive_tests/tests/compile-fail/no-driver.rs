@@ -1,7 +1,7 @@
 use hextacy::{
     derive::Adapter,
     drivers::{
-        db::{DBConnect, Driver},
+        db::{Connect, Driver},
         DriverError,
     },
 };
@@ -11,7 +11,7 @@ struct Conn;
 struct SomeDriver;
 
 #[async_trait::async_trait]
-impl DBConnect for SomeDriver {
+impl Connect for SomeDriver {
     type Connection = Conn;
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
         Ok(Conn)
@@ -21,7 +21,7 @@ impl DBConnect for SomeDriver {
 #[derive(Adapter)]
 struct ServiceRepo<D, C, User>
 where
-    D: DBConnect<Connection = C>,
+    D: Connect<Connection = C>,
 {
     driver: Driver<D, C>,
     _user: User,

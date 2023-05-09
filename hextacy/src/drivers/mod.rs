@@ -13,7 +13,7 @@ pub enum DriverError {
 
     #[cfg(any(feature = "full", feature = "db", feature = "postgres-diesel"))]
     #[error("Postgres pool error: {0}")]
-    PgPoolConnection(String),
+    DieselConnection(String),
     #[cfg(any(feature = "full", feature = "db", feature = "postgres-diesel"))]
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),

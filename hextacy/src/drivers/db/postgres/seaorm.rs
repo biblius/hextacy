@@ -1,6 +1,6 @@
 use crate::{
     db::{Atomic, DatabaseError},
-    drivers::{db::DBConnect, DriverError},
+    drivers::{db::Connect, DriverError},
 };
 use async_trait::async_trait;
 use sea_orm::TransactionTrait;
@@ -44,7 +44,7 @@ impl PostgresSea {
 }
 
 #[async_trait]
-impl DBConnect for PostgresSea {
+impl Connect for PostgresSea {
     type Connection = DatabaseConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

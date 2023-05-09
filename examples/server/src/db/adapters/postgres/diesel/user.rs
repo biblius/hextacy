@@ -8,16 +8,16 @@ use crate::db::{
 use crate::services::oauth::OAuthProvider;
 use async_trait::async_trait;
 use diesel::{AsChangeset, ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
-use hextacy::drivers::db::postgres::diesel::PgPoolConnection;
+use hextacy::drivers::db::postgres::diesel::DieselConnection;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct PgUserAdapter;
 
 #[async_trait]
-impl UserRepository<PgPoolConnection> for PgUserAdapter {
+impl UserRepository<DieselConnection> for PgUserAdapter {
     async fn create(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         email: &str,
         username: &str,
         password: &str,
@@ -39,7 +39,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     async fn create_from_oauth(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         account_id: &str,
         email: &str,
         username: &str,
@@ -64,7 +64,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Fetches a user by their ID
-    async fn get_by_id(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn get_by_id(conn: &mut DieselConnection, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(id.eq(user_id))
@@ -73,7 +73,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     async fn get_by_oauth_id(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         oauth_id: &str,
         provider: OAuthProvider,
     ) -> Result<User, AdapterError> {
@@ -91,7 +91,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
     /// Fetches a user by their email
     async fn get_by_email(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_email: &str,
     ) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
@@ -103,7 +103,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
     /// Hashes the given password with bcrypt and sets the user's password field to the hash
     async fn update_password(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
         pw_hash: &str,
     ) -> Result<User, AdapterError> {
@@ -117,7 +117,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
     /// Updates the user's OTP secret to the given key
     async fn update_otp_secret(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
         secret: &str,
     ) -> Result<User, AdapterError> {
@@ -131,7 +131,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
 
     /// Update the user's email verified at field to now
     async fn update_email_verified_at(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
     ) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
@@ -143,7 +143,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     async fn update_oauth_id(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         id: &str,
         oauth_id: &str,
         provider: OAuthProvider,
@@ -170,7 +170,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     }
 
     /// Sets the user's frozen flag to true
-    async fn freeze(conn: &mut PgPoolConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn freeze(conn: &mut DieselConnection, user_id: &str) -> Result<User, AdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
@@ -182,7 +182,7 @@ impl UserRepository<PgPoolConnection> for PgUserAdapter {
     /// Returns the total count of users and a vec of users constrained by the options as
     /// the first and second element respectively
     async fn get_paginated(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         page: u16,
         per_page: u16,
         sort: Option<SortOptions>,

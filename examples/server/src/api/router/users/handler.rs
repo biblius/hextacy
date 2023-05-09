@@ -1,4 +1,4 @@
-use super::api::ServiceApi;
+use super::contract::ServiceContract;
 use crate::{
     api::router::users::data::{GetUsersPaginated, GetUsersPaginatedPayload},
     error::Error,
@@ -10,7 +10,7 @@ use validify::Validify;
 pub struct Handler;
 
 impl Handler {
-    pub(super) async fn get_paginated<T: ServiceApi>(
+    pub(super) async fn get_paginated<T: ServiceContract>(
         data: web::Query<GetUsersPaginatedPayload>,
         service: web::Data<T>,
     ) -> Result<impl Responder, Error> {

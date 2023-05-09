@@ -1,5 +1,5 @@
 use super::{
-    api::{RepositoryApi, ServiceApi},
+    contract::{RepositoryContract, ServiceContract},
     data::{GetUsersPaginated, UserResponse},
 };
 use crate::error::Error;
@@ -10,15 +10,15 @@ use reqwest::StatusCode;
 
 pub(super) struct UserService<R>
 where
-    R: RepositoryApi,
+    R: RepositoryContract,
 {
     pub repository: R,
 }
 
 #[async_trait]
-impl<R> ServiceApi for UserService<R>
+impl<R> ServiceContract for UserService<R>
 where
-    R: RepositoryApi + Send + Sync,
+    R: RepositoryContract + Send + Sync,
 {
     async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
         let users = self

@@ -1,5 +1,5 @@
 use crate::api::middleware::auth::adapter::{Cache as MwCache, Repo as MwRepo};
-use crate::api::router::auth::adapters::repository::ServiceAdapter;
+use crate::api::router::auth::adapters::repository::RepositoryComponent;
 use crate::api::{
     middleware::auth::interceptor::AuthenticationGuard,
     router::auth::{
@@ -16,7 +16,7 @@ use actix_web::web::{self, Data};
 use hextacy::drivers::db::postgres::seaorm::PostgresSea;
 use sea_orm::DatabaseConnection;
 
-type RepoComponent = ServiceAdapter<
+type RepoComponent = RepositoryComponent<
     PostgresSea,
     DatabaseConnection,
     PgUserAdapter,

@@ -1,4 +1,6 @@
-use super::super::adapters::{cache::CacheApi, repository::ServiceAdapterApi as RepositoryApi};
+use super::super::adapters::{
+    cache::CacheContract, repository::RepositoryComponentContract as RepositoryContract,
+};
 use super::super::data::OAuthCodeExchange;
 use crate::{
     api::router::auth::data::AuthenticationSuccessResponse,
@@ -12,7 +14,7 @@ use crate::{
 };
 use actix_web::HttpResponse;
 use hextacy::{
-    component,
+    contract,
     crypto::uuid,
     web::http::response::{MessageResponse, Response},
 };
@@ -24,18 +26,18 @@ use tracing::info;
 
 pub(super) struct OAuthService<R, C>
 where
-    R: RepositoryApi,
-    C: CacheApi,
+    R: RepositoryContract,
+    C: CacheContract,
 {
     pub repository: R,
     pub cache: C,
 }
 
-#[component(super)]
+#[contract(super)]
 impl<R, C> OAuthService<R, C>
 where
-    R: RepositoryApi + Send + Sync,
-    C: CacheApi + Send + Sync,
+    R: RepositoryContract + Send + Sync,
+    C: CacheContract + Send + Sync,
 {
     /// Process the code received in the authorization step and log the user in or auto
     /// register them, based on whether they already exist. Establishes a session.
@@ -179,8 +181,8 @@ where
 #[async_trait]
 impl<R, C> ServiceApi for OAuthService<R, C>
 where
-    R: RepositoryApi + Send + Sync,
-    C: CacheApi + Send + Sync,
+    R: RepositoryContract + Send + Sync,
+    C: CacheContract + Send + Sync,
 {
     async fn login<T: OAuth + Send + Sync>(
         &self,

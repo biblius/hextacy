@@ -6,9 +6,9 @@ use crate::{
 };
 use chrono::Utc;
 use hextacy::adapt;
+use hextacy::contract;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisPoolConnection};
-// use hextacy::drivers::db::DBConnect;
-use hextacy::component;
+use hextacy::drivers::db::Connect;
 use hextacy::{
     cache::redis::CacheAccess,
     cache::redis::CacheError,
@@ -16,7 +16,7 @@ use hextacy::{
 };
 use std::sync::Arc;
 
-pub type Repo = Adapter<PostgresSea, DatabaseConnection, PgSessionAdapter>;
+pub type Repo = RepositoryComponent<PostgresSea, DatabaseConnection, PgSessionAdapter>;
 
 impl Clone for Repo {
     fn clone(&self) -> Self {
@@ -28,12 +28,20 @@ impl Clone for Repo {
 }
 
 adapt! {
-    Adapter,
+    RepositoryComponent,
 
-    use Diesel for Connection as driver: seaorm;
+    use D for Connection as driver: seaorm;
 
-    SessionRepository<Connection> as Session;
+    S: SessionRepository<Connection>,
+}
 
+#[contract]
+impl<D, Connection, Session> RepositoryComponent<D, Connection, Session>
+where
+    D: Connect<Connection = Connection> + Send + Sync,
+    Connection: Send,
+    Session: SessionRepository<Connection> + Send + Sync,
+{
     async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
         Session::refresh(&mut conn, id, csrf)
@@ -47,7 +55,6 @@ adapt! {
             .await
             .map_err(Error::new)
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +72,7 @@ impl CacheAccess for Cache {
     }
 }
 
-#[component(super)]
+#[contract(super)]
 impl Cache {
     fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         self.get_json(AuthCache::Session, id).map_err(Error::new)

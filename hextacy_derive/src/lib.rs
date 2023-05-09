@@ -24,14 +24,14 @@ use syn::{spanned::Spanned, Ident, ItemImpl, TypePath};
 /// the generic connection parameter of the component, e.g. if the generic connection
 /// is specified as `C` then the field attribute must be `#[driver(C)]`.
 ///
-/// If using the `component!` macro, this will be done automatically behind the scenes
+/// If using the `adapt!` macro, this will be done automatically behind the scenes
 /// for whatever drivers are passed in as the parameters to the macro.
 ///
 /// ```ignore
 /// #[derive(Debug, Adapter)]
 /// pub(super) struct RepositoryComponent<C, Connection, User>
 ///   where
-///     C: DBConnect<Connection = Connection>,
+///     C: Connect<Connection = Connection>,
 ///     User: UserRepository<Connection>
 ///  {
 ///     #[diesel(Connection)]
@@ -49,14 +49,14 @@ pub fn derive_adapter(input: proc_macro::TokenStream) -> proc_macro::TokenStream
 #[proc_macro_attribute]
 #[proc_macro_error]
 /// When deriving on an impl block for a struct, this will instead create a trait whose name
-/// is the original struct name suffixed with `Api` and implements it on the struct. The trait
+/// is the original struct name suffixed with `Contract` and implements it on the struct. The trait
 /// has the same signatures as the functions in the impl block.
 ///
-/// This allows for easy mocking of component APIs for unit testing, as well as for DI through bounds
+/// This allows for easy mocking of component contracts for unit testing, as well as for DI through bounds
 /// on services.
 ///
-/// Visibility can be provided for the generated trait, e.g. `#[component(crate)]`
-pub fn component(
+/// Visibility can be provided for the generated trait, e.g. `#[contract(crate)]`
+pub fn contract(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
@@ -69,7 +69,7 @@ pub fn component(
             let struct_name = &path.segments[0].ident;
             (
                 struct_name,
-                Ident::new(&format!("{}Api", struct_name), Span::call_site()),
+                Ident::new(&format!("{}Contract", struct_name), Span::call_site()),
             )
         }
         _ => abort!(ast.span(), "component not supported for this type of impl"),
@@ -84,6 +84,7 @@ pub fn component(
             let syn::ImplItem::Fn(func) = item else {
                 abort!(item.span(), "component not supported for this type of impl")
             };
+
             let sig = &func.sig;
             let tokens = quote!(#sig ;);
             fn_defs.push(tokens);

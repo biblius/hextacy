@@ -6,7 +6,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
-use hextacy::drivers::db::postgres::diesel::PgPoolConnection;
+use hextacy::drivers::db::postgres::diesel::DieselConnection;
 use std::fmt::Debug;
 
 #[derive(Debug, Insertable)]
@@ -25,9 +25,9 @@ struct NewOAuthEntry<'a> {
 pub struct PgOAuthAdapter;
 
 #[async_trait]
-impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
+impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
     async fn create<T>(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
         account_id: &str,
         tokens: &T,
@@ -56,7 +56,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
             .map_err(AdapterError::from)
     }
 
-    async fn get_by_id(conn: &mut PgPoolConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
+    async fn get_by_id(conn: &mut DieselConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -68,7 +68,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn get_by_account_id(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         account_id: &str,
     ) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
@@ -82,7 +82,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn get_by_user_id(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
     ) -> Result<Vec<OAuthMeta>, AdapterError> {
         use super::schema::oauth::dsl;
@@ -96,7 +96,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn get_by_provider(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
         provider: OAuthProvider,
     ) -> Result<OAuthMeta, AdapterError> {
@@ -112,7 +112,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn revoke(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         access_token: &str,
     ) -> Result<OAuthMeta, AdapterError> {
         use super::schema::oauth::dsl;
@@ -126,7 +126,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn revoke_all(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
     ) -> Result<Vec<OAuthMeta>, AdapterError> {
         use super::schema::oauth::dsl;
@@ -139,7 +139,7 @@ impl OAuthRepository<PgPoolConnection> for PgOAuthAdapter {
     }
 
     async fn update<T>(
-        conn: &mut PgPoolConnection,
+        conn: &mut DieselConnection,
         user_id: &str,
         tokens: &T,
         provider: OAuthProvider,

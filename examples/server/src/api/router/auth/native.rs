@@ -6,25 +6,23 @@ pub(crate) mod setup;
 mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{
-        data::{
-            ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Otp,
-            RegistrationData, ResendRegToken, ResetPassword,
-        },
-        service::Authentication,
+    use super::super::data::{
+        ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Otp,
+        RegistrationData, ResendRegToken, ResetPassword,
     };
-    use crate::api::router::auth::native::service::{
-        AuthenticationApi as ServiceApi, MockAuthenticationApi as MockServiceApi,
+    use super::service::Authentication;
+    use crate::api::router::auth::adapters::{
+        cache::MockCacheContract, email::MockEmailContract,
+        repository::MockRepositoryComponentContract as MockRepository,
     };
+    use crate::api::router::auth::native::service::AuthenticationContract as ServiceContract;
+    use crate::api::router::auth::native::service::MockAuthenticationContract;
     use crate::db::{
         adapters::AdapterError,
         models::{session::Session, user::User},
     };
     use crate::{
-        api::router::auth::{
-            api::{MockCacheApi, MockEmailApi, MockRepositoryApi},
-            data::AuthenticationSuccessResponse,
-        },
+        api::router::auth::data::AuthenticationSuccessResponse,
         error::{AuthenticationError, Error},
     };
     use actix_web::body::to_bytes;
@@ -87,9 +85,9 @@ mod tests {
         /*
          * Good to go
          */
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let mut email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let mut email = MockEmailContract::new();
         // The service will first attempt to find an existing user
         repository
             .expect_get_user_by_email()
@@ -119,9 +117,9 @@ mod tests {
         /*
          * Already exists
          */
-        let mut repository = MockRepositoryApi::new();
-        let cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         repository
             .expect_get_user_by_email()
             .return_once_st(move |_| Ok(USER_NO_OTP.clone()));
@@ -141,9 +139,9 @@ mod tests {
         /*
          * Good to go
          */
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Ok(USER_NO_OTP.id.clone()));
@@ -168,9 +166,9 @@ mod tests {
         /*
          * Invalid reg token
          */
-        let repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));
@@ -198,9 +196,9 @@ mod tests {
         /*
          * Good to go
          */
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let mut email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let mut email = MockEmailContract::new();
         let mut user = USER_NO_OTP.clone();
         user.email_verified_at = None;
         // Find the user
@@ -233,9 +231,9 @@ mod tests {
         /*
          * Already verified
          */
-        let mut repository = MockRepositoryApi::new();
-        let cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Find the verified user
         repository
             .expect_get_user_by_email()
@@ -253,10 +251,10 @@ mod tests {
 
     #[tokio::test]
     async fn credentials_no_otp() {
-        let mut service = MockServiceApi::new();
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut service = MockAuthenticationContract::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Find user without OTP secret
         repository
             .expect_get_user_by_email()
@@ -287,9 +285,9 @@ mod tests {
 
     #[tokio::test]
     async fn credentials_and_otp() {
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Expect the user to exist
         repository
             .expect_get_user_by_email()
@@ -310,9 +308,9 @@ mod tests {
             serde_json::from_str::<TwoFactorAuthResponse>(std::str::from_utf8(&body).unwrap())
                 .unwrap()
                 .token;
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Get the OTP token
         cache
             .expect_get_token()
@@ -365,9 +363,9 @@ mod tests {
         /*
          * Invalid email
          */
-        let mut repository = MockRepositoryApi::new();
-        let cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         repository
             .expect_get_user_by_email()
             .return_once(move |_| Err(AdapterError::DoesNotExist.into()));
@@ -392,9 +390,9 @@ mod tests {
         /*
          * Invalid password
          */
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Try to find a valid user with an invalid password
         repository
             .expect_get_user_by_email()
@@ -422,10 +420,10 @@ mod tests {
 
     #[tokio::test]
     async fn change_password() {
-        let mut service = MockServiceApi::new();
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let mut email = MockEmailApi::new();
+        let mut service = MockAuthenticationContract::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let mut email = MockEmailContract::new();
         // Update pw
         repository
             .expect_update_user_password()
@@ -461,10 +459,10 @@ mod tests {
         /*
          * Valid token
          */
-        let mut service = MockServiceApi::new();
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let mut email = MockEmailApi::new();
+        let mut service = MockAuthenticationContract::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let mut email = MockEmailContract::new();
         // Expect to have a reset token
         cache
             .expect_get_token()
@@ -498,9 +496,9 @@ mod tests {
         /*
          * No token
          */
-        let repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));
@@ -524,9 +522,9 @@ mod tests {
 
     #[tokio::test]
     async fn forgot_password() {
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let mut email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let mut email = MockEmailContract::new();
         // Get the user
         repository
             .expect_get_user_by_email()
@@ -557,9 +555,9 @@ mod tests {
         /*
          * Invalid email
          */
-        let mut repository = MockRepositoryApi::new();
-        let cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut repository = MockRepository::new();
+        let cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         repository
             .expect_get_user_by_email()
             .return_once(|_| Err(AdapterError::DoesNotExist.into()));
@@ -577,10 +575,10 @@ mod tests {
 
     #[tokio::test]
     async fn verify_forgot_password() {
-        let mut service = MockServiceApi::new();
-        let mut repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let mut service = MockAuthenticationContract::new();
+        let mut repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         // Get the user from the verify token
         cache
             .expect_get_token()
@@ -615,9 +613,9 @@ mod tests {
         /*
          * Wrong token
          */
-        let repository = MockRepositoryApi::new();
-        let mut cache = MockCacheApi::new();
-        let email = MockEmailApi::new();
+        let repository = MockRepository::new();
+        let mut cache = MockCacheContract::new();
+        let email = MockEmailContract::new();
         cache
             .expect_get_token()
             .return_once(|_, _| Err(Error::None));

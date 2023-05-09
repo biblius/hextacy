@@ -3,12 +3,12 @@ use super::{handler, service::UserService};
 use crate::db::adapters::postgres::diesel::user::PgUserAdapter;
 use actix_web::web::{self, Data};
 use hextacy::drivers::cache::redis::Redis;
-use hextacy::drivers::db::postgres::diesel::{PgPoolConnection, PostgresDiesel};
+use hextacy::drivers::db::postgres::diesel::{DieselConnection, PostgresDiesel};
 use std::sync::Arc;
 
 pub(crate) fn routes(pg: Arc<PostgresDiesel>, _rd: Arc<Redis>, cfg: &mut web::ServiceConfig) {
     let service = UserService {
-        repository: Repository::<PostgresDiesel, PgPoolConnection, PgUserAdapter>::new(pg),
+        repository: Repository::<PostgresDiesel, DieselConnection, PgUserAdapter>::new(pg),
     };
 
     /*     let session_guard =
@@ -19,7 +19,7 @@ pub(crate) fn routes(pg: Arc<PostgresDiesel>, _rd: Arc<Redis>, cfg: &mut web::Se
     // Show all
     cfg.service(
         web::resource("/users").route(web::get().to(handler::Handler::get_paginated::<
-            UserService<Repository<PostgresDiesel, PgPoolConnection, PgUserAdapter>>,
+            UserService<Repository<PostgresDiesel, DieselConnection, PgUserAdapter>>,
         >)),
     );
 }

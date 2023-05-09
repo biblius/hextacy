@@ -15,8 +15,8 @@ pub struct Connection {
 }
 
 pub const DIESEL_CONNECTION: Connection = Connection {
-    name: "PgPoolConnection",
-    full_path: "hextacy::drivers::db::postgres::diesel::PgPoolConnection",
+    name: "DieselConnection",
+    full_path: "hextacy::drivers::db::postgres::diesel::DieselConnection",
 };
 pub const SEAORM_CONNECTION: Connection = Connection {
     name: "DatabaseConnection",
@@ -24,7 +24,7 @@ pub const SEAORM_CONNECTION: Connection = Connection {
 };
 pub const MONGO_CONNECTION: Connection = Connection {
     name: "ClientSession",
-    full_path: "hextacy::drivers::db::mongo::PgPoolConnection",
+    full_path: "hextacy::drivers::db::mongo::ClientSession",
 };
 
 const DRIVERS: [&str; 3] = ["diesel", "mongo", "seaorm"];
@@ -80,7 +80,6 @@ fn modify_type_generics(
         .type_params_mut()
         .enumerate()
         .filter_map(|(i, param)| {
-            dbg!(&param.ident);
             // For the initial impl scoping we want to exclude the generic connection
             // as it will be concrete
             if !keys.contains(&&param.ident.to_string()) {
@@ -100,8 +99,6 @@ fn modify_type_generics(
         .collect::<Punctuated<GenericParam, Comma>>();
 
     generics.params = types;
-    dbg!(generics);
-    dbg!(&replaced);
     replaced
 }
 

@@ -7,11 +7,10 @@ use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
 use hextacy::cache::redis::{CacheAccess, CacheError};
-use hextacy::component;
+use hextacy::contract;
 use hextacy::drivers::cache::redis::RedisPoolConnection;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis};
 use std::sync::Arc;
-use tracing::debug;
 
 pub(in crate::api::router::auth) struct Cache {
     pub driver: Arc<Redis>,
@@ -27,11 +26,10 @@ impl CacheAccess for Cache {
     }
 }
 
-#[component(crate::api::router::auth)]
+#[contract(crate::api::router::auth)]
 impl Cache {
     /// Sessions get cached behind the user's csrf token.
     fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
-        debug!("Caching session with ID {session_id}");
         self.set_json(
             AuthCache::Session,
             session_id,
@@ -65,7 +63,6 @@ impl Cache {
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
     /// will be created, otherwise they will be incremented.
     fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
-        debug!("Caching login attempt for: {user_id}");
         let mut connection = self.driver.connect()?;
         let key = Self::construct_key(AuthCache::LoginAttempts, user_id);
         match connection.incr::<&str, u8, u8>(&key, 1) {
@@ -78,7 +75,6 @@ impl Cache {
 
     /// Removes the user's login attempts from the cache
     fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
-        debug!("Deleting login attempts for: {}", &user_id);
         self.delete(AuthCache::LoginAttempts, user_id)
             .map_err(Error::new)
     }
@@ -90,8 +86,6 @@ impl Cache {
     /// Cache the OTP throttle and attempts. The throttle always gets set to now and the attempts always get
     /// incremented. The domain should take care of the actual throttling.
     fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
-        debug!("Throttling OTP attempts for: {user_id}");
-
         let mut connection = self.connection()?;
 
         let throttle_key = Self::construct_key(AuthCache::OTPThrottle, user_id);

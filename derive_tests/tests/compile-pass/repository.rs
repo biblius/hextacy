@@ -1,13 +1,13 @@
 use hextacy::{
     derive::Adapter,
-    drivers::db::{postgres::diesel::PgPoolConnection, DBConnect, Driver},
+    drivers::db::{postgres::diesel::DieselConnection, Connect, Driver},
 };
 trait UserRepository<C> {}
 
 #[derive(Adapter)]
 struct ServiceRepo<D, C, User>
 where
-    D: DBConnect<Connection = C> + Send + Sync,
+    D: Connect<Connection = C> + Send + Sync,
     User: Send + Sync,
 {
     #[diesel(C)]

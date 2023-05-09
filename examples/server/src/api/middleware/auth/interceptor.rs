@@ -1,4 +1,4 @@
-use super::adapter::{Adapter, AdapterApi, Cache, CacheApi};
+use super::adapter::{Cache, CacheContract, RepositoryComponent, RepositoryComponentContract};
 use crate::config::constants::COOKIE_S_ID;
 use crate::db::models::role::Role;
 use crate::db::models::session::Session;
@@ -8,9 +8,8 @@ use actix_web::cookie::Cookie;
 use actix_web::dev::ServiceRequest;
 use actix_web::HttpMessage;
 use futures_util::FutureExt;
-use hextacy::component;
 use hextacy::drivers::cache::redis::Redis;
-use hextacy::drivers::db::DBConnect;
+use hextacy::drivers::db::Connect;
 use hextacy::{call, transform};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -37,14 +36,14 @@ pub struct AuthMiddleware<S, Repo, Cache> {
 
 transform! {
     AuthenticationGuard => AuthMiddleware,
-    R: AdapterApi,
-    C: CacheApi
+    R: RepositoryComponentContract,
+    C: CacheContract
 }
 
 call! {
     AuthMiddleware,
-    R: AdapterApi,
-    C: CacheApi;
+    R: RepositoryComponentContract,
+    C: CacheContract;
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         info!("Auth guard: Validating session");
@@ -86,11 +85,10 @@ call! {
     }
 }
 
-#[component]
 impl<R, C> AuthenticationGuardInner<R, C>
 where
-    R: AdapterApi + Send + Sync,
-    C: CacheApi + Send + Sync,
+    R: RepositoryComponentContract + Send + Sync,
+    C: CacheContract + Send + Sync,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
@@ -138,7 +136,7 @@ where
     }
 
     /// Extracts the `S_ID` cookie from the request
-    fn get_session_cookie(&self, req: &ServiceRequest) -> Result<Cookie<'_>, Error> {
+    fn get_session_cookie<'a>(&self, req: &ServiceRequest) -> Result<Cookie<'a>, Error> {
         req.cookie(COOKIE_S_ID)
             .ok_or_else(|| AuthenticationError::Unauthenticated.into())
     }
@@ -149,23 +147,23 @@ where
     }
 }
 
-impl<D, Conn, Session> AuthenticationGuardInner<Adapter<D, Conn, Session>, Cache>
+impl<D, Conn, Session> AuthenticationGuardInner<RepositoryComponent<D, Conn, Session>, Cache>
 where
-    D: DBConnect<Connection = Conn> + Send + Sync,
+    D: Connect<Connection = Conn> + Send + Sync,
     Session: SessionRepository<Conn> + Send + Sync,
 {
     pub fn new(repository_driver: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {
         Self {
             cache: Cache { driver: rd },
-            repository: Adapter::new(repository_driver),
+            repository: RepositoryComponent::new(repository_driver),
             auth_level: role,
         }
     }
 }
 
-impl<D, Conn, Session> AuthenticationGuard<Adapter<D, Conn, Session>, Cache>
+impl<D, Conn, Session> AuthenticationGuard<RepositoryComponent<D, Conn, Session>, Cache>
 where
-    D: DBConnect<Connection = Conn> + Send + Sync,
+    D: Connect<Connection = Conn> + Send + Sync,
     Session: SessionRepository<Conn> + Send + Sync,
 {
     pub fn new(pg: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {

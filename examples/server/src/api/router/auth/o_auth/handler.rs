@@ -1,6 +1,6 @@
 use super::{
     super::data::{OAuthCodeExchange, OAuthCodeExchangePayload},
-    service::OAuthServiceApi,
+    service::OAuthServiceContract,
 };
 use crate::{
     error::Error,
@@ -11,7 +11,7 @@ use actix_web::{web, HttpRequest, Responder};
 use tracing::info;
 use validify::Validify;
 
-pub(super) async fn login<T: OAuthServiceApi>(
+pub(super) async fn login<T: OAuthServiceContract>(
     path: web::Path<String>,
     data: web::Json<OAuthCodeExchangePayload>,
     service: web::Data<T>,
@@ -25,7 +25,7 @@ pub(super) async fn login<T: OAuthServiceApi>(
     }
 }
 
-pub(super) async fn request_scopes<T: OAuthServiceApi>(
+pub(super) async fn request_scopes<T: OAuthServiceContract>(
     req: HttpRequest,
     path: web::Path<String>,
     data: web::Json<OAuthCodeExchangePayload>,

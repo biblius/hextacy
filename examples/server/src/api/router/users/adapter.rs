@@ -1,16 +1,16 @@
-use super::api::RepositoryApi;
+use super::contract::RepositoryContract;
 use crate::db::models::user;
 use crate::db::repository::user::UserRepository;
 use crate::error::Error;
 use async_trait::async_trait;
 use hextacy::db::{DatabaseError, RepositoryAccess};
-use hextacy::drivers::db::DBConnect;
+use hextacy::drivers::db::Connect;
 use hextacy::drivers::db::Driver;
 use std::sync::Arc;
 
 pub struct Repository<A, C, User>
 where
-    A: DBConnect<Connection = C>,
+    A: Connect<Connection = C>,
     User: UserRepository<C>,
 {
     postgres: Driver<A, C>,
@@ -19,7 +19,7 @@ where
 
 impl<A, C, User> Repository<A, C, User>
 where
-    A: DBConnect<Connection = C>,
+    A: Connect<Connection = C>,
     User: UserRepository<C>,
 {
     pub fn new(driver: Arc<A>) -> Self {
@@ -33,7 +33,7 @@ where
 #[async_trait]
 impl<A, C, User> RepositoryAccess<C> for Repository<A, C, User>
 where
-    A: DBConnect<Connection = C> + Send + Sync,
+    A: Connect<Connection = C> + Send + Sync,
     User: UserRepository<C> + Send + Sync,
 {
     async fn connect(&self) -> Result<C, DatabaseError> {
@@ -42,10 +42,10 @@ where
 }
 
 #[async_trait::async_trait]
-impl<Driver, Conn, User> RepositoryApi for Repository<Driver, Conn, User>
+impl<Driver, Conn, User> RepositoryContract for Repository<Driver, Conn, User>
 where
     Self: RepositoryAccess<Conn>,
-    Driver: DBConnect<Connection = Conn> + Send + Sync,
+    Driver: Connect<Connection = Conn> + Send + Sync,
     User: UserRepository<Conn> + Send + Sync,
     Conn: Send,
 {

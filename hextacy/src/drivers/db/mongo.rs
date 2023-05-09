@@ -1,4 +1,4 @@
-use super::DBConnect;
+use super::Connect;
 use crate::{
     db::{Atomic, DatabaseError},
     drivers::DriverError,
@@ -53,11 +53,10 @@ impl Mongo {
 }
 
 #[async_trait]
-impl DBConnect for Mongo {
+impl Connect for Mongo {
     type Connection = ClientSession;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        trace!("Mongo - Attempting pooled connection");
         let session = self.driver.start_session(None).await?;
         Ok(session)
     }

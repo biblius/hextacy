@@ -12,7 +12,7 @@ use crate::{
         adapter::{Cache as MwCache, Repo as MwRepo},
         interceptor,
     },
-    api::router::auth::adapters::{cache::Cache, email::Email, repository::ServiceAdapter},
+    api::router::auth::adapters::{cache::Cache, email::Email, repository::RepositoryComponent},
     config::AppState,
     db::adapters::postgres::seaorm::{
         oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter,
@@ -22,7 +22,7 @@ use actix_web::web::{self, Data};
 use hextacy::{drivers::db::postgres::seaorm::PostgresSea, route};
 use sea_orm::DatabaseConnection;
 
-type RepoComponent = ServiceAdapter<
+type RepoComponent = RepositoryComponent<
     PostgresSea,
     DatabaseConnection,
     PgUserAdapter,

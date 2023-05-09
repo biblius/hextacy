@@ -36,4 +36,4 @@ pub mod derive {
     pub use hextacy_derive::Adapter;
 }
 
-pub use hextacy_derive::component;
+pub use hextacy_derive::contract;

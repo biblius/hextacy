@@ -1,5 +1,6 @@
 use super::super::adapters::{
-    cache::CacheApi, email::EmailApi, repository::ServiceAdapterApi as RepositoryApi,
+    cache::CacheContract, email::EmailContract,
+    repository::RepositoryComponentContract as RepositoryContract,
 };
 use super::super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify,
@@ -24,7 +25,7 @@ use crate::{
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use data_encoding::{BASE32, BASE64URL};
 use hextacy::{
-    component,
+    contract,
     crypto::{
         self,
         hmac::{generate_hmac, verify_hmac},
@@ -44,12 +45,12 @@ pub(super) struct Authentication<R, C, E> {
     pub email: E,
 }
 
-#[component(super)]
+#[contract(super)]
 impl<R, C, E> Authentication<R, C, E>
 where
-    R: RepositoryApi + Send + Sync,
-    C: CacheApi + Send + Sync,
-    E: EmailApi + Send + Sync,
+    R: RepositoryContract + Send + Sync,
+    C: CacheContract + Send + Sync,
+    E: EmailContract + Send + Sync,
 {
     /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`
     /// flag is true the session established will be permanent (applies for `verify_otp` as well).

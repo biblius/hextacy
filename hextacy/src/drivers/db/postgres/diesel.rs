@@ -1,6 +1,6 @@
 use crate::db::DatabaseError;
 use crate::drivers::DriverError;
-use crate::{db::Atomic, drivers::db::DBConnect};
+use crate::{db::Atomic, drivers::db::Connect};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,
@@ -8,16 +8,13 @@ use diesel::{
     PgConnection,
 };
 
-pub use diesel;
-
-pub type PgPool = Pool<ConnectionManager<PgConnection>>;
-pub type PgPoolConnection = PooledConnection<ConnectionManager<PgConnection>>;
+pub type DieselConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Contains a connection pool for postgres with diesel. An instance of this
 /// should be shared through the app with Arcs
 #[derive(Debug, Clone)]
 pub struct PostgresDiesel {
-    pool: PgPool,
+    pool: Pool<ConnectionManager<PgConnection>>,
 }
 
 impl PostgresDiesel {
@@ -48,20 +45,19 @@ impl PostgresDiesel {
 }
 
 #[async_trait]
-impl DBConnect for PostgresDiesel {
-    type Connection = PgPoolConnection;
+impl Connect for PostgresDiesel {
+    type Connection = DieselConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        tracing::trace!("PostgresDiesel - Attempting pooled connection");
         match self.pool.get() {
             Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::PgPoolConnection(e.to_string())),
+            Err(e) => Err(DriverError::DieselConnection(e.to_string())),
         }
     }
 }
 
 #[async_trait]
-impl Atomic for PgPoolConnection {
+impl Atomic for DieselConnection {
     type TransactionResult = Self;
     async fn start_transaction(mut self) -> Result<Self, DatabaseError> {
         diesel::connection::AnsiTransactionManager::begin_transaction(&mut *self)?;

@@ -29,81 +29,73 @@ pub trait Atomic: Sized {
 }
 
 #[macro_export]
-/// Generates a struct with the given name and visibility and derives [RepositoryAccess].
-///
-/// Useful for reducing overall boilerplate in repository adapters.
-///
-/// #### 1 - Struct ident (optional)
-///
-/// The macro accepts an optional ident as the first parameter and will name the struct that way if provided.
-///
-/// #### 2 - Driver - connection, field - driver pairs
-///
-/// The second part of the macro uses a
-///
-/// `DriverIdent => ConnectionIdent,`
-///
-/// `field_ident => driver,`
-///
-/// syntax, where DriverIdent and ConnectionIdent are arbitrary driver and connection generics that can be used
-/// to specify which repositories will use which drivers.
-///
-/// **Available drivers (for `driver`) are `diesel`, `seaorm` for postgres and `mongo`.**
-///
-/// #### 3 - Repository ident - Repository path
-///
-/// The third and final part accepts a
-///
-/// `RepoIdent => SomeRepository<ConnectionIdent>`
-///
-/// syntax, indicating which identifiers can call which repository methods.
-///
-/// The drivers module includes drivers which derive DBConnect for the derived
-/// connections. Check out [Repository][hextacy_derive::Repository]
+/// Generates a struct with the given name and visibility and derives [RepositoryAccess] for the given driver.
+/// Intended to be used for service components accessing the database.
 ///
 /// ### Example
 ///
 /// ```ignore
 /// adapt! {
-///     Adapter, // Optional name for the generated struct    
+///     Adapter in super, // Name of the generated struct, optional visibility
 ///
-///     Postgres => PgConnection, // Driver and connection
-///     postgres => diesel,       // The struct field to annotate with a driver.
+///     // This line adds the generics `D` and `Connection` to the struct
+///     // as well as a field named `driver` which gets used in the underlying
+///     // `RepositoryAccess` implementation. Specifically, the field will be
+///     // a `Driver<D, Connection>`.
+///     // The `Connection` will be substituted with the appropriate driver connection
+///     // in the `RepositoryAccess` impl, allowing the overlying service to be instantiated
+///     // with any driver that uses that connection.
+///     // Any number of use clauses are allowed for a given adapter.
+///     use D for Connection as driver : seaorm | diesel | mongo;
 ///
-///     Mongo    => MgConnection, // Same as above, any number of pairs
-///     mongo    => mongo;        // is allowed
-///
-///     SomeRepo => SomeRepository<Conn>, // Repository bounds
-///     OtherRepo => OtherRepository<Conn>,
-///     /* ... */
+///     // This adds another generic parameter `User` for the struct and
+///     // will bind it to a `UserRepository<Connection>`. This binds
+///     // the user repository to use the connection from the previous line.
+///     // If multiple use clauses are given, any number repository-connection
+///     // combinations are possible, so long the necessary adapters exist.
+///     User: UserRepository<Connection>,
 /// }
 /// ```
 ///
-/// This macro also provides a `new()` method whose input is anything that implements `DBConnect` for convenience.
-/// `DBConnect` is automatically added to the bounds as a generic parameter for the driver.
+/// The main use case is to consisely create an adapter followed by an impl block annotated with `#[component]`,
+/// specifying an adapters interaction with the database.
+///
+/// The impl block, for example for some kind of user service would then have the form of:
+///
+/// ```ignore
+///
+///  #[component]
+///  impl<D, C, User, Session, OAuth> RepositoryComponent<D, C, User, Session, OAuth>
+///  where
+///      C: Atomic + Send,
+///      D: Connect<Connection = C> + Send + Sync,
+///      User: UserRepository<C> + UserRepository<<C as Atomic>::TransactionResult> + Send + Sync,
+/// ```
+///
+/// The `Atomic` bound is optional and is solely here to demonstrate what an ACID compliant implementation
+/// would look like.
+///
+/// This macro also provides a `new()` method whose input is anything that implements `Connect` for convenience.
 macro_rules! adapt {
     (
         $name:ident $(in $vis:path)?,
         $(
             use $driver:ident
-            for $conn_name:ident $(: $atomic_conn:path )?
+            for $conn_name:ident
             as $field:ident
             : $driver_field:ident $(,)?
         )+;
         $(
-            $repository:ident < $connection:ident $(: $conn_trait:path )? > as $id:ident
+            $id:ident : $repository:ident < $connection:ident >
         ),*
-        $(,)? ;
-
-        $($b:item)*
-
+        $(,)?
         ) => {
                #[allow(non_snake_case)]
                #[derive(Debug, hextacy::derive::Adapter)]
                pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::drivers::db::Connect<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
@@ -118,7 +110,7 @@ macro_rules! adapt {
                impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::drivers::db::Connect<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
@@ -131,36 +123,6 @@ macro_rules! adapt {
                        }
                    }
                }
-
-               #[hextacy::component$(($vis))?]
-               impl
-                   <$($driver),+, $($conn_name),+, $($id),*>
-
-                   $name
-
-                   <$($driver),+, $($conn_name),+, $($id),*>
-               where
-                   Self: $(hextacy::db::RepositoryAccess<$conn_name> +)+,
-
-                   // Apply DBConnect bounds for drivers
-                   $(
-                       $driver: hextacy::drivers::db::DBConnect<Connection = $conn_name> + Send + Sync,
-                   )+
-
-                   // Apply connection bounds
-                   $(
-                       $conn_name: $( $atomic_conn + )? Send
-                   )+,
-
-                   // Apply repository bounds
-                   $(
-                        $id: $repository <$connection> $(+ $repository< <$connection as $conn_trait>::TransactionResult> )? + Send + Sync
-                    ),*
-
-                    // Impl items
-                   {
-                       $($b)*
-                   }
           };
 }
 

@@ -5,7 +5,7 @@ use super::super::data::{
     RegistrationDataPayload, ResendRegToken, ResendRegTokenPayload, ResetPassword,
     ResetPasswordPayload,
 };
-use super::service::AuthenticationApi;
+use super::service::AuthenticationContract;
 use crate::error::Error;
 use crate::helpers::request::extract_session;
 use actix_web::{web, HttpRequest, Responder};
@@ -14,7 +14,7 @@ use validify::Validify;
 
 /// Verifies the user's login credentials and either establishes a session if the user
 /// doesn't have 2FA or prompts the user for their 2FA pass if they have it set up
-pub(super) async fn login<T: AuthenticationApi>(
+pub(super) async fn login<T: AuthenticationContract>(
     data: web::Json<CredentialsPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -25,7 +25,7 @@ pub(super) async fn login<T: AuthenticationApi>(
 
 /// Starts the registration process for the user and sends an email containing a temporary
 /// token used to complete the registration
-pub(super) async fn start_registration<T: AuthenticationApi>(
+pub(super) async fn start_registration<T: AuthenticationContract>(
     data: web::Json<RegistrationDataPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -35,7 +35,7 @@ pub(super) async fn start_registration<T: AuthenticationApi>(
 }
 
 /// Verifies the user's registration token
-pub(super) async fn verify_registration_token<T: AuthenticationApi>(
+pub(super) async fn verify_registration_token<T: AuthenticationContract>(
     data: web::Query<EmailTokenPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -45,7 +45,7 @@ pub(super) async fn verify_registration_token<T: AuthenticationApi>(
 }
 
 /// Resend the user's registration token in case it expired
-pub(super) async fn resend_registration_token<T: AuthenticationApi>(
+pub(super) async fn resend_registration_token<T: AuthenticationContract>(
     data: web::Json<ResendRegTokenPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -55,7 +55,7 @@ pub(super) async fn resend_registration_token<T: AuthenticationApi>(
 }
 
 /// Sets the user's OTP secret. Requires a valid session to be established beforehand
-pub(super) async fn set_otp_secret<T: AuthenticationApi>(
+pub(super) async fn set_otp_secret<T: AuthenticationContract>(
     req: HttpRequest,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -65,7 +65,7 @@ pub(super) async fn set_otp_secret<T: AuthenticationApi>(
 }
 
 /// Verifies the user's OTP if they have 2FA enabled
-pub(super) async fn verify_otp<T: AuthenticationApi>(
+pub(super) async fn verify_otp<T: AuthenticationContract>(
     data: web::Json<OtpPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -75,7 +75,7 @@ pub(super) async fn verify_otp<T: AuthenticationApi>(
 }
 
 /// Changes the user's password and purges all their sessions
-pub(super) async fn change_password<T: AuthenticationApi>(
+pub(super) async fn change_password<T: AuthenticationContract>(
     data: web::Json<ChangePasswordPayload>,
     req: HttpRequest,
     service: web::Data<T>,
@@ -87,7 +87,7 @@ pub(super) async fn change_password<T: AuthenticationApi>(
 }
 
 /// Sends a forgot password token via email
-pub(super) async fn forgot_password<T: AuthenticationApi>(
+pub(super) async fn forgot_password<T: AuthenticationContract>(
     data: web::Json<ForgotPasswordPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -97,7 +97,7 @@ pub(super) async fn forgot_password<T: AuthenticationApi>(
 }
 
 /// Changes the user's password and purges all their sessions
-pub(super) async fn verify_forgot_password<T: AuthenticationApi>(
+pub(super) async fn verify_forgot_password<T: AuthenticationContract>(
     data: web::Json<ForgotPasswordVerifyPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -107,7 +107,7 @@ pub(super) async fn verify_forgot_password<T: AuthenticationApi>(
 }
 
 /// Changes the user's password and purges all their sessions
-pub(super) async fn reset_password<T: AuthenticationApi>(
+pub(super) async fn reset_password<T: AuthenticationContract>(
     data: web::Query<ResetPasswordPayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
@@ -117,7 +117,7 @@ pub(super) async fn reset_password<T: AuthenticationApi>(
 }
 
 /// Logs the user out. Optionally purges their sessions, Requires a valid session to be established beforehand
-pub(super) async fn logout<T: AuthenticationApi>(
+pub(super) async fn logout<T: AuthenticationContract>(
     data: web::Json<Logout>,
     req: HttpRequest,
     service: web::Data<T>,
