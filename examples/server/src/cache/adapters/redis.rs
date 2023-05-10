@@ -1,4 +1,4 @@
-use crate::cache::{contracts::AuthCacheAccess, CacheAdapterError, Cacher, KeyPrefix};
+use crate::cache::{contracts::SimpleCacheAccess, CacheAdapterError, Cacher, KeyPrefix};
 use async_trait::async_trait;
 use chrono::Utc;
 use hextacy::drivers::cache::redis::{redis::AsyncCommands, RedisAdapterExt, RedisConnection};
@@ -12,7 +12,7 @@ impl RedisAdapterExt for RedisAdapter {}
 impl Cacher for RedisAdapter {}
 
 #[async_trait]
-impl AuthCacheAccess<RedisConnection> for RedisAdapter {
+impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
     async fn set_str(
         conn: &mut RedisConnection,
         id: impl KeyPrefix + Send,

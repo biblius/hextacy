@@ -1,4 +1,4 @@
-use crate::cache::{contracts::AuthCacheAccess, AuthID as CacheKey};
+use crate::cache::{contracts::SimpleCacheAccess, AuthID as CacheKey};
 use crate::config::constants::{
     EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, OTP_TOKEN_DURATION,
     REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_CACHE_DURATION,
@@ -13,7 +13,7 @@ use hextacy::{adapt, contract};
 adapt! {
     AuthenticationCache,
     use Driver for Connection as driver;
-    Cache: AuthCacheAccess<Connection>
+    Cache: SimpleCacheAccess<Connection>
 }
 
 #[contract]
@@ -21,7 +21,7 @@ impl<D, C, Cache> AuthenticationCache<D, C>
 where
     C: Send,
     D: Connect<Connection = C> + Send + Sync,
-    Cache: AuthCacheAccess<C> + Send + Sync,
+    Cache: SimpleCacheAccess<C> + Send + Sync,
 {
     /// Sessions get cached behind the user's csrf token.
     async fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {

@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[async_trait]
-pub trait AuthCacheAccess<C> {
+pub trait SimpleCacheAccess<C> {
     async fn get_string(
         conn: &mut C,
         id: impl KeyPrefix + Send,

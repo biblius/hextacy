@@ -1,4 +1,4 @@
-use crate::cache::contracts::AuthCacheAccess;
+use crate::cache::contracts::SimpleCacheAccess;
 use crate::cache::AuthID;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
@@ -37,14 +37,14 @@ where
 adapt! {
     AuthMwCache,
     use Driver for Connection as driver;
-    Cache: AuthCacheAccess<Connection>
+    Cache: SimpleCacheAccess<Connection>
 }
 
 #[contract]
 impl<D, Conn, Cache> AuthMwCache<D, Conn, Cache>
 where
     Conn: Send,
-    Cache: AuthCacheAccess<Conn> + Send + Sync,
+    Cache: SimpleCacheAccess<Conn> + Send + Sync,
     D: Connect<Connection = Conn> + Send + Sync,
 {
     async fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
@@ -96,7 +96,7 @@ where
 impl<D, C, Cache> Clone for AuthMwCache<D, C, Cache>
 where
     D: Connect<Connection = C> + Send + Sync,
-    Cache: AuthCacheAccess<C> + Send + Sync,
+    Cache: SimpleCacheAccess<C> + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self {

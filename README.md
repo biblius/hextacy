@@ -163,9 +163,23 @@ That's a lot of stuff for just fetching users, so let's elaborate.
 `Connect` is a trait used by drivers to establish an actual connection. All concrete drivers implement it in their specific ways. It is also implemented by the `Driver` struct. A `Driver` is nothing more than a simple struct:
 
 ```rust
+// The driver in combination with the Connect trait allows us to fully decouple
+// the business logic from the underlying data source implementations
+struct Driver<A, C>
+where
+    A: Connect<Connection = C>,
+{
+    pub inner: Arc<A>,
+}
+
+#[async_trait]
+pub trait Connect {
+    type Connection;
+    async fn connect(&self) -> Result<Self::Connection, DriverError>;
+}
 ```
 
-As you can see, the driver's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds, but . This takes care of how we're connecting to the DB.
+As you can see, the component's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds, but . This takes care of how we're connecting to the DB.
 
 The `User` bound is simply a bound to a repository the service component will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
@@ -354,7 +368,3 @@ Feature flags:
     Uses an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
 
     Check out the `web::ws` module for more info and an example of how it works.
-
-- ### **cache**
-
-  Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation. The `AuthCacheAccess` and `KeyPrefix` traits can be used for such purposes.
