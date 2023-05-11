@@ -1,13 +1,6 @@
 use async_trait::async_trait;
 use thiserror::Error;
 
-/// Used for establishing connections to a database. Implementations can be found in the `hextacy_derive`
-/// crate. Manual implementations should utilise `hextacy::drivers`.
-#[async_trait]
-pub trait RepositoryAccess<C> {
-    async fn connect(&self) -> Result<C, DatabaseError>;
-}
-
 /// Used for creating bounds on generic connections when the adapter needs to have atomic repository access.
 ///
 /// This trait is used to normalise the API for transactions that are connection based and transactions that
@@ -42,11 +35,7 @@ pub trait Atomic: Sized {
 ///     // as well as a field named `driver` which gets used in the underlying
 ///     // `RepositoryAccess` implementation. Specifically, the field will be
 ///     // a `Driver<D, Connection>`.
-///     // The `Connection` will be substituted with the appropriate driver connection
-///     // in the `RepositoryAccess` impl, allowing the overlying service to be instantiated
-///     // with any driver that uses that connection.
-///     // Any number of use clauses are allowed for a given adapter.
-///     use D for Connection as driver : seaorm | diesel | mongo;
+///     use D for Connection as driver;
 ///
 ///     // This adds another generic parameter `User` for the struct and
 ///     // will bind it to a `UserRepository<Connection>`. This binds
@@ -83,7 +72,7 @@ macro_rules! adapt {
             use $driver:ident
             for $conn_name:ident
             as $field:ident
-            : $driver_field:ident $(,)?
+            $(in $field_vis:path)? $(,)?
         )+;
         $(
             $id:ident : $repository:ident < $connection:ident >
@@ -91,17 +80,16 @@ macro_rules! adapt {
         $(,)?
         ) => {
                #[allow(non_snake_case)]
-               #[derive(Debug, hextacy::derive::Adapter)]
+               #[derive(Debug)]
                pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::db::Connect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::drivers::Connect<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
                   $(
-                      #[$driver_field($conn_name)]
-                      $field: hextacy::drivers::db::Driver<$driver, $conn_name>,
+                      $( pub (in $field_vis) )? $field: hextacy::drivers::Driver<$driver, $conn_name>,
                   )+
                    $($id: ::std::marker::PhantomData<$id>),*
                }
@@ -110,14 +98,14 @@ macro_rules! adapt {
                impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::db::Connect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::drivers::Connect<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
                    pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
                        Self {
                           $(
-                              $field: hextacy::drivers::db::Driver::new($driver),
+                              $field: hextacy::drivers::Driver::new($driver),
                           )+
                            $($id: ::std::marker::PhantomData),*
                        }

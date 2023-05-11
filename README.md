@@ -108,31 +108,29 @@ The `#[component]` attribute macro will create a `ServiceContract` trait with si
 
 The contract provides an api that serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryContract`. This helps with the generic bounds in the upcoming adapter and makes testing the services a breeze!
 
-Now we have to define our adapter and is when we enter the esoteric realms of rust trait bounds:
+Now we have to define our adapter and is when we enter the esoteric realms of rust generics:
 
 - **adapter.rs**
 
   ```rust
-  use hextacy_derive::Repository;
   use hextacy::drivers::db::{Driver, Connect};
   use std::{marker::PhantomData, sync::Arc};
 
-  #[derive(Debug, Clone, Repository)]
-  pub struct Repository<D, Connection, User>
+  #[derive(Debug, Clone)]
+  pub struct Repository<D, Conn, User>
   where
-      D: Connect<Connection = Connection>,
-      User: UserRepository<Connection>,
+      D: Connect<Connection = Conn>,
+      User: UserRepository<Conn>,
   {
-      #[diesel(Connection)]
-      postgres: Driver<D, Connection>,
+      driver: Driver<D, Conn>,
       user: PhantomData<User>,
   }
 
   // This one's for convenience
-  impl<D, Connection, User> Repository<D, Connection, User>
+  impl<D, Conn, User> Repository<D, Conn, User>
   where
-      D: Connect<Connection = Connection>,
-      User: UserRepository<Connection>
+      D: Connect<Connection = Conn>,
+      User: UserRepository<Conn>
   {
       pub fn new(driver: Arc<A>) -> Self {
           Self {
@@ -143,11 +141,10 @@ Now we have to define our adapter and is when we enter the esoteric realms of ru
   }
 
   #[hextacy::component]
-  impl<D, Connection, User> RepositoryContract for Repository<D, Connection, User>
+  impl<D, Conn, User> RepositoryContract for Repository<D, Conn, User>
   where
-      Self: RepositoryAccess<Connection>,
-      D: Connect<Connection = Connection>,
-      User: UserRepository<Connection>
+      D: Connect<Connection = Conn>,
+      User: UserRepository<Conn>
   {
     async fn get_paginated(
         &self,
@@ -155,7 +152,7 @@ Now we have to define our adapter and is when we enter the esoteric realms of ru
         per_page: u16,
         sort: Option<user::SortOptions>,
     ) -> Result<Vec<user::User>, Error> {
-        let mut conn = self.connect().await?;
+        let mut conn = self.driver.connect().await?;
         User::get_paginated(&mut conn, page, per_page, sort).await.map_err(Error::new)
     }
   }
@@ -163,25 +160,20 @@ Now we have to define our adapter and is when we enter the esoteric realms of ru
 
 That's a lot of stuff for just fetching users, so let's elaborate.
 
-The `Repository` derive implements the `RepositoryAccess` trait using `DieselConnection` as its connection type, since we annotated its driver field with diesel - a postgres driver that uses `DieselConnection`.
+`Connect` is a trait used by drivers to establish an actual connection. All concrete drivers implement it in their specific ways. It is also implemented by the `Driver` struct. A `Driver` is nothing more than a simple struct:
 
-`RepositoryAccess` is a simple trait that is generic over the connection and gives its implementors a `connect()` method to establish a connection to the database. In the `Repository` derive, this generic connection is concretised to `DieselConnection`, which basically means we can use any driver that can establish that connection. The `PostgresDiesel` driver can do just that (it is simply a wrapper around a connection pool).
+```rust
+```
 
-The `#[diesel(Connection)]` attribute tells the derive macro which generic connection parameter to substitute in the implementation with a concrete implementation and must match the generic connection the struct. `RepositoryAccess` can be manually implemented as well.
-
-`Connect` is a trait used by drivers to establish an actual connection. All concrete drivers implement it in their specific ways. It is also implemented by the `Driver` struct. A `Driver` is a wrapper around a concrete driver and simply delegates the `connect()` call to it.
-
-As you can see, the driver's `D` parameter MUST implement `Connect` which takes care of connecting to the database and its connection MUST be the same as the connection on `Connect`. This takes care of how we're connecting to the DB.
+As you can see, the driver's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds, but . This takes care of how we're connecting to the DB.
 
 The `User` bound is simply a bound to a repository the service component will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
-So far we haven't coupled any implementation details to the service. The derive macro generates code for a postgres driver, but it just substitutes the generic connection bounds for concrete ones in its `RepositoryAccess` implementation.
-
-So pretty much, all the service has are calls to some generic drivers, connections and repositories, while the macros generate a concrete implementation for the driver of choice you can use in the setup.
+So far we haven't coupled any implementation details to the service, all the service has are calls to some generic drivers, connections and repositories.
 
 This fact is at the core of this architecture and is precisely what makes it so powerful. Not only does this make testing a piece of cake, but it also allows us to switch up our adapters any way we want without ever having to change the business logic. They are completely decoupled.
 
-Do note that the underlying functionality of the repository does not necessarily have to involve a database. The service doesn't care from where the repository obtains its data, it just cares about the signatures. For example, a wrapper around a reqwest client could implement the `Connect` trait with its connection type as the reqwest `Client` and could be used to fetch data from an external data source. Neat!
+Do note that the underlying functionality of the repository does not necessarily have to involve a database. The service doesn't care from where the repository obtains its data, it just cares about the signatures. For example, a wrapper around a reqwest client could implement the `Connect` trait with its connection type as the reqwest `Client` struct and could be used to fetch data from an external data source. Neat!
 
 Finally, we'll concretise everything in the setup:
 

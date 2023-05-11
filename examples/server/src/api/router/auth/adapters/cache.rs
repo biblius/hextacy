@@ -6,9 +6,9 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::cache::redis::{CacheAccess, CacheError};
+use hextacy::cache::{CacheAccess, CacheError};
 use hextacy::contract;
-use hextacy::drivers::cache::redis::RedisPoolConnection;
+use hextacy::drivers::cache::redis::RedisConnection;
 use hextacy::drivers::cache::redis::{redis::Commands, Redis};
 use std::sync::Arc;
 
@@ -21,7 +21,7 @@ impl CacheAccess for Cache {
         "auth"
     }
 
-    fn connection(&self) -> Result<RedisPoolConnection, CacheError> {
+    fn connection(&self) -> Result<RedisConnection, CacheError> {
         self.driver.connect().map_err(|e| e.into())
     }
 }

@@ -1,11 +1,11 @@
 [package]
 authors = ["biblius <crazycompanyxxl@gmail.com>"]
-description = "Library containing derive macros for the hextacy crate"
+description = "Contains procedural macros for the hextacy crate"
 edition = "2021"
 homepage = "https://github.com/biblius/hextacy"
 keywords = ["backend", "hextacy", "hextc", "xtc"]
 license = "MIT"
-name = "hextacy_derive"
+name = "hextacy_macros"
 readme = "../README.md"
 version = "0.1.1"
 

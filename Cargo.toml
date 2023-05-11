@@ -1,5 +1,5 @@
 [workspace]
-members = ["derive_tests", "hextacy", "hextacy_derive"]
+members = ["hextacy", "hextacy_macros"]
 
 [package]
 authors = ["biblius <crazycompanyxxl@gmail.com>"]

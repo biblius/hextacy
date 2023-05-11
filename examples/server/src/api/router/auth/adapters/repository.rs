@@ -7,9 +7,8 @@ use crate::db::repository::user::UserRepository;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
 use hextacy::db::Atomic;
-use hextacy::drivers::db::Connect;
+use hextacy::drivers::Connect;
 use hextacy::{adapt, contract};
-use sea_orm::DatabaseConnection;
 use tracing::info;
 
 #[allow(unused_imports)]
@@ -18,7 +17,7 @@ use hextacy::drivers::db::postgres::diesel::{DieselConnection, PostgresDiesel};
 adapt! {
     RepositoryComponent in crate::api::router::auth,
 
-    use Postgres for Connection as driver : seaorm;
+    use Postgres for Connection as driver;
 
     U: UserRepository<Connection>,
     S: SessionRepository<Connection>,

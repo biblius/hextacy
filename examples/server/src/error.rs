@@ -17,7 +17,7 @@ pub enum Error {
     #[error("Database Error: {0}")]
     Database(#[from] hextacy::db::DatabaseError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] hextacy::cache::redis::CacheError),
+    Cache(#[from] hextacy::cache::CacheError),
     #[error("Adapter Error: {0}")]
     Adapter(#[from] crate::db::adapters::AdapterError),
     #[error("Redis Error: {0}")]

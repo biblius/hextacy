@@ -1,6 +1,6 @@
 use crate::{
     db::{Atomic, DatabaseError},
-    drivers::{db::Connect, DriverError},
+    drivers::{Connect, DriverError},
 };
 use async_trait::async_trait;
 use sea_orm::TransactionTrait;

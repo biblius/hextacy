@@ -1,8 +1,0 @@
-error: Repository derive needs at least one driver field
-
-         = help: Annotate the Driver field with one of the available drivers: diesel, mongo, seaorm
-
-  --> tests/compile-fail/no-driver.rs:22:8
-   |
-22 | struct ServiceRepo<D, C, User>
-   |        ^^^^^^^^^^^

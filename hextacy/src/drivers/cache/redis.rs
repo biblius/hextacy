@@ -1,17 +1,23 @@
+use std::fmt::{Debug, Display};
+
+use async_trait::async_trait;
 pub use redis;
+use serde::{de::DeserializeOwned, Serialize};
 
-use crate::drivers::DriverError;
-use r2d2::{Pool, PooledConnection};
-use redis::{Client, ConnectionInfo, IntoConnectionInfo};
-use tracing::{info, trace};
+use crate::{
+    cache::{CacheAccess, CacheAccessJson, CacheError},
+    drivers::{Connect, DriverError},
+};
+use deadpool_redis::{Config, Connection, Pool, Runtime};
+use r2d2::PooledConnection;
+use redis::{AsyncCommands, ConnectionInfo, FromRedisValue, IntoConnectionInfo, ToRedisArgs};
 
-pub type RedisPool = Pool<Client>;
-pub type RedisPoolConnection = PooledConnection<redis::Client>;
+pub type RedisConnection = PooledConnection<redis::Client>;
 
 /// Contains a redis connection pool. An instance of this should be shared through the app with arcs.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Redis {
-    pool: RedisPool,
+    pool: Pool,
 }
 
 impl Redis {
@@ -21,52 +27,20 @@ impl Redis {
         user: Option<&str>,
         password: Option<&str>,
         db: i64,
-        pool_size: u32,
+        max_size: usize,
     ) -> Self {
-        info!("Initializing redis pool");
-        Self {
-            pool: build_pool(host, port, user, password, db, pool_size),
-        }
-    }
-
-    pub fn connect(&self) -> Result<RedisPoolConnection, DriverError> {
-        match self.pool.get() {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::RdPoolConnection(e.to_string())),
-        }
-    }
-
-    /// Expect a url as redis://username:password@host:port
-    pub fn connect_direct(db_url: &str) -> Result<Client, DriverError> {
-        match Client::open(db_url) {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::RdDirectConnection(e)),
-        }
+        let conn_info = connection_info(host, port, user, password, db);
+        let pool = Config::from_connection_info(conn_info)
+            .builder()
+            .expect("Could not create redis pool builder")
+            .max_size(max_size)
+            .runtime(Runtime::Tokio1)
+            .build()
+            .expect("Could not create redis connection pool");
+        Self { pool }
     }
 }
 
-/// Builds a Redis connection pool with a default size of 8 workers
-pub fn build_pool(
-    host: &str,
-    port: u16,
-    user: Option<&str>,
-    password: Option<&str>,
-    db: i64,
-    pool_size: u32,
-) -> RedisPool {
-    let conn_info = connection_info(host, port, user, password, db);
-
-    trace!("Building Redis pool for {:?}", conn_info.addr);
-
-    let driver = Client::open(conn_info).expect("Could not create redis driver");
-
-    Pool::builder()
-        .max_size(pool_size)
-        .build(driver)
-        .unwrap_or_else(|e| panic!("Failed to create redis pool: {e}"))
-}
-
-/// Panics if the DB url cannot be constructed
 fn connection_info(
     host: &str,
     port: u16,
@@ -80,4 +54,78 @@ fn connection_info(
     conn_info.redis.username = user.map(|uname| uname.to_string());
     conn_info.redis.db = db;
     conn_info
+}
+
+#[async_trait]
+impl Connect for Redis {
+    type Connection = Connection;
+    async fn connect(&self) -> Result<Self::Connection, DriverError> {
+        match self.pool.get().await {
+            Ok(conn) => Ok(conn),
+            Err(e) => Err(DriverError::RedisConnection(e.to_string())),
+        }
+    }
+}
+
+#[async_trait]
+impl<K, V> CacheAccess<Connection, K, V> for Redis
+where
+    K: ToRedisArgs + Send + Sync,
+    V: ToRedisArgs + FromRedisValue + Send + Sync,
+{
+    async fn get(&self, key: &K) -> Result<V, CacheError> {
+        let mut conn = self.connect().await?;
+        let result = conn.get::<&K, V>(key).await?;
+        drop(conn);
+        Ok(result)
+    }
+
+    async fn set(&self, key: &K, val: &V, ex: Option<usize>) -> Result<(), CacheError> {
+        let mut conn = self.connect().await?;
+        if let Some(ex) = ex {
+            conn.set_ex::<&K, &V, ()>(key, val, ex)
+                .await
+                .map_err(Into::into)
+        } else {
+            conn.set::<&K, &V, ()>(key, val).await.map_err(Into::into)
+        }
+    }
+
+    async fn delete(&self, key: &K) -> Result<(), CacheError> {
+        let mut conn = self.connect().await?;
+        conn.del::<&K, ()>(key).await.map_err(Into::into)
+    }
+}
+
+#[async_trait]
+impl<K, V> CacheAccessJson<Connection, K, V> for Redis
+where
+    K: ToRedisArgs + Send + Sync,
+    V: Serialize + DeserializeOwned + Send + Sync,
+{
+    async fn get_json(&self, key: &K) -> Result<V, CacheError> {
+        let mut conn = self.connect().await?;
+        let result = conn.get::<&K, String>(key).await?;
+        serde_json::from_str::<V>(&result).map_err(Into::into)
+    }
+
+    async fn set_json(&self, key: &K, val: &V, ex: Option<usize>) -> Result<(), CacheError> {
+        let mut conn = self.connect().await?;
+        let value = serde_json::to_string(val)?;
+        if let Some(ex) = ex {
+            conn.set_ex::<&K, String, ()>(key, value, ex)
+                .await
+                .map_err(Into::into)
+        } else {
+            conn.set::<&K, String, ()>(key, value)
+                .await
+                .map_err(Into::into)
+        }
+    }
+}
+
+impl Debug for Redis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Redis").field("pool", &"{ ... }").finish()
+    }
 }

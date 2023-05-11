@@ -1,17 +1,18 @@
 use crate::db::adapters::postgres::seaorm::session::PgSessionAdapter;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{
-    config::{cache::AuthCache, constants::SESSION_CACHE_DURATION},
+    config::{cache::AuthCache as AuthCacheID, constants::SESSION_CACHE_DURATION},
     error::Error,
 };
+use async_trait::async_trait;
 use chrono::Utc;
 use hextacy::adapt;
 use hextacy::contract;
-use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisPoolConnection};
-use hextacy::drivers::db::Connect;
+use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisConnection};
+use hextacy::drivers::{Connect, Driver};
 use hextacy::{
-    cache::redis::CacheAccess,
-    cache::redis::CacheError,
+    cache::CacheAccess,
+    cache::CacheError,
     drivers::db::postgres::{seaorm::DatabaseConnection, seaorm::PostgresSea},
 };
 use std::sync::Arc;
@@ -29,9 +30,7 @@ impl Clone for Repo {
 
 adapt! {
     RepositoryComponent,
-
-    use D for Connection as driver: seaorm;
-
+    use D for Connection as driver;
     S: SessionRepository<Connection>,
 }
 
@@ -58,34 +57,44 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct Cache {
-    pub driver: Arc<Redis>,
+pub struct AuthCache<D, Connection>
+where
+    D: Connect<Connection = Connection> + CacheAccess<Connection>,
+{
+    pub driver: Driver<D, Connection>,
 }
 
-impl CacheAccess for Cache {
+/* #[async_trait]
+impl CacheAccess<Conn> for AuthCache {
     fn domain() -> &'static str {
         "auth"
     }
 
-    fn connection(&self) -> Result<RedisPoolConnection, CacheError> {
-        self.driver.connect().map_err(|e| e.into())
+    async fn connection(&self) -> Result<RedisConnection, CacheError> {
+        self.driver.connect().await.map_err(|e| e.into())
     }
-}
+} */
 
 #[contract(super)]
-impl Cache {
+impl<D, Conn> AuthCache<D, Conn>
+where
+    D: Connect<Connection = Conn> + CacheAccess<Conn>,
+{
     fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
-        self.get_json(AuthCache::Session, id).map_err(Error::new)
+        self.driver
+            .get_json(AuthCache::Session, id)
+            .map_err(Error::new)
     }
 
     fn cache_session(&self, id: &str, session: &session::Session) -> Result<(), Error> {
-        self.set_json(
-            AuthCache::Session,
-            id,
-            session,
-            Some(SESSION_CACHE_DURATION),
-        )
-        .map_err(Error::new)
+        self.driver
+            .set_json(
+                AuthCache::Session,
+                id,
+                session,
+                Some(SESSION_CACHE_DURATION),
+            )
+            .map_err(Error::new)
     }
 
     fn refresh_session(&self, session_id: &str) -> Result<(), Error> {

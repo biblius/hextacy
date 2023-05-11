@@ -1,6 +1,6 @@
 use crate::db::DatabaseError;
 use crate::drivers::DriverError;
-use crate::{db::Atomic, drivers::db::Connect};
+use crate::{db::Atomic, drivers::Connect};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,

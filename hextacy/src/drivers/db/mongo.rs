@@ -1,4 +1,4 @@
-use super::Connect;
+use super::super::Connect;
 use crate::{
     db::{Atomic, DatabaseError},
     drivers::DriverError,

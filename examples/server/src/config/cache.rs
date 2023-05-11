@@ -1,4 +1,4 @@
-use hextacy::cache::redis::CacheIdentifier;
+use hextacy::cache::CacheIdentifier;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AuthCache {

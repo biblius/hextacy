@@ -32,8 +32,4 @@ pub mod time;
 pub mod web;
 
 /// Derive macros for quick implementations of generic repository traits.
-pub mod derive {
-    pub use hextacy_derive::Adapter;
-}
-
-pub use hextacy_derive::contract;
+pub use hextacy_macros::contract;

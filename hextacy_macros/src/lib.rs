@@ -1,50 +1,7 @@
-mod db;
-
 use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
 use quote::quote;
 use syn::{spanned::Spanned, Ident, ItemImpl, TypePath};
-
-/// Provides an implementation of `RepositoryAccess<C>` depending on the provided attributes.
-///
-/// Intended to be derived on service components that contain a generic connection that needs to
-/// be concretised. The macro will essentially replace the generic connection with a concrete one
-/// used by the driver in the aformentioned implementation.
-///
-/// Multiple driver fields on the same struct are allowed.
-///
-/// Accepted field attributes (drivers) are:
-///
-/// `diesel`,
-/// `mongo`,
-/// `seaorm`
-///
-/// Useful for deriving on repository components with generic connections.
-/// The `driver` field attribute must be specified on a `Driver` field and match
-/// the generic connection parameter of the component, e.g. if the generic connection
-/// is specified as `C` then the field attribute must be `#[driver(C)]`.
-///
-/// If using the `adapt!` macro, this will be done automatically behind the scenes
-/// for whatever drivers are passed in as the parameters to the macro.
-///
-/// ```ignore
-/// #[derive(Debug, Adapter)]
-/// pub(super) struct RepositoryComponent<C, Connection, User>
-///   where
-///     C: Connect<Connection = Connection>,
-///     User: UserRepository<Connection>
-///  {
-///     #[diesel(Connection)]
-///     driver: Driver<C, Connection>,
-///     user: PhantomData<User>
-///  }
-/// ```
-#[proc_macro_derive(Adapter, attributes(diesel, seaorm, mongo))]
-#[proc_macro_error]
-pub fn derive_adapter(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let mut ast = syn::parse(input).unwrap();
-    db::adapter::derive(&mut ast).into()
-}
 
 #[proc_macro_attribute]
 #[proc_macro_error]
