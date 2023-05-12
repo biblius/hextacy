@@ -1,7 +1,7 @@
 use crate::{
     db::{
-        adapters::AdapterError,
         models::user::{SortOptions, User},
+        RepoAdapterError,
     },
     services::oauth::OAuthProvider,
 };
@@ -15,7 +15,7 @@ pub trait UserRepository<C> {
         email: &str,
         username: &str,
         password: &str,
-    ) -> Result<User, AdapterError>;
+    ) -> Result<User, RepoAdapterError>;
 
     async fn create_from_oauth(
         conn: &mut C,
@@ -23,29 +23,37 @@ pub trait UserRepository<C> {
         email: &str,
         username: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError>;
+    ) -> Result<User, RepoAdapterError>;
 
     /// Get a user by their ID
-    async fn get_by_id(conn: &mut C, id: &str) -> Result<User, AdapterError>;
+    async fn get_by_id(conn: &mut C, id: &str) -> Result<User, RepoAdapterError>;
 
     /// Get a user by their oauth ID
     async fn get_by_oauth_id(
         conn: &mut C,
         id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError>;
+    ) -> Result<User, RepoAdapterError>;
 
     /// Get a user by their email
-    async fn get_by_email(conn: &mut C, email: &str) -> Result<User, AdapterError>;
+    async fn get_by_email(conn: &mut C, email: &str) -> Result<User, RepoAdapterError>;
 
     /// Hash the given password with bcrypt and set the user's password field to the hash
-    async fn update_password(conn: &mut C, id: &str, password: &str) -> Result<User, AdapterError>;
+    async fn update_password(
+        conn: &mut C,
+        id: &str,
+        password: &str,
+    ) -> Result<User, RepoAdapterError>;
 
     /// Update the user's OTP secret to the given key
-    async fn update_otp_secret(conn: &mut C, id: &str, secret: &str) -> Result<User, AdapterError>;
+    async fn update_otp_secret(
+        conn: &mut C,
+        id: &str,
+        secret: &str,
+    ) -> Result<User, RepoAdapterError>;
 
     /// Update the user's `email_verified_at` field to now
-    async fn update_email_verified_at(conn: &mut C, id: &str) -> Result<User, AdapterError>;
+    async fn update_email_verified_at(conn: &mut C, id: &str) -> Result<User, RepoAdapterError>;
 
     /// Update one of the user's oauth IDs
     async fn update_oauth_id(
@@ -53,10 +61,10 @@ pub trait UserRepository<C> {
         id: &str,
         oauth_id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError>;
+    ) -> Result<User, RepoAdapterError>;
 
     /// Set the user's frozen flag to true
-    async fn freeze(conn: &mut C, id: &str) -> Result<User, AdapterError>;
+    async fn freeze(conn: &mut C, id: &str) -> Result<User, RepoAdapterError>;
 
     /// Return a vec of users constrained by the params
     async fn get_paginated(
@@ -64,5 +72,5 @@ pub trait UserRepository<C> {
         page: u16,
         per_page: u16,
         sort_by: Option<SortOptions>,
-    ) -> Result<Vec<User>, AdapterError>;
+    ) -> Result<Vec<User>, RepoAdapterError>;
 }

@@ -1,9 +1,9 @@
 use crate::db::adapters::postgres::diesel::schema::users;
 use crate::db::models::role::Role;
 use crate::db::{
-    adapters::AdapterError,
     models::user::{SortOptions, User},
     repository::user::UserRepository,
+    RepoAdapterError,
 };
 use crate::services::oauth::OAuthProvider;
 use async_trait::async_trait;
@@ -21,7 +21,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         email: &str,
         username: &str,
         password: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl;
 
         let user = NewUser {
@@ -44,7 +44,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         email: &str,
         username: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl;
 
         let mut user = NewUser {
@@ -64,7 +64,10 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
     }
 
     /// Fetches a user by their ID
-    async fn get_by_id(conn: &mut DieselConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn get_by_id(
+        conn: &mut DieselConnection,
+        user_id: &str,
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(id.eq(user_id))
@@ -76,7 +79,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         conn: &mut DieselConnection,
         oauth_id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
 
         let mut query = users.into_boxed();
@@ -93,7 +96,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
     async fn get_by_email(
         conn: &mut DieselConnection,
         user_email: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         users
             .filter(email.eq(user_email))
@@ -106,13 +109,13 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         conn: &mut DieselConnection,
         user_id: &str,
         pw_hash: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(password.eq(pw_hash))
             .load::<User>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Updates the user's OTP secret to the given key
@@ -120,26 +123,26 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         conn: &mut DieselConnection,
         user_id: &str,
         secret: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(otp_secret.eq(Some(secret)))
             .load::<User>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Update the user's email verified at field to now
     async fn update_email_verified_at(
         conn: &mut DieselConnection,
         user_id: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(email_verified_at.eq(chrono::Utc::now()))
             .load::<User>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     async fn update_oauth_id(
@@ -147,7 +150,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         id: &str,
         oauth_id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl;
 
         let mut update = UserUpdate {
@@ -166,17 +169,17 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
             .set(update)
             .load::<User>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Sets the user's frozen flag to true
-    async fn freeze(conn: &mut DieselConnection, user_id: &str) -> Result<User, AdapterError> {
+    async fn freeze(conn: &mut DieselConnection, user_id: &str) -> Result<User, RepoAdapterError> {
         use super::schema::users::dsl::*;
         diesel::update(users.filter(id.eq(user_id)))
             .set(frozen.eq(true))
             .load::<User>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Returns the total count of users and a vec of users constrained by the options as
@@ -186,7 +189,7 @@ impl UserRepository<DieselConnection> for PgUserAdapter {
         page: u16,
         per_page: u16,
         sort: Option<SortOptions>,
-    ) -> Result<Vec<User>, AdapterError> {
+    ) -> Result<Vec<User>, RepoAdapterError> {
         use super::schema::users::dsl::*;
         let mut query = users.into_boxed();
 

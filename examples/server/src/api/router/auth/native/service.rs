@@ -1,5 +1,5 @@
 use super::super::adapters::{
-    cache::CacheContract, email::EmailContract,
+    cache::AuthenticationCacheContract, email::EmailContract,
     repository::RepositoryComponentContract as RepositoryContract,
 };
 use super::super::data::{
@@ -7,16 +7,13 @@ use super::super::data::{
     FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
     ResendRegToken, ResetPassword, TwoFactorAuthResponse,
 };
-use crate::config::{
-    cache::AuthCache,
-    constants::{
-        COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, OTP_TOKEN_DURATION,
-        REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_DURATION,
-    },
+use crate::config::constants::{
+    COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, OTP_TOKEN_DURATION,
+    REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_DURATION,
 };
 use crate::db::{
-    adapters::AdapterError,
     models::{session::Session, user::User},
+    RepoAdapterError,
 };
 use crate::{
     api::router::auth::data::AuthenticationSuccessResponse,
@@ -49,7 +46,7 @@ pub(super) struct Authentication<R, C, E> {
 impl<R, C, E> Authentication<R, C, E>
 where
     R: RepositoryContract + Send + Sync,
-    C: CacheContract + Send + Sync,
+    C: AuthenticationCacheContract + Send + Sync,
     E: EmailContract + Send + Sync,
 {
     /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`
@@ -82,9 +79,9 @@ where
 
         // Check the password and cache the attempt if it was wrong
         if !bcrypt_verify(password, user.password.as_ref().unwrap())? {
-            let attempts = self.cache.cache_login_attempt(&user.id)?;
+            let attempts = self.cache.cache_login_attempt(&user.id).await?;
 
-            if attempts <= MAXIMUM_LOGIN_ATTEMPTS as u8 {
+            if attempts <= MAXIMUM_LOGIN_ATTEMPTS as i64 {
                 return Err(AuthenticationError::InvalidCredentials.into());
             }
 
@@ -96,12 +93,9 @@ where
             self.email
                 .send_freeze_account(&user.username, &user.email, &token)?;
 
-            self.cache.set_token(
-                AuthCache::PWToken,
-                &token,
-                &user.id,
-                Some(RESET_PW_TOKEN_DURATION),
-            )?;
+            self.cache
+                .set_pw_token(&token, &user.id, Some(RESET_PW_TOKEN_DURATION))
+                .await?;
 
             return Ok(FreezeAccountResponse::new(
                 &user.email,
@@ -117,12 +111,9 @@ where
 
             debug!("User {} requires 2FA, caching token {}", user.id, token);
 
-            self.cache.set_token(
-                AuthCache::OTPToken,
-                &token,
-                &user.id,
-                Some(OTP_TOKEN_DURATION),
-            )?;
+            self.cache
+                .set_otp_token(&token, &user.id, Some(OTP_TOKEN_DURATION))
+                .await?;
 
             return Ok(TwoFactorAuthResponse::new(&user.username, &token, remember)
                 .to_response(StatusCode::OK)
@@ -140,7 +131,7 @@ where
             remember,
         } = otp;
 
-        let user_id = match self.cache.get_token(AuthCache::OTPToken, token) {
+        let user_id = match self.cache.get_otp_token(token).await {
             Ok(id) => id,
             Err(_) => return Err(AuthenticationError::InvalidToken("OTP").into()),
         };
@@ -154,16 +145,11 @@ where
         };
 
         // Check if there's an active throttle
-        let attempts = self
-            .cache
-            .get_otp_throttle(AuthCache::OTPAttempts, &user.id)
-            .ok();
+        let attempts = self.cache.get_otp_attempts(&user.id).await.ok();
 
         // Check whether it's ok to attempt to verify it
         if let Some(attempts) = attempts {
-            let throttle = self
-                .cache
-                .get_otp_throttle(AuthCache::OTPThrottle, &user.id)?;
+            let throttle = self.cache.get_otp_throttle(&user.id).await?;
             let now = chrono::Utc::now().timestamp();
             if now - throttle <= OTP_THROTTLE_INCREMENT * attempts {
                 return Err(AuthenticationError::AuthBlocked.into());
@@ -173,14 +159,14 @@ where
 
         // If it's wrong increment the throttle and error
         if !result {
-            self.cache.cache_otp_throttle(&user.id)?;
+            self.cache.cache_otp_throttle(&user.id).await?;
             return Err(AuthenticationError::InvalidOTP.into());
         }
 
-        self.cache.delete_token(AuthCache::OTPToken, token)?;
+        self.cache.delete_otp_token(token).await?;
 
         if attempts.is_some() {
-            self.cache.delete_otp_throttle(&user.id)?;
+            self.cache.delete_otp_attempts(token).await?;
         }
 
         self.establish_session(user, remember).await
@@ -208,7 +194,7 @@ where
 
         match user {
             Ok(_) => return Ok(response()),
-            Err(Error::Adapter(AdapterError::DoesNotExist)) => {}
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => {}
             Err(e) => return Err(e),
         }
 
@@ -221,12 +207,9 @@ where
         let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
         let token = generate_hmac(secret.as_bytes(), user.id.as_bytes(), BASE64URL)?;
 
-        self.cache.set_token(
-            AuthCache::RegToken,
-            &token,
-            &user.id,
-            Some(REGISTRATION_TOKEN_DURATION),
-        )?;
+        self.cache
+            .set_registration_token(&token, &user.id, Some(REGISTRATION_TOKEN_DURATION))
+            .await?;
 
         self.email
             .send_registration_token(&token, &user.username, email)?;
@@ -244,7 +227,7 @@ where
     async fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error> {
         let token = &data.token;
 
-        let user_id = match self.cache.get_token(AuthCache::RegToken, token) {
+        let user_id = match self.cache.get_registration_token(token).await {
             Ok(id) => id,
             Err(_) => return Err(AuthenticationError::InvalidToken("Registration").into()),
         };
@@ -266,7 +249,7 @@ where
             .update_user_email_verification(&user_id)
             .await?;
 
-        self.cache.delete_token(AuthCache::RegToken, token)?;
+        self.cache.delete_registration_token(token).await?;
 
         Ok(
             MessageResponse::new("Successfully verified registration token. Good job.")
@@ -290,7 +273,7 @@ where
 
         let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
-            Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response()),
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
             Err(e) => return Err(e),
         };
 
@@ -298,23 +281,20 @@ where
             return Ok(response());
         }
 
-        if self.cache.get_email_throttle(&user.id).ok().is_some() {
+        if self.cache.get_email_throttle(&user.id).await.ok().is_some() {
             return Err(AuthenticationError::AuthBlocked.into());
         }
 
         let token = token(BASE64URL, 160);
 
-        self.cache.set_token(
-            AuthCache::RegToken,
-            &token,
-            &user.id,
-            Some(REGISTRATION_TOKEN_DURATION),
-        )?;
+        self.cache
+            .set_registration_token(&token, &user.id, Some(REGISTRATION_TOKEN_DURATION))
+            .await?;
 
         self.email
             .send_registration_token(&token, &user.username, &user.email)?;
 
-        self.cache.set_email_throttle(&user.id)?;
+        self.cache.set_email_throttle(&user.id).await?;
 
         Ok(response())
     }
@@ -362,12 +342,9 @@ where
 
         let token = token(BASE64URL, 128);
 
-        self.cache.set_token(
-            AuthCache::PWToken,
-            &token,
-            &user.id,
-            Some(RESET_PW_TOKEN_DURATION),
-        )?;
+        self.cache
+            .set_pw_token(&token, &user.id, Some(RESET_PW_TOKEN_DURATION))
+            .await?;
 
         self.email
             .alert_password_change(&user.username, &user.email, &token)?;
@@ -391,12 +368,12 @@ where
             ref token,
         } = data;
 
-        let user_id = match self.cache.get_token(AuthCache::PWToken, token) {
+        let user_id = match self.cache.get_pw_token(token).await {
             Ok(id) => id,
             Err(_) => return Err(AuthenticationError::InvalidToken("Password").into()),
         };
 
-        self.cache.delete_token(AuthCache::PWToken, token)?;
+        self.cache.delete_pw_token(token).await?;
 
         let hashed = bcrypt_hash(password)?;
 
@@ -415,14 +392,14 @@ where
         let pw_token = data.token.as_str();
 
         // Check if there's a reset PW token in the cache
-        let user_id = match self.cache.get_token(AuthCache::PWToken, pw_token) {
+        let user_id = match self.cache.get_pw_token(pw_token).await {
             Ok(id) => id,
             Err(_) => return Err(Error::new(AuthenticationError::InvalidToken("Password"))),
         };
 
         info!("Resetting password for {user_id}");
 
-        self.cache.delete_token(AuthCache::PWToken, pw_token)?;
+        self.cache.delete_pw_token(pw_token).await?;
 
         // Create a temporary password
         let (temp_pw, hash) = pw_and_hash()?;
@@ -461,12 +438,12 @@ where
 
         let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
-            Err(Error::Adapter(AdapterError::DoesNotExist)) => return Ok(response()),
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
             Err(e) => return Err(e),
         };
 
         // Check throttle
-        if self.cache.get_email_throttle(&user.id).ok().is_some() {
+        if self.cache.get_email_throttle(&user.id).await.ok().is_some() {
             return Err(AuthenticationError::AuthBlocked.into());
         }
 
@@ -476,14 +453,11 @@ where
         self.email
             .send_forgot_password(&user.username, email, &token)?;
 
-        self.cache.set_token(
-            AuthCache::PWToken,
-            &token,
-            &user.id,
-            Some(RESET_PW_TOKEN_DURATION),
-        )?;
+        self.cache
+            .set_pw_token(&token, &user.id, Some(RESET_PW_TOKEN_DURATION))
+            .await?;
 
-        self.cache.set_email_throttle(&user.id)?;
+        self.cache.set_email_throttle(&user.id).await?;
 
         Ok(response())
     }
@@ -496,7 +470,7 @@ where
             self.purge_sessions(&session.user_id, None).await?;
         } else {
             let session = self.repository.expire_session(&session.id).await?;
-            self.cache.delete_token(AuthCache::Session, &session.id)?;
+            self.cache.delete_session(&session.id).await?;
         }
 
         // Expire the cookie
@@ -512,7 +486,7 @@ where
     async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
         let sessions = self.repository.purge_sessions(user_id, skip).await?;
         for s in sessions {
-            self.cache.delete_token(AuthCache::Session, &s.id).ok();
+            self.cache.delete_session(&s.id).await.ok();
         }
         Ok(())
     }
@@ -535,13 +509,13 @@ where
         let session_cookie = crate::helpers::cookie::create(COOKIE_S_ID, &session.id, false)?;
 
         // Delete login attempts on success
-        match self.cache.delete_login_attempts(&user.id) {
+        match self.cache.delete_login_attempts(&user.id).await {
             Ok(_) => debug!("Deleted cached login attempts for {}", user.id),
             Err(_) => debug!("No login attempts found for user {}, proceeding", user.id),
         };
 
         // Cache the session
-        self.cache.set_session(&session.id, &session)?;
+        self.cache.set_session(&session.id, &session).await?;
 
         info!("Successfully created session for {}", user.username);
 

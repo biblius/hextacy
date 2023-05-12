@@ -18,8 +18,8 @@ mod tests {
     use crate::api::router::auth::native::service::AuthenticationContract as ServiceContract;
     use crate::api::router::auth::native::service::MockAuthenticationContract;
     use crate::db::{
-        adapters::AdapterError,
         models::{session::Session, user::User},
+        RepoAdapterError,
     };
     use crate::{
         api::router::auth::data::AuthenticationSuccessResponse,
@@ -91,7 +91,7 @@ mod tests {
         // The service will first attempt to find an existing user
         repository
             .expect_get_user_by_email()
-            .return_once_st(move |_| Err(AdapterError::DoesNotExist.into()));
+            .return_once_st(move |_| Err(RepoAdapterError::DoesNotExist.into()));
         // Then create one
         repository
             .expect_create_user()
@@ -368,7 +368,7 @@ mod tests {
         let email = MockEmailContract::new();
         repository
             .expect_get_user_by_email()
-            .return_once(move |_| Err(AdapterError::DoesNotExist.into()));
+            .return_once(move |_| Err(RepoAdapterError::DoesNotExist.into()));
         let invalid_email = Credentials {
             email: "doesnt@exist.ever".to_string(),
             password: "not good".to_string(),
@@ -560,7 +560,7 @@ mod tests {
         let email = MockEmailContract::new();
         repository
             .expect_get_user_by_email()
-            .return_once(|_| Err(AdapterError::DoesNotExist.into()));
+            .return_once(|_| Err(RepoAdapterError::DoesNotExist.into()));
         let service = Authentication {
             repository,
             cache,

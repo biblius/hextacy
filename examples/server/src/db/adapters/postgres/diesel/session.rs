@@ -1,13 +1,13 @@
 use super::schema::sessions;
 use crate::{
     db::{
-        adapters::AdapterError,
         models::{
             role::Role,
             session::{AuthType, Session},
             user::User,
         },
         repository::session::SessionRepository,
+        RepoAdapterError,
     },
     services::oauth::OAuthProvider,
 };
@@ -31,7 +31,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         expires_after: Option<i64>,
         oauth_token: Option<&str>,
         provider: Option<OAuthProvider>,
-    ) -> Result<Session, AdapterError> {
+    ) -> Result<Session, RepoAdapterError> {
         use super::schema::sessions::dsl;
 
         let new = NewSession {
@@ -52,7 +52,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         diesel::insert_into(dsl::sessions)
             .values(new)
             .get_result::<Session>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     /// Gets an unexpired session with its corresponding CSRF token
@@ -60,14 +60,14 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         conn: &mut DieselConnection,
         id: &str,
         csrf: &str,
-    ) -> Result<Session, AdapterError> {
+    ) -> Result<Session, RepoAdapterError> {
         use super::schema::sessions::dsl;
         dsl::sessions
             .filter(dsl::id.eq(id))
             .filter(dsl::csrf.eq(csrf))
             .filter(dsl::expires_at.gt(chrono::Utc::now()))
             .first::<Session>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     /// Updates the sessions `expires_at` field to 30 minutes from now
@@ -75,7 +75,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         conn: &mut DieselConnection,
         id: &str,
         csrf: &str,
-    ) -> Result<Session, AdapterError> {
+    ) -> Result<Session, RepoAdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
@@ -84,11 +84,11 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
             .set(dsl::expires_at.eq(Utc::now() + Duration::minutes(30)))
             .load::<Session>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Updates the sessions `expires_at` field to now
-    async fn expire(conn: &mut DieselConnection, id: &str) -> Result<Session, AdapterError> {
+    async fn expire(conn: &mut DieselConnection, id: &str) -> Result<Session, RepoAdapterError> {
         use super::schema::sessions::dsl;
 
         diesel::update(dsl::sessions)
@@ -96,7 +96,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
             .set(dsl::expires_at.eq(Utc::now()))
             .load::<Session>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     /// Updates all user related sessions' `expires_at` field to now
@@ -104,7 +104,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         conn: &mut DieselConnection,
         usr_id: &str,
         skip: Option<&str>,
-    ) -> Result<Vec<Session>, AdapterError> {
+    ) -> Result<Vec<Session>, RepoAdapterError> {
         use super::schema::sessions::dsl;
 
         let mut query = diesel::update(dsl::sessions)
@@ -117,7 +117,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
             query = query.filter(dsl::id.ne(skip))
         }
 
-        query.load::<Session>(conn).map_err(AdapterError::from)
+        query.load::<Session>(conn).map_err(RepoAdapterError::from)
     }
 
     async fn update_access_tokens(
@@ -125,7 +125,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
         access_token: &str,
         user_id: &str,
         provider: OAuthProvider,
-    ) -> Result<Vec<Session>, AdapterError> {
+    ) -> Result<Vec<Session>, RepoAdapterError> {
         use super::schema::sessions::dsl;
 
         let ty = match provider {
@@ -139,7 +139,7 @@ impl SessionRepository<DieselConnection> for PgSessionAdapter {
             .filter(dsl::expires_at.ge(Utc::now()))
             .set(dsl::oauth_token.eq(access_token))
             .load::<Session>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 }
 

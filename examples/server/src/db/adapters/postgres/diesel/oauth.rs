@@ -1,6 +1,6 @@
 use super::schema::oauth;
 use crate::{
-    db::{adapters::AdapterError, models::oauth::OAuthMeta, repository::oauth::OAuthRepository},
+    db::{models::oauth::OAuthMeta, repository::oauth::OAuthRepository, RepoAdapterError},
     services::oauth::{OAuthProvider, TokenResponse},
 };
 use async_trait::async_trait;
@@ -32,7 +32,7 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
         account_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse + Send + Sync,
     {
@@ -53,10 +53,13 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
         diesel::insert_into(dsl::oauth)
             .values(entry)
             .get_result::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
-    async fn get_by_id(conn: &mut DieselConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
+    async fn get_by_id(
+        conn: &mut DieselConnection,
+        id: &str,
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -64,13 +67,13 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
             .first::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     async fn get_by_account_id(
         conn: &mut DieselConnection,
         account_id: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -78,13 +81,13 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
             .first::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     async fn get_by_user_id(
         conn: &mut DieselConnection,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -92,14 +95,14 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
             .load::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     async fn get_by_provider(
         conn: &mut DieselConnection,
         user_id: &str,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         dsl::oauth
@@ -108,13 +111,13 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             .filter(dsl::revoked.eq(false))
             .filter(dsl::expires_at.gt(Utc::now()))
             .first::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     async fn revoke(
         conn: &mut DieselConnection,
         access_token: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         diesel::update(dsl::oauth)
@@ -122,20 +125,20 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             .set(dsl::revoked.eq(true))
             .load::<OAuthMeta>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     async fn revoke_all(
         conn: &mut DieselConnection,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         use super::schema::oauth::dsl;
 
         diesel::update(dsl::oauth)
             .filter(dsl::user_id.eq(user_id))
             .set(dsl::revoked.eq(true))
             .load::<OAuthMeta>(conn)
-            .map_err(AdapterError::from)
+            .map_err(RepoAdapterError::from)
     }
 
     async fn update<T>(
@@ -143,7 +146,7 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
         user_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse,
     {
@@ -162,6 +165,6 @@ impl OAuthRepository<DieselConnection> for PgOAuthAdapter {
             ))
             .load::<OAuthMeta>(conn)?
             .pop()
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 }

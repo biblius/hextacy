@@ -210,7 +210,7 @@ To reduce some of the unpleasentness with dealing with so many generics, macros 
 
   adapt! {
     Repository,
-    use D for Connection as driver : seaorm;
+    use D for Connection as driver;
     User: UserRepository<Connection>
   }
 
@@ -294,7 +294,7 @@ pub trait UserRepository<C> {
         page: u16,
         per_page: u16,
         sort_by: Option<SortOptions>,
-    ) -> Result<Vec<User>, AdapterError>;
+    ) -> Result<Vec<User>, RepoAdapterError>;
 }
 ```
 
@@ -357,4 +357,4 @@ Feature flags:
 
 - ### **cache**
 
-  Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation. The `CacheAccess` and `CacheIdentifier` traits can be used for such purposes.
+  Contains a cacher trait which can be implemented for services that require access to the cache. Each service must have its cache domain and identifiers for cache seperation. The `AuthCacheAccess` and `KeyPrefix` traits can be used for such purposes.

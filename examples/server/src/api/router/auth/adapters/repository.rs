@@ -1,9 +1,9 @@
-use crate::db::adapters::AdapterError;
 use crate::db::models::oauth::OAuthMeta;
 use crate::db::models::{session, user};
 use crate::db::repository::oauth::OAuthRepository;
 use crate::db::repository::session::SessionRepository;
 use crate::db::repository::user::UserRepository;
+use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
 use hextacy::db::Atomic;
@@ -127,7 +127,7 @@ where
             Ok(user) => User::update_oauth_id(&mut conn, &user.id, account_id, provider)
                 .await
                 .map_err(Error::new)?,
-            Err(Error::Adapter(AdapterError::DoesNotExist)) => {
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => {
                 User::create_from_oauth(&mut conn, account_id, email, username, provider)
                     .await
                     .map_err(Error::new)?
@@ -142,7 +142,7 @@ where
             Ok(oauth) => oauth,
             Err(e) => match e {
                 // If the entry does not exist, we must create one for the user
-                Error::Adapter(AdapterError::DoesNotExist) => {
+                Error::Adapter(RepoAdapterError::DoesNotExist) => {
                     info!("OAuth entry does not exist, creating");
                     OAuth::create(&mut conn, &user.id, account_id, tokens, provider)
                         .await

@@ -1,6 +1,7 @@
 use super::adapter::{
-    AuthCache, AuthCacheContract, RepositoryComponent, RepositoryComponentContract,
+    CacheComponent, CacheComponentContract, RepositoryComponent, RepositoryComponentContract,
 };
+use crate::cache::adapters::redis::RedisAdapter;
 use crate::config::constants::COOKIE_S_ID;
 use crate::db::models::role::Role;
 use crate::db::models::session::Session;
@@ -10,7 +11,7 @@ use actix_web::cookie::Cookie;
 use actix_web::dev::ServiceRequest;
 use actix_web::HttpMessage;
 use futures_util::FutureExt;
-use hextacy::drivers::cache::redis::Redis;
+use hextacy::drivers::cache::redis::{Redis, RedisConnection};
 use hextacy::drivers::Connect;
 use hextacy::{call, transform};
 use std::rc::Rc;
@@ -39,13 +40,13 @@ pub struct AuthMiddleware<S, Repo, Cache> {
 transform! {
     AuthenticationGuard => AuthMiddleware,
     R: RepositoryComponentContract,
-    C: AuthCacheContract
+    C: CacheComponentContract
 }
 
 call! {
     AuthMiddleware,
     R: RepositoryComponentContract,
-    C: AuthCacheContract;
+    C: CacheComponentContract;
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         info!("Auth guard: Validating session");
@@ -90,21 +91,21 @@ call! {
 impl<R, C> AuthenticationGuardInner<R, C>
 where
     R: RepositoryComponentContract + Send + Sync,
-    C: AuthCacheContract + Send + Sync,
+    C: CacheComponentContract + Send + Sync,
 {
     /// Attempts to get a session from the cache. If it doesn't exist, checks the database for an unexpired session.
     /// Then if the session is found and permanent, caches it. If it's not permanent, refreshes it for 30 minutes.
     /// If it can't find a session returns an `Unauthenticated` error.
     async fn get_valid_session(&self, session_id: &str, csrf: &str) -> Result<Session, Error> {
         // Check cache
-        match self.cache.get_session_by_id(session_id) {
+        match self.cache.get_session_by_id(session_id).await {
             Ok(session) => {
                 if session.csrf != csrf {
                     return Err(Error::new(AuthenticationError::InvalidCsrfHeader));
                 }
 
                 if !session.is_permanent() {
-                    self.cache.refresh_session(session_id)?;
+                    self.cache.refresh_session(session_id).await?;
                 }
 
                 Ok(session)
@@ -115,7 +116,7 @@ where
                 if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
                     debug!("Found valid session with id {session_id}");
                     // Cache
-                    self.cache.cache_session(session_id, &session)?;
+                    self.cache.cache_session(session_id, &session).await?;
                     debug!("Refreshing session {}", session.id);
                     if !session.is_permanent() {
                         self.repository.refresh_session(&session.id, csrf).await?;
@@ -150,7 +151,10 @@ where
 }
 
 impl<D, Conn, Session>
-    AuthenticationGuardInner<RepositoryComponent<D, Conn, Session>, AuthCache<D, Conn>>
+    AuthenticationGuardInner<
+        RepositoryComponent<D, Conn, Session>,
+        CacheComponent<Redis, RedisConnection, RedisAdapter>,
+    >
 where
     D: Connect<Connection = Conn> + Send + Sync,
     Session: SessionRepository<Conn> + Send + Sync,
@@ -158,7 +162,7 @@ where
     pub fn new(repository_driver: Arc<D>, rd: Arc<Redis>, role: Role) -> Self {
         todo!()
         /* Self {
-            cache: AuthCache { driver: rd },
+            cache: CacheComponent { driver: rd },
             repository: RepositoryComponent::new(repository_driver),
             auth_level: role,
         } */
@@ -166,7 +170,10 @@ where
 }
 
 impl<D, Conn, Session>
-    AuthenticationGuard<RepositoryComponent<D, Conn, Session>, AuthCache<D, Conn>>
+    AuthenticationGuard<
+        RepositoryComponent<D, Conn, Session>,
+        CacheComponent<Redis, RedisConnection, RedisAdapter>,
+    >
 where
     D: Connect<Connection = Conn> + Send + Sync,
     Session: SessionRepository<Conn> + Send + Sync,

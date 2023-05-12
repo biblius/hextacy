@@ -1,11 +1,11 @@
 use crate::{
     db::{
-        adapters::AdapterError,
         models::{
             role::Role,
             user::{SortOptions, User},
         },
         repository::user::UserRepository,
+        RepoAdapterError,
     },
     services::oauth::OAuthProvider,
 };
@@ -24,7 +24,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         email: &str,
         username: &str,
         password: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         let user = NewUser::from_initial(email, username, password);
         let _id = db
@@ -49,7 +49,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         email: &str,
         username: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
 
         let mut user = NewUser {
@@ -76,7 +76,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         Ok(user)
     }
 
-    async fn get_by_id(conn: &mut ClientSession, id: &str) -> Result<User, AdapterError> {
+    async fn get_by_id(conn: &mut ClientSession, id: &str) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         let user = db
             .collection("users")
@@ -91,7 +91,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         conn: &mut ClientSession,
         id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
 
         let provider_id = match provider {
@@ -108,19 +108,19 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         Ok(user)
     }
 
-    async fn get_by_email(conn: &mut ClientSession, email: &str) -> Result<User, AdapterError> {
+    async fn get_by_email(conn: &mut ClientSession, email: &str) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         db.collection("users")
             .find_one(doc! {"email": email}, None)
             .await?
-            .ok_or_else(|| AdapterError::DoesNotExist)
+            .ok_or_else(|| RepoAdapterError::DoesNotExist)
     }
 
     async fn update_password(
         conn: &mut ClientSession,
         id: &str,
         password: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
 
         let _id = db
@@ -147,7 +147,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         conn: &mut ClientSession,
         id: &str,
         secret: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         let _id = db
             .collection::<User>("users")
@@ -172,7 +172,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
     async fn update_email_verified_at(
         conn: &mut ClientSession,
         id: &str,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         let _id = db
             .collection::<User>("users")
@@ -199,7 +199,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         id: &str,
         oauth_id: &str,
         provider: OAuthProvider,
-    ) -> Result<User, AdapterError> {
+    ) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
 
         let provider_id = match provider {
@@ -227,7 +227,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         Ok(user)
     }
 
-    async fn freeze(conn: &mut ClientSession, id: &str) -> Result<User, AdapterError> {
+    async fn freeze(conn: &mut ClientSession, id: &str) -> Result<User, RepoAdapterError> {
         let db = conn.client().database("xtc");
         let _id = db
             .collection::<User>("users")
@@ -254,7 +254,7 @@ impl UserRepository<ClientSession> for MgUserAdapter {
         _page: u16,
         _per_page: u16,
         _sort_by: Option<SortOptions>,
-    ) -> Result<Vec<User>, AdapterError> {
+    ) -> Result<Vec<User>, RepoAdapterError> {
         let _db = conn.client().database("xtc");
         todo!()
     }

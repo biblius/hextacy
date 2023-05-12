@@ -6,21 +6,31 @@ use super::{
     },
     service::Authentication,
 };
-use crate::db::models::role::Role;
 use crate::{
     api::middleware::auth::{
         adapter::{Cache as MwCache, Repo as MwRepo},
         interceptor,
     },
-    api::router::auth::adapters::{cache::Cache, email::Email, repository::RepositoryComponent},
+    api::router::auth::adapters::{
+        cache::AuthenticationCache, email::Email, repository::RepositoryComponent,
+    },
     config::AppState,
     db::adapters::postgres::seaorm::{
         oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter,
     },
 };
+use crate::{cache::adapters::redis::RedisAdapter, db::models::role::Role};
 use actix_web::web::{self, Data};
-use hextacy::{drivers::db::postgres::seaorm::PostgresSea, route};
+use hextacy::{
+    drivers::{
+        cache::redis::{Redis, RedisConnection},
+        db::postgres::seaorm::PostgresSea,
+    },
+    route,
+};
 use sea_orm::DatabaseConnection;
+
+type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
 
 type RepoComponent = RepositoryComponent<
     PostgresSea,
@@ -41,9 +51,7 @@ pub(crate) fn routes(
 ) {
     let service = Authentication {
         repository: RepoComponent::new(pg_sea.clone()),
-        cache: Cache {
-            driver: redis.clone(),
-        },
+        cache: CacheComponent::new(redis.clone()),
         email: Email {
             driver: smtp.clone(),
         },
@@ -58,7 +66,7 @@ pub(crate) fn routes(
     cfg.app_data(Data::new(service));
 
     route!(
-        Authentication<RepoComponent, Cache, Email>, cfg,
+        Authentication<RepoComponent, CacheComponent, Email>, cfg,
 
         post => "/auth/login" => login;
 

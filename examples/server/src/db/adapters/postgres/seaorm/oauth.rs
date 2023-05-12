@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 use crate::services::oauth::OAuthProvider;
 use crate::{
-    db::{adapters::AdapterError, models::oauth::OAuthMeta, repository::oauth::OAuthRepository},
+    db::{models::oauth::OAuthMeta, repository::oauth::OAuthRepository, RepoAdapterError},
     services::oauth::TokenResponse,
 };
 use async_trait::async_trait;
@@ -20,7 +20,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
         account_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse + Send + Sync,
     {
@@ -28,7 +28,10 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
     }
 
     /// Get an entry by it's DB ID
-    async fn get_by_id(conn: &mut DatabaseConnection, id: &str) -> Result<OAuthMeta, AdapterError> {
+    async fn get_by_id(
+        conn: &mut DatabaseConnection,
+        id: &str,
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -36,7 +39,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
     async fn get_by_account_id(
         conn: &mut DatabaseConnection,
         account_id: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -44,7 +47,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
     async fn get_by_user_id(
         conn: &mut DatabaseConnection,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         todo!()
     }
 
@@ -53,7 +56,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
         conn: &mut DatabaseConnection,
         user_id: &str,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -61,7 +64,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
     async fn revoke(
         conn: &mut DatabaseConnection,
         access_token: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -69,7 +72,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
     async fn revoke_all(
         conn: &mut DatabaseConnection,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         todo!()
     }
 
@@ -80,7 +83,7 @@ impl OAuthRepository<DatabaseConnection> for PgOAuthAdapter {
         user_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse,
     {
@@ -97,7 +100,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
         account_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse + Send + Sync,
     {
@@ -108,7 +111,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
     async fn get_by_id(
         conn: &mut DatabaseTransaction,
         id: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -116,7 +119,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
     async fn get_by_account_id(
         conn: &mut DatabaseTransaction,
         account_id: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -124,7 +127,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
     async fn get_by_user_id(
         conn: &mut DatabaseTransaction,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         todo!()
     }
 
@@ -133,7 +136,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
         conn: &mut DatabaseTransaction,
         user_id: &str,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -141,7 +144,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
     async fn revoke(
         conn: &mut DatabaseTransaction,
         access_token: &str,
-    ) -> Result<OAuthMeta, AdapterError> {
+    ) -> Result<OAuthMeta, RepoAdapterError> {
         todo!()
     }
 
@@ -149,7 +152,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
     async fn revoke_all(
         conn: &mut DatabaseTransaction,
         user_id: &str,
-    ) -> Result<Vec<OAuthMeta>, AdapterError> {
+    ) -> Result<Vec<OAuthMeta>, RepoAdapterError> {
         todo!()
     }
 
@@ -160,7 +163,7 @@ impl OAuthRepository<DatabaseTransaction> for PgOAuthAdapter {
         user_id: &str,
         tokens: &T,
         provider: OAuthProvider,
-    ) -> Result<OAuthMeta, AdapterError>
+    ) -> Result<OAuthMeta, RepoAdapterError>
     where
         T: TokenResponse,
     {

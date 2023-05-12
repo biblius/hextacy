@@ -1,5 +1,6 @@
 use super::super::adapters::{
-    cache::CacheContract, repository::RepositoryComponentContract as RepositoryContract,
+    cache::AuthenticationCacheContract,
+    repository::RepositoryComponentContract as RepositoryContract,
 };
 use super::super::data::OAuthCodeExchange;
 use crate::{
@@ -27,7 +28,7 @@ use tracing::info;
 pub(super) struct OAuthService<R, C>
 where
     R: RepositoryContract,
-    C: CacheContract,
+    C: AuthenticationCacheContract,
 {
     pub repository: R,
     pub cache: C,
@@ -37,7 +38,7 @@ where
 impl<R, C> OAuthService<R, C>
 where
     R: RepositoryContract + Send + Sync,
-    C: CacheContract + Send + Sync,
+    C: AuthenticationCacheContract + Send + Sync,
 {
     /// Process the code received in the authorization step and log the user in or auto
     /// register them, based on whether they already exist. Establishes a session.
@@ -130,7 +131,7 @@ where
         // cached sessions so we have to cache the current one to reflect the change
         session.oauth_token = Some(access_token.to_string());
 
-        self.cache.set_session(&session.id, &session)?;
+        self.cache.set_session(&session.id, &session).await?;
 
         Ok(MessageResponse::new("lol")
             .to_response(StatusCode::OK)
@@ -162,7 +163,7 @@ where
         let session_cookie = crate::helpers::cookie::create(COOKIE_S_ID, &session.id, false)?;
 
         // Cache the session
-        self.cache.set_session(&session.id, &session)?;
+        self.cache.set_session(&session.id, &session).await?;
 
         info!("Successfully created session for {}", user.username);
 
@@ -182,7 +183,7 @@ where
 impl<R, C> ServiceApi for OAuthService<R, C>
 where
     R: RepositoryContract + Send + Sync,
-    C: CacheContract + Send + Sync,
+    C: AuthenticationCacheContract + Send + Sync,
 {
     async fn login<T: OAuth + Send + Sync>(
         &self,

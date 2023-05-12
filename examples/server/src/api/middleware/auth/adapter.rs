@@ -1,23 +1,31 @@
+use std::marker::PhantomData;
+
+use crate::cache::adapters::redis::RedisAdapter;
+use crate::cache::contracts::AuthCacheAccess;
+use crate::cache::AuthID;
 use crate::db::adapters::postgres::seaorm::session::PgSessionAdapter;
 use crate::db::{models::session, repository::session::SessionRepository};
-use crate::{
-    config::{cache::AuthCache as AuthCacheID, constants::SESSION_CACHE_DURATION},
-    error::Error,
-};
+use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
 use async_trait::async_trait;
 use chrono::Utc;
 use hextacy::adapt;
 use hextacy::contract;
-use hextacy::drivers::cache::redis::{redis::Commands, Redis, RedisConnection};
+use hextacy::drivers::cache::redis::redis::Commands;
+use hextacy::drivers::cache::redis::{Redis, RedisConnection};
+use hextacy::drivers::db::postgres::{seaorm::DatabaseConnection, seaorm::PostgresSea};
 use hextacy::drivers::{Connect, Driver};
-use hextacy::{
-    cache::CacheAccess,
-    cache::CacheError,
-    drivers::db::postgres::{seaorm::DatabaseConnection, seaorm::PostgresSea},
-};
-use std::sync::Arc;
 
+pub type Cache = CacheComponent<Redis, RedisConnection, RedisAdapter>;
 pub type Repo = RepositoryComponent<PostgresSea, DatabaseConnection, PgSessionAdapter>;
+
+impl Clone for Cache {
+    fn clone(&self) -> Self {
+        Self {
+            driver: self.driver.clone(),
+            ..*self
+        }
+    }
+}
 
 impl Clone for Repo {
     fn clone(&self) -> Self {
@@ -56,53 +64,52 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AuthCache<D, Connection>
+#[derive(Debug)]
+pub struct CacheComponent<D, Connection, Cache>
 where
-    D: Connect<Connection = Connection> + CacheAccess<Connection>,
+    D: Connect<Connection = Connection>,
+    Cache: AuthCacheAccess<Connection>,
 {
     pub driver: Driver<D, Connection>,
+    cache: PhantomData<Cache>,
 }
 
-/* #[async_trait]
-impl CacheAccess<Conn> for AuthCache {
-    fn domain() -> &'static str {
-        "auth"
-    }
-
-    async fn connection(&self) -> Result<RedisConnection, CacheError> {
-        self.driver.connect().await.map_err(|e| e.into())
-    }
-} */
-
-#[contract(super)]
-impl<D, Conn> AuthCache<D, Conn>
+#[contract]
+impl<D, Conn, Cache> CacheComponent<D, Conn, Cache>
 where
-    D: Connect<Connection = Conn> + CacheAccess<Conn>,
+    Conn: Send,
+    Cache: AuthCacheAccess<Conn> + Send + Sync,
+    D: Connect<Connection = Conn> + Send + Sync,
 {
-    fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
-        self.driver
-            .get_json(AuthCache::Session, id)
+    async fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_json(&mut conn, AuthID::Session, id)
+            .await
             .map_err(Error::new)
     }
 
-    fn cache_session(&self, id: &str, session: &session::Session) -> Result<(), Error> {
-        self.driver
-            .set_json(
-                AuthCache::Session,
-                id,
-                session,
-                Some(SESSION_CACHE_DURATION),
-            )
-            .map_err(Error::new)
+    async fn cache_session(&self, id: &str, session: &session::Session) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_json(
+            &mut conn,
+            AuthID::Session,
+            id,
+            session,
+            Some(SESSION_CACHE_DURATION),
+        )
+        .await
+        .map_err(Error::new)
     }
 
-    fn refresh_session(&self, session_id: &str) -> Result<(), Error> {
-        let mut conn = self.driver.connect()?;
-        conn.expire_at(
+    async fn refresh_session(&self, session_id: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::refresh(
+            &mut conn,
+            AuthID::Session,
             session_id,
-            ((Utc::now().timestamp() + SESSION_CACHE_DURATION as i64) % i64::MAX) as usize,
-        )?;
-        Ok(())
+            SESSION_CACHE_DURATION as i64,
+        )
+        .await
+        .map_err(Error::new)
     }
 }

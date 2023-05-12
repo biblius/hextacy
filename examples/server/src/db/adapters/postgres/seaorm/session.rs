@@ -1,8 +1,8 @@
 #![allow(unused_variables)]
 use crate::db::{
-    adapters::AdapterError,
     models::{session::Session, user::User},
     repository::session::SessionRepository,
+    RepoAdapterError,
 };
 use crate::services::oauth::OAuthProvider;
 use async_trait::async_trait;
@@ -24,22 +24,26 @@ where
         expires_after: Option<i64>,
         oauth_token: Option<&str>,
         provider: Option<OAuthProvider>,
-    ) -> Result<Session, AdapterError> {
+    ) -> Result<Session, RepoAdapterError> {
         todo!()
     }
 
     /// Get unexpired session corresponding to the CSRF token
-    async fn get_valid_by_id(conn: &mut C, id: &str, csrf: &str) -> Result<Session, AdapterError> {
+    async fn get_valid_by_id(
+        conn: &mut C,
+        id: &str,
+        csrf: &str,
+    ) -> Result<Session, RepoAdapterError> {
         todo!()
     }
 
     /// Update session's `expires_at` field
-    async fn refresh(conn: &mut C, id: &str, csrf: &str) -> Result<Session, AdapterError> {
+    async fn refresh(conn: &mut C, id: &str, csrf: &str) -> Result<Session, RepoAdapterError> {
         todo!()
     }
 
     /// Update session's `expires_at` field to now
-    async fn expire(conn: &mut C, id: &str) -> Result<Session, AdapterError> {
+    async fn expire(conn: &mut C, id: &str) -> Result<Session, RepoAdapterError> {
         todo!()
     }
 
@@ -48,7 +52,7 @@ where
         conn: &mut C,
         user_id: &str,
         skip: Option<&str>,
-    ) -> Result<Vec<Session>, AdapterError> {
+    ) -> Result<Vec<Session>, RepoAdapterError> {
         todo!()
     }
 
@@ -58,7 +62,7 @@ where
         access_token: &str,
         user_id: &str,
         provider: OAuthProvider,
-    ) -> Result<Vec<Session>, AdapterError> {
+    ) -> Result<Vec<Session>, RepoAdapterError> {
         todo!()
     }
 }

@@ -1,4 +1,4 @@
-use crate::config::cache::AuthCache;
+use crate::cache::{contracts::AuthCacheAccess, AuthID as CacheKey};
 use crate::config::constants::{
     EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, SESSION_CACHE_DURATION,
     WRONG_PASSWORD_CACHE_DURATION,
@@ -6,142 +6,239 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::cache::{CacheAccess, CacheError};
-use hextacy::contract;
-use hextacy::drivers::cache::redis::RedisConnection;
-use hextacy::drivers::cache::redis::{redis::Commands, Redis};
-use std::sync::Arc;
+use hextacy::drivers::Connect;
+use hextacy::{adapt, contract};
 
-pub(in crate::api::router::auth) struct Cache {
-    pub driver: Arc<Redis>,
-}
-
-impl CacheAccess for Cache {
-    fn domain() -> &'static str {
-        "auth"
-    }
-
-    fn connection(&self) -> Result<RedisConnection, CacheError> {
-        self.driver.connect().map_err(|e| e.into())
-    }
+adapt! {
+    AuthenticationCache,
+    use Driver for Connection as driver;
+    Cache: AuthCacheAccess<Connection>
 }
 
 #[contract(crate::api::router::auth)]
-impl Cache {
+impl<D, C, Cache> AuthenticationCache<D, C>
+where
+    C: Send,
+    D: Connect<Connection = C> + Send + Sync,
+    Cache: AuthCacheAccess<C> + Send + Sync,
+{
     /// Sessions get cached behind the user's csrf token.
-    fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
-        self.set_json(
-            AuthCache::Session,
+    async fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_json(
+            &mut conn,
+            CacheKey::Session,
             session_id,
             session,
             Some(SESSION_CACHE_DURATION),
         )
+        .await
         .map_err(Error::new)
     }
 
-    /// Sets a token as a key to the provided value in the cache
-    fn set_token(
+    async fn delete_session(&self, session_id: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::Session, session_id)
+            .await
+            .map_err(Error::new)
+    }
+
+    // Get
+
+    async fn get_registration_token(&self, token: &str) -> Result<String, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_string(&mut conn, CacheKey::RegToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn get_pw_token(&self, token: &str) -> Result<String, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_string(&mut conn, CacheKey::PWToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn get_otp_token(&self, token: &str) -> Result<String, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_string(&mut conn, CacheKey::OTPToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn get_otp_throttle(&self, token: &str) -> Result<i64, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_i64(&mut conn, CacheKey::OTPThrottle, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn get_otp_attempts(&self, token: &str) -> Result<i64, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_i64(&mut conn, CacheKey::OTPAttempts, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    // Delete
+
+    async fn delete_registration_token(&self, token: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::RegToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn delete_pw_token(&self, token: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::PWToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn delete_otp_token(&self, token: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::OTPToken, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    async fn delete_otp_attempts(&self, token: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::OTPAttempts, token)
+            .await
+            .map_err(Error::new)
+    }
+
+    // Set
+
+    async fn set_registration_token(
         &self,
-        cache_id: AuthCache,
         token: &str,
         value: &str,
         ex: Option<usize>,
     ) -> Result<(), Error> {
-        self.set(cache_id, token, value, ex).map_err(Error::new)
+        let mut conn = self.driver.connect().await?;
+        Cache::set_str(&mut conn, CacheKey::RegToken, token, value, ex)
+            .await
+            .map_err(Error::new)
     }
 
-    /// Gets a value from the cache stored under the token
-    fn get_token(&self, cache_id: AuthCache, token: &str) -> Result<String, Error> {
-        self.get(cache_id, token).map_err(Error::new)
+    async fn set_pw_token(&self, token: &str, value: &str, ex: Option<usize>) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_str(&mut conn, CacheKey::PWToken, token, value, ex)
+            .await
+            .map_err(Error::new)
     }
 
-    /// Deletes the value in the cache stored under the token
-    fn delete_token(&self, cache_id: AuthCache, token: &str) -> Result<(), Error> {
-        self.delete(cache_id, token).map_err(Error::new)
+    async fn set_otp_token(
+        &self,
+        token: &str,
+        value: &str,
+        ex: Option<usize>,
+    ) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_str(&mut conn, CacheKey::OTPToken, token, value, ex)
+            .await
+            .map_err(Error::new)
     }
 
     /// Caches the number of login attempts using the user ID as the key. If the attempts do not exist they
     /// will be created, otherwise they will be incremented.
-    fn cache_login_attempt(&self, user_id: &str) -> Result<u8, Error> {
-        let mut connection = self.driver.connect()?;
-        let key = Self::construct_key(AuthCache::LoginAttempts, user_id);
-        match connection.incr::<&str, u8, u8>(&key, 1) {
-            Ok(c) => Ok(c),
-            Err(_) => connection
-                .set_ex::<String, u8, u8>(key, 1, WRONG_PASSWORD_CACHE_DURATION)
-                .map_err(Error::new),
-        }
+    async fn cache_login_attempt(&self, user_id: &str) -> Result<i64, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_or_increment(
+            &mut conn,
+            CacheKey::LoginAttempts,
+            user_id,
+            1,
+            Some(WRONG_PASSWORD_CACHE_DURATION),
+        )
+        .await
+        .map_err(Error::new)
     }
 
     /// Removes the user's login attempts from the cache
-    fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
-        self.delete(AuthCache::LoginAttempts, user_id)
+    async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::delete(&mut conn, CacheKey::LoginAttempts, user_id)
+            .await
             .map_err(Error::new)
-    }
-
-    fn get_otp_throttle(&self, cache_id: AuthCache, user_id: &str) -> Result<i64, Error> {
-        self.get(cache_id, user_id).map_err(|e| e.into())
     }
 
     /// Cache the OTP throttle and attempts. The throttle always gets set to now and the attempts always get
     /// incremented. The domain should take care of the actual throttling.
-    fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
-        let mut connection = self.connection()?;
+    async fn cache_otp_throttle(&self, user_id: &str) -> Result<i64, Error> {
+        let mut conn = self.driver.connect().await?;
 
-        let throttle_key = Self::construct_key(AuthCache::OTPThrottle, user_id);
-        let attempt_key = Self::construct_key(AuthCache::OTPAttempts, user_id);
+        /*         let throttle_key = Self::construct_key(CacheKey::OTPThrottle, user_id);
+        let attempt_key = Self::construct_key(CacheKey::OTPAttempts, user_id); */
 
-        match connection.get::<&str, i64>(&attempt_key) {
+        let attempts = Cache::get_i64(&mut conn, CacheKey::OTPAttempts, user_id).await;
+
+        match attempts {
             Ok(attempts) => {
-                // Override the throttle key to now
-                connection
-                    .set_ex::<&str, i64, _>(
-                        &throttle_key,
-                        Utc::now().timestamp(),
-                        OTP_THROTTLE_DURATION,
-                    )
-                    .map_err(Error::new)?;
+                Cache::set_i64(
+                    &mut conn,
+                    CacheKey::OTPThrottle,
+                    user_id,
+                    Utc::now().timestamp(),
+                    Some(OTP_THROTTLE_DURATION),
+                )
+                .await?;
 
-                // Increment the number of failed attempts
-                connection
-                    .set_ex::<&str, i64, _>(&attempt_key, attempts + 1, OTP_THROTTLE_DURATION)
-                    .map_err(Error::new)?;
+                Cache::set_i64(
+                    &mut conn,
+                    CacheKey::OTPAttempts,
+                    user_id,
+                    attempts + 1,
+                    Some(OTP_THROTTLE_DURATION),
+                )
+                .await?;
+
                 Ok(attempts)
             }
             Err(_) => {
-                // No key has been found in which case we cache
-                connection
-                    .set_ex::<&str, i64, _>(
-                        &throttle_key,
-                        Utc::now().timestamp(),
-                        OTP_THROTTLE_DURATION,
-                    )
-                    .map_err(Error::new)?;
-                connection
-                    .set_ex::<&str, i64, _>(&attempt_key, 1, OTP_THROTTLE_DURATION)
-                    .map_err(Error::new)
+                Cache::set_i64(
+                    &mut conn,
+                    CacheKey::OTPThrottle,
+                    user_id,
+                    Utc::now().timestamp(),
+                    Some(OTP_THROTTLE_DURATION),
+                )
+                .await?;
+
+                Cache::set_i64(
+                    &mut conn,
+                    CacheKey::OTPAttempts,
+                    user_id,
+                    1,
+                    Some(OTP_THROTTLE_DURATION),
+                )
+                .await?;
+
+                Ok(1)
             }
         }
     }
 
-    fn delete_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
-        self.delete(AuthCache::OTPThrottle, user_id)?;
-        self.delete(AuthCache::OTPAttempts, user_id)?;
-        Ok(())
-    }
-
-    fn set_email_throttle(&self, user_id: &str) -> Result<(), Error> {
-        self.set(
-            AuthCache::EmailThrottle,
+    async fn set_email_throttle(&self, user_id: &str) -> Result<(), Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::set_i64(
+            &mut conn,
+            CacheKey::EmailThrottle,
             user_id,
             1,
             Some(EMAIL_THROTTLE_DURATION),
         )
-        .map_err(|e| e.into())
+        .await
+        .map_err(Error::new)
     }
 
-    fn get_email_throttle(&self, user_id: &str) -> Result<i64, Error> {
-        self.get(AuthCache::EmailThrottle, user_id)
-            .map_err(|e| e.into())
+    async fn get_email_throttle(&self, user_id: &str) -> Result<i64, Error> {
+        let mut conn = self.driver.connect().await?;
+        Cache::get_i64(&mut conn, CacheKey::EmailThrottle, user_id)
+            .await
+            .map_err(Error::new)
     }
 }

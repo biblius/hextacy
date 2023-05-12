@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use hextacy::drivers::cache::redis;
+use hextacy::drivers::cache::redis::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -17,11 +17,11 @@ pub enum Error {
     #[error("Database Error: {0}")]
     Database(#[from] hextacy::db::DatabaseError),
     #[error("Cache Error: {0}")]
-    Cache(#[from] hextacy::cache::CacheError),
+    Cache(#[from] crate::cache::CacheAdapterError),
     #[error("Adapter Error: {0}")]
-    Adapter(#[from] crate::db::adapters::AdapterError),
+    Adapter(#[from] crate::db::RepoAdapterError),
     #[error("Redis Error: {0}")]
-    Redis(#[from] redis::redis::RedisError),
+    Redis(#[from] redis::RedisError),
     #[error("Crypto Error: {0}")]
     Crypto(#[from] hextacy::crypto::CryptoError),
     #[error("Diesel Error: {0}")]
@@ -59,7 +59,7 @@ impl Error {
     pub fn message_and_description(&self) -> (&'static str, String) {
         match self {
             Self::Authentication(e) => e.describe(),
-            Self::Adapter(crate::db::adapters::AdapterError::DoesNotExist) => {
+            Self::Adapter(crate::db::RepoAdapterError::DoesNotExist) => {
                 ("NOT_FOUND", "Resource does not exist".to_string())
             }
             Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),

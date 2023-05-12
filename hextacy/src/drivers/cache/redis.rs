@@ -1,18 +1,16 @@
-use std::fmt::{Debug, Display};
-
-use async_trait::async_trait;
-pub use redis;
-use serde::{de::DeserializeOwned, Serialize};
-
 use crate::{
-    cache::{CacheAccess, CacheAccessJson, CacheError},
+    cache::CacheError,
     drivers::{Connect, DriverError},
 };
+use async_trait::async_trait;
 use deadpool_redis::{Config, Connection, Pool, Runtime};
-use r2d2::PooledConnection;
 use redis::{AsyncCommands, ConnectionInfo, FromRedisValue, IntoConnectionInfo, ToRedisArgs};
+use serde::{de::DeserializeOwned, Serialize};
+use std::fmt::Debug;
 
-pub type RedisConnection = PooledConnection<redis::Client>;
+pub use redis;
+
+pub type RedisConnection = Connection;
 
 /// Contains a redis connection pool. An instance of this should be shared through the app with arcs.
 #[derive(Clone)]
@@ -60,66 +58,77 @@ fn connection_info(
 impl Connect for Redis {
     type Connection = Connection;
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        match self.pool.get().await {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::RedisConnection(e.to_string())),
-        }
+        self.pool.get().await.map_err(DriverError::RedisConnection)
     }
 }
 
 #[async_trait]
-impl<K, V> CacheAccess<Connection, K, V> for Redis
-where
-    K: ToRedisArgs + Send + Sync,
-    V: ToRedisArgs + FromRedisValue + Send + Sync,
-{
-    async fn get(&self, key: &K) -> Result<V, CacheError> {
-        let mut conn = self.connect().await?;
-        let result = conn.get::<&K, V>(key).await?;
-        drop(conn);
+pub trait RedisAdapterExt {
+    async fn get<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, CacheError>
+    where
+        K: ToRedisArgs + Send + Sync,
+        V: FromRedisValue + Send + Sync,
+    {
+        let result = conn.get::<K, V>(key).await?;
         Ok(result)
     }
 
-    async fn set(&self, key: &K, val: &V, ex: Option<usize>) -> Result<(), CacheError> {
-        let mut conn = self.connect().await?;
+    async fn set<K, V>(
+        conn: &mut RedisConnection,
+        key: K,
+        val: V,
+        ex: Option<usize>,
+    ) -> Result<(), CacheError>
+    where
+        K: ToRedisArgs + Send + Sync,
+        V: ToRedisArgs + Send + Sync,
+    {
         if let Some(ex) = ex {
-            conn.set_ex::<&K, &V, ()>(key, val, ex)
+            conn.set_ex::<K, V, ()>(key, val, ex)
                 .await
-                .map_err(Into::into)
+                .map_err(CacheError::Redis)
         } else {
-            conn.set::<&K, &V, ()>(key, val).await.map_err(Into::into)
+            conn.set::<K, V, ()>(key, val)
+                .await
+                .map_err(CacheError::Redis)
         }
     }
 
-    async fn delete(&self, key: &K) -> Result<(), CacheError> {
-        let mut conn = self.connect().await?;
-        conn.del::<&K, ()>(key).await.map_err(Into::into)
-    }
-}
-
-#[async_trait]
-impl<K, V> CacheAccessJson<Connection, K, V> for Redis
-where
-    K: ToRedisArgs + Send + Sync,
-    V: Serialize + DeserializeOwned + Send + Sync,
-{
-    async fn get_json(&self, key: &K) -> Result<V, CacheError> {
-        let mut conn = self.connect().await?;
-        let result = conn.get::<&K, String>(key).await?;
-        serde_json::from_str::<V>(&result).map_err(Into::into)
+    async fn delete<K>(conn: &mut RedisConnection, key: K) -> Result<(), CacheError>
+    where
+        K: ToRedisArgs + Send + Sync,
+    {
+        conn.del::<K, ()>(key).await.map_err(CacheError::Redis)
     }
 
-    async fn set_json(&self, key: &K, val: &V, ex: Option<usize>) -> Result<(), CacheError> {
-        let mut conn = self.connect().await?;
-        let value = serde_json::to_string(val)?;
+    async fn get_json<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, CacheError>
+    where
+        K: ToRedisArgs + Send + Sync,
+        V: DeserializeOwned,
+    {
+        let result = conn.get::<K, String>(key).await?;
+        serde_json::from_str::<V>(&result).map_err(CacheError::Serde)
+    }
+
+    async fn set_json<K, V>(
+        conn: &mut RedisConnection,
+        key: K,
+        val: V,
+        ex: Option<usize>,
+    ) -> Result<(), CacheError>
+    where
+        K: ToRedisArgs + Send + Sync,
+        V: Serialize + Send + Sync,
+    {
+        let value = serde_json::to_string(&val)?;
         if let Some(ex) = ex {
-            conn.set_ex::<&K, String, ()>(key, value, ex)
+            conn.set_ex::<K, String, ()>(key, value, ex)
                 .await
-                .map_err(Into::into)
+                .map_err(CacheError::Redis)
         } else {
-            conn.set::<&K, String, ()>(key, value)
+            conn.set::<K, String, ()>(key, value)
                 .await
-                .map_err(Into::into)
+                .map_err(CacheError::Redis)
         }
     }
 }
