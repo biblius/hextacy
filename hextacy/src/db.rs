@@ -22,8 +22,8 @@ pub trait Atomic: Sized {
 }
 
 #[macro_export]
-/// Generates a struct with the given name and visibility and derives [RepositoryAccess] for the given driver.
-/// Intended to be used for service components accessing the database.
+/// Generates a struct with the given name and visibility.
+/// Intended to be used for service components accessing the database or cache.
 ///
 /// ### Example
 ///
@@ -89,7 +89,7 @@ macro_rules! adapt {
                    $($id: $repository <$connection> + Send + Sync),*
                {
                   $(
-                      $( pub (in $field_vis) )? $field: hextacy::drivers::Driver<$driver, $conn_name>,
+                    $( pub (in $field_vis) )? $field: hextacy::drivers::Driver<$driver, $conn_name>,
                   )+
                    $($id: ::std::marker::PhantomData<$id>),*
                }

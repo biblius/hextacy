@@ -1,7 +1,7 @@
 pub mod constants;
 pub mod cors;
 
-use crate::api::router;
+use crate::app::router;
 use actix_web::web::ServiceConfig;
 use hextacy::drivers::{
     cache::redis::Redis,
@@ -51,12 +51,7 @@ impl AppState {
 }
 
 pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
-    router::auth::native::setup::routes(state, cfg);
-
-    router::auth::o_auth::setup::routes(state, cfg);
-    router::users::setup::routes(state.pg_diesel.clone(), state.redis.clone(), cfg);
-    router::health::route(cfg);
-    router::resources::setup::routes(cfg);
+    router::route(state, cfg);
 }
 
 async fn init_sea_pg() -> Arc<PostgresSea> {

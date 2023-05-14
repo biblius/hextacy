@@ -1,7 +1,6 @@
 use actix_web::cookie::{time::Duration, Cookie, CookieBuilder, SameSite};
 use serde::Serialize;
 
-// TODO: Move this out of infra and create cookie config
 const PATH: &str = "/";
 const HTTP_ONLY: bool = true;
 const SECURE: bool = true;

@@ -19,7 +19,7 @@ pub struct Driver<A, C>
 where
     A: Connect<Connection = C>,
 {
-    pub driver: Arc<A>,
+    pub inner: Arc<A>,
 }
 
 impl<A, C> Clone for Driver<A, C>
@@ -28,7 +28,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            driver: self.driver.clone(),
+            inner: self.inner.clone(),
         }
     }
 }
@@ -37,8 +37,8 @@ impl<A, C> Driver<A, C>
 where
     A: Connect<Connection = C>,
 {
-    pub fn new(driver: Arc<A>) -> Self {
-        Self { driver }
+    pub fn new(inner: Arc<A>) -> Self {
+        Self { inner }
     }
 }
 
@@ -58,7 +58,7 @@ where
     type Connection = C;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        self.driver.connect().await
+        self.inner.connect().await
     }
 }
 

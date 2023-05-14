@@ -34,7 +34,7 @@ impl AuthCacheAccess<RedisConnection> for RedisAdapter {
         ex: Option<usize>,
     ) -> Result<(), CacheAdapterError> {
         let key = Self::key(id, key);
-        <Self as RedisAdapterExt>::set(conn, key, value, ex)
+        Self::set(conn, key, value, ex)
             .await
             .map_err(CacheAdapterError::Cache)
     }
