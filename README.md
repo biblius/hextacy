@@ -179,7 +179,7 @@ pub trait Connect {
 }
 ```
 
-As you can see, the component's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds, but . This takes care of how we're connecting to the DB.
+As you can see, the component's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds. This takes care of how we're connecting to the DB.
 
 The `User` bound is simply a bound to a repository the service component will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
