@@ -25,8 +25,8 @@ fn auth_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
+    use super::handlers::auth::native::*;
     use super::setup::auth_service::*;
-    use crate::app::core::auth::native::handler::*;
     AuthenticationService::configure(state, cfg);
     route!(
         AuthenticationService, cfg,
@@ -49,8 +49,8 @@ fn oauth_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
+    use super::handlers::auth::o_auth::*;
     use super::setup::oauth_service::*;
-    use crate::app::core::auth::o_auth::handler::*;
     OAuthService::configure(state, cfg);
     route!(
         OAuthService, cfg,
@@ -64,8 +64,8 @@ fn user_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
+    use super::core::users::handler::*;
     use super::setup::user_service::*;
-    use crate::app::core::users::handler::*;
     UserService::configure(state, cfg);
     route!(
         UserService, cfg,

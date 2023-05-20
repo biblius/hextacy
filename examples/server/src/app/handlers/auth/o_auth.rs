@@ -1,6 +1,6 @@
-use super::{
-    super::data::{OAuthCodeExchange, OAuthCodeExchangePayload},
-    service::OAuthServiceContract,
+use crate::app::core::auth::{
+    data::{OAuthCodeExchange, OAuthCodeExchangePayload},
+    o_auth::OAuthServiceContract,
 };
 use crate::{
     error::Error,

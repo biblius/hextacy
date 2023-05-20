@@ -1,636 +1,525 @@
-pub mod handler;
-pub mod service;
+use super::adapters::{
+    cache::AuthenticationCacheContract, email::EmailContract,
+    repository::AuthenticationRepositoryContract,
+};
+use super::data::{
+    ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify,
+    FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
+    ResendRegToken, ResetPassword, TwoFactorAuthResponse,
+};
+use crate::config::constants::{
+    COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, SESSION_DURATION,
+};
+use crate::db::{
+    models::{session::Session, user::User},
+    RepoAdapterError,
+};
+use crate::{
+    app::core::auth::data::AuthenticationSuccessResponse,
+    error::{AuthenticationError, Error},
+};
+use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
+use data_encoding::{BASE32, BASE64URL};
+use hextacy::{
+    contract,
+    crypto::{
+        self,
+        hmac::{generate_hmac, verify_hmac},
+        {bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
+    },
+    web::http::response::{MessageResponse, Response},
+};
+use reqwest::{
+    header::{self, HeaderName, HeaderValue},
+    StatusCode,
+};
+use tracing::{debug, info};
 
-#[cfg(test)]
-mod tests {
-    use std::time::{SystemTime, UNIX_EPOCH};
+pub struct Authentication<R, C, E> {
+    pub repository: R,
+    pub cache: C,
+    pub email: E,
+}
 
-    use super::super::data::{
-        ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify, Otp,
-        RegistrationData, ResendRegToken, ResetPassword,
-    };
-    use super::service::Authentication;
-    use crate::app::core::auth::adapters::{
-        cache::MockAuthenticationCacheContract as MockCache, email::MockEmailContract,
-        repository::MockAuthenticationRepositoryContract as MockRepository,
-    };
-    use crate::app::core::auth::native::service::AuthenticationContract as ServiceContract;
-    use crate::app::core::auth::native::service::MockAuthenticationContract;
-    use crate::db::{
-        models::{session::Session, user::User},
-        RepoAdapterError,
-    };
-    use crate::{
-        app::core::auth::data::AuthenticationSuccessResponse,
-        error::{AuthenticationError, Error},
-    };
-    use actix_web::body::to_bytes;
-    use data_encoding::{BASE32, BASE64URL};
-    use derive_new::new;
-    use hextacy::{
-        crypto::{
-            hmac::generate_hmac,
-            {bcrypt_hash, uuid},
-        },
-        env,
-        web::http::response::Response,
-    };
-    use lazy_static::lazy_static;
-    use reqwest::StatusCode;
-    use serde::{Deserialize, Serialize};
+/// As we are showcasing an HTTP server, we'll directly put HttpResponse in the signatures.
+/// We could work around this by creating an API that returns enums for any functions that
+/// can return multiple responses (e.g. login could return an enum idnicating the status).
+/// Since HttpResponse erases the type, it is much simpler to return it, but if we wanted to decouple
+/// the service from the handler, the enums would be a way to do it in cases where multiple responses
+/// are available.
+#[contract]
+impl<R, C, E> Authentication<R, C, E>
+where
+    R: AuthenticationRepositoryContract + Send + Sync,
+    C: AuthenticationCacheContract + Send + Sync,
+    E: EmailContract + Send + Sync,
+{
+    /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`
+    /// flag is true the session established will be permanent (applies for `verify_otp` as well).
+    async fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
+        let Credentials {
+            ref email,
+            ref password,
+            remember,
+        } = credentials;
 
-    /// Mock this one here so we don't clog the code with unnecessary implementations
-    #[derive(Debug, Serialize, Deserialize, new)]
-    struct TwoFactorAuthResponse {
-        pub username: String,
-        pub token: String,
-        pub remember: bool,
-    }
+        info!("Verifying credentials for {email}");
 
-    lazy_static! {
-        static ref CREDENTIALS: Credentials = Credentials {
-            email: "test@lo.com".to_string(),
-            password: "123".to_string(),
-            remember: false,
+        let user = match self.repository.get_user_by_email(email).await {
+            Ok(u) => u,
+            Err(_) => return Err(AuthenticationError::InvalidCredentials.into()),
         };
-        static ref REGISTRATION: RegistrationData = RegistrationData {
-            email: "test@lo.com".to_string(),
-            password: "123".to_string(),
-            username: "bibli".to_string(),
-        };
-        static ref USER_NO_OTP: User = User::__mock(
-            uuid(),
-            "bibli@khan.com",
-            "bibli",
-            Some(bcrypt_hash("123").unwrap()),
-            false,
-            true,
-            false
-        );
-        static ref USER_OTP: User = User::__mock(
-            uuid(),
-            "bibli@khan.com",
-            "bibli",
-            Some(bcrypt_hash("123").unwrap()),
-            true,
-            true,
-            false
-        );
-        static ref SESSION: Session = Session::__mock(uuid(), &USER_OTP, uuid(), true);
-    }
 
-    #[tokio::test]
-    async fn registration() {
-        /*
-         * Good to go
-         */
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let mut email = MockEmailContract::new();
-        // The service will first attempt to find an existing user
-        repository
-            .expect_get_user_by_email()
-            .return_once_st(move |_| Err(RepoAdapterError::DoesNotExist.into()));
-        // Then create one
-        repository
-            .expect_create_user()
-            .return_once(move |_, _, _| Ok(USER_NO_OTP.clone()));
-        // Cache their registration token
-        cache
-            .expect_set_registration_token()
-            .return_once_st(move |_, _| Ok(()));
-        // And send it via email
-        email
-            .expect_send_registration_token()
-            .return_once_st(move |_, _, _| Ok(()));
-        let auth_service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        auth_service
-            .start_registration(REGISTRATION.clone())
-            .await
-            .unwrap();
+        if user.frozen {
+            return Err(AuthenticationError::AccountFrozen.into());
+        }
 
-        /*
-         * Already exists
-         */
-        let mut repository = MockRepository::new();
-        let cache = MockCache::new();
-        let email = MockEmailContract::new();
-        repository
-            .expect_get_user_by_email()
-            .return_once_st(move |_| Ok(USER_NO_OTP.clone()));
-        let auth_service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        auth_service
-            .start_registration(REGISTRATION.clone())
-            .await
-            .unwrap();
-    }
+        if user.email_verified_at.is_none() {
+            return Err(AuthenticationError::EmailUnverified.into());
+        }
 
-    #[tokio::test]
-    async fn verify_registration_token() {
-        /*
-         * Good to go
-         */
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        cache
-            .expect_get_registration_token()
-            .return_once(|_| Ok(USER_NO_OTP.id.clone()));
-        repository
-            .expect_update_user_email_verification()
-            .return_once(|_| Ok(USER_NO_OTP.clone()));
-        cache
-            .expect_delete_registration_token()
-            .return_once(|_| Ok(()));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = EmailToken {
-            token: generate_hmac(
-                "supersecret".as_bytes(),
-                USER_NO_OTP.id.as_bytes(),
-                BASE64URL,
+        if user.password.is_none() {
+            return Err(AuthenticationError::InvalidCredentials.into());
+        }
+
+        // Check the password and cache the attempt if it was wrong
+        if !bcrypt_verify(password, user.password.as_ref().unwrap())? {
+            let attempts = self.cache.cache_login_attempt(&user.id).await?;
+
+            if attempts <= MAXIMUM_LOGIN_ATTEMPTS as i64 {
+                return Err(AuthenticationError::InvalidCredentials.into());
+            }
+
+            // Freeze the account if attempts exceed the threshold and send a password reset token
+            self.repository.freeze_user(&user.id).await?;
+
+            let token = token(BASE64URL, 160);
+
+            self.email
+                .send_freeze_account(&user.username, &user.email, &token)?;
+
+            self.cache.set_pw_token(&token, &user.id).await?;
+
+            return Ok(FreezeAccountResponse::new(
+                &user.email,
+                "Your account has been frozen due to too many invalid login attempts",
             )
-            .unwrap(),
-        };
-        service.verify_registration_token(data).await.unwrap();
-        /*
-         * Invalid reg token
-         */
-        let repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        cache
-            .expect_get_registration_token()
-            .return_once(|_| Err(Error::None));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = EmailToken {
-            token: "12345".to_string(),
-        };
-        let res = service.verify_registration_token(data).await;
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::InvalidToken("Registration"))
-            )),
-        };
+            .to_response(StatusCode::LOCKED)
+            .finish());
+        }
+
+        // If the user has 2FA turned on, stop here and cache the user ID so we can quickly verify their otp
+        if user.otp_secret.is_some() {
+            let token = token(BASE64URL, 80);
+
+            debug!("User {} requires 2FA, caching token {}", user.id, token);
+
+            self.cache.set_otp_token(&token, &user.id).await?;
+
+            return Ok(TwoFactorAuthResponse::new(&user.username, &token, remember)
+                .to_response(StatusCode::OK)
+                .finish());
+        }
+
+        self.establish_session(user, remember).await
     }
 
-    #[tokio::test]
-    async fn resend_reg_token() {
-        env::set("REG_TOKEN_SECRET", "supersecret");
-        /*
-         * Good to go
-         */
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let mut email = MockEmailContract::new();
-        let mut user = USER_NO_OTP.clone();
-        user.email_verified_at = None;
-        // Find the user
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Ok(user));
-        // See if they have an email throttle
-        cache
-            .expect_get_email_throttle()
-            .return_once(|_| Err(Error::None));
-        // Set the reg token
-        cache
-            .expect_set_registration_token()
-            .return_once(|_, _| Ok(()));
-        // Send it
-        email
-            .expect_send_registration_token()
-            .return_once(|_, _, _| Ok(()));
-        // And set the email throttle
-        cache.expect_set_email_throttle().return_once(|_| Ok(()));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
+    /// Verifies the given OTP using the token generated on the credentials login. Throttles by 2*attempts seconds on each failed attempt.
+    async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
+        let Otp {
+            ref password,
+            ref token,
+            remember,
+        } = otp;
+
+        let user_id = match self.cache.get_otp_token(token).await {
+            Ok(id) => id,
+            Err(_) => return Err(AuthenticationError::InvalidToken("OTP").into()),
         };
-        let data = ResendRegToken {
-            email: USER_NO_OTP.email.clone(),
+
+        info!("Verifying OTP for {user_id}");
+
+        let user = self.repository.get_user_by_id(&user_id).await?;
+
+        let Some(ref secret) = user.otp_secret else {
+            return Err(AuthenticationError::InvalidOTP.into());
         };
-        service.resend_registration_token(data).await.unwrap();
-        /*
-         * Already verified
-         */
-        let mut repository = MockRepository::new();
-        let cache = MockCache::new();
-        let email = MockEmailContract::new();
-        // Find the verified user
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Ok(USER_NO_OTP.clone()));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ResendRegToken {
-            email: USER_NO_OTP.email.clone(),
-        };
-        service.resend_registration_token(data).await.unwrap();
+
+        // Check if there's an active throttle
+        let attempts = self.cache.get_otp_attempts(&user.id).await.ok();
+
+        // Check whether it's ok to attempt to verify it
+        if let Some(attempts) = attempts {
+            let throttle = self.cache.get_otp_throttle(&user.id).await?;
+            let now = chrono::Utc::now().timestamp();
+            if now - throttle <= OTP_THROTTLE_INCREMENT * attempts {
+                return Err(AuthenticationError::AuthBlocked.into());
+            }
+        }
+        let result = crypto::otp::verify_otp(password, secret)?;
+
+        // If it's wrong increment the throttle and error
+        if !result {
+            self.cache.cache_otp_throttle(&user.id).await?;
+            return Err(AuthenticationError::InvalidOTP.into());
+        }
+
+        self.cache.delete_otp_token(token).await?;
+
+        if attempts.is_some() {
+            self.cache.delete_otp_attempts(token).await?;
+        }
+
+        self.establish_session(user, remember).await
     }
 
-    #[tokio::test]
-    async fn credentials_no_otp() {
-        let mut service = MockAuthenticationContract::new();
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        // Find user without OTP secret
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Ok(USER_NO_OTP.clone()));
-        // Create session
-        repository
-            .expect_create_session()
-            .return_once(move |_, _, _, _, _| Ok(SESSION.clone()));
-        // Delete login attempts
-        cache.expect_delete_login_attempts().return_once(|_| Ok(()));
-        // Set the session
-        cache.expect_set_session().return_once(|_, _| Ok(()));
-        // Respond with session
-        service
-            .expect_establish_session()
-            .return_once_st(move |_, _| {
-                Ok(AuthenticationSuccessResponse::new(USER_NO_OTP.clone())
-                    .to_response(StatusCode::OK)
-                    .finish())
-            });
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        auth.login(CREDENTIALS.clone()).await.unwrap();
-    }
+    /// Stores the initial data in the users table and sends an email to the user with the registration token.
+    async fn start_registration(&self, data: RegistrationData) -> Result<HttpResponse, Error> {
+        let RegistrationData {
+            ref email,
+            ref username,
+            ref password,
+        } = data;
 
-    #[tokio::test]
-    async fn credentials_and_otp() {
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        // Expect the user to exist
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Ok(USER_OTP.clone()));
-        // Expect to cache an OTP token
-        cache.expect_set_otp_token().return_once(move |_, _| Ok(()));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
+        // If the user does not exist we need to prevent erroring so as to not share
+        // which emails exist in the db
+        let response = || {
+            MessageResponse::new("Successfully sent registration token.")
+                .to_response(StatusCode::OK)
+                .finish()
         };
-        // Verify the creds and grab the token from the response
-        let res = auth.login(CREDENTIALS.clone()).await.unwrap();
-        let body = to_bytes(res.into_body()).await.unwrap();
-        let token =
-            serde_json::from_str::<TwoFactorAuthResponse>(std::str::from_utf8(&body).unwrap())
-                .unwrap()
-                .token;
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
 
-        // Get the OTP token
-        cache
-            .expect_get_otp_token()
-            .returning(move |_| Ok(USER_OTP.id.clone()));
-        // Try to get the OTP throttle
-        cache
-            .expect_get_otp_attempts()
-            .return_once(move |_| Err(Error::None));
-        // Get the user's ID stored behind the token
-        repository
-            .expect_get_user_by_id()
-            .returning(move |_| Ok(USER_OTP.clone()));
-        // Delete the OTP token
-        cache.expect_delete_otp_token().return_once(move |_| Ok(()));
-        // Create a session
-        repository
-            .expect_create_session()
-            .returning(move |_, _, _, _, _| Ok(SESSION.clone()));
-        // Delete login attempts
-        cache.expect_delete_login_attempts().return_once(|_| Ok(()));
-        // Cache the session since it has the permanent flag enabled
-        cache.expect_set_session().return_once(move |_, _| Ok(()));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        // Grab current time slice and calculate the OTP
-        let time_step_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs()
-            / 30;
-        let sec = USER_OTP.otp_secret.clone();
-        let otp = thotp::otp(
-            &BASE32.decode(sec.unwrap().as_bytes()).unwrap(),
-            time_step_now,
+        info!("Starting registration for {}", email);
+
+        let user = self.repository.get_user_by_email(email).await;
+
+        match user {
+            Ok(_) => return Ok(response()),
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => {}
+            Err(e) => return Err(e),
+        }
+
+        let hashed = bcrypt_hash(password)?;
+
+        let user = self
+            .repository
+            .create_user(email, username, &hashed)
+            .await?;
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        let token = generate_hmac(secret.as_bytes(), user.id.as_bytes(), BASE64URL)?;
+
+        self.cache.set_registration_token(&token, &user.id).await?;
+
+        self.email
+            .send_registration_token(&token, &user.username, email)?;
+
+        Ok(RegistrationStartResponse::new(
+            "Successfully sent registration token",
+            &user.username,
+            &user.email,
         )
-        .unwrap();
-        let data = Otp {
-            password: otp,
-            token,
-            remember: true,
-        };
-        auth.verify_otp(data).await.unwrap();
+        .to_response(StatusCode::CREATED)
+        .finish())
     }
 
-    #[tokio::test]
-    async fn invalid_credentails() {
-        /*
-         * Invalid email
-         */
-        let mut repository = MockRepository::new();
-        let cache = MockCache::new();
-        let email = MockEmailContract::new();
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Err(RepoAdapterError::DoesNotExist.into()));
-        let invalid_email = Credentials {
-            email: "doesnt@exist.ever".to_string(),
-            password: "not good".to_string(),
-            remember: false,
+    /// Verifies the registration token sent via email upon registration.
+    async fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error> {
+        let token = &data.token;
+
+        let user_id = match self.cache.get_registration_token(token).await {
+            Ok(id) => id,
+            Err(_) => return Err(AuthenticationError::InvalidToken("Registration").into()),
         };
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let res = service.login(invalid_email).await;
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::InvalidCredentials)
-            )),
+
+        info!("Verfiying registration token for {user_id}");
+
+        // Verify the token with the hashed user ID, error if they mismatch
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        if !verify_hmac(
+            secret.as_bytes(),
+            user_id.as_bytes(),
+            token.as_bytes(),
+            BASE64URL,
+        )? {
+            return Err(AuthenticationError::InvalidToken("Registration").into());
         }
-        /*
-         * Invalid password
-         */
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        // Try to find a valid user with an invalid password
-        repository
-            .expect_get_user_by_email()
-            .return_once(move |_| Ok(USER_NO_OTP.clone()));
-        cache.expect_cache_login_attempt().returning(|_| Ok(1));
-        let invalid_password = Credentials {
-            email: USER_NO_OTP.email.clone(),
-            password: "not good".to_string(),
-            remember: false,
+
+        self.repository
+            .update_user_email_verification(&user_id)
+            .await?;
+
+        self.cache.delete_registration_token(token).await?;
+
+        Ok(
+            MessageResponse::new("Successfully verified registration token. Good job.")
+                .to_response(StatusCode::OK)
+                .finish(),
+        )
+    }
+
+    /// Resends a registration token to the user if they are not already verified
+    async fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
+        let email = data.email.as_str();
+        info!("Resending registration token to {email}");
+
+        let response = || {
+            MessageResponse::new(
+                "An email will be sent with further instructions if it exists in the database.",
+            )
+            .to_response(StatusCode::OK)
+            .finish()
         };
-        let service = Authentication {
-            repository,
-            cache,
-            email,
+
+        let user = match self.repository.get_user_by_email(email).await {
+            Ok(u) => u,
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
+            Err(e) => return Err(e),
         };
-        let res = service.login(invalid_password).await;
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::InvalidCredentials)
-            )),
+
+        if user.email_verified_at.is_some() {
+            return Ok(response());
         }
-    }
 
-    #[tokio::test]
-    async fn change_password() {
-        let mut service = MockAuthenticationContract::new();
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let mut email = MockEmailContract::new();
-        // Update pw
-        repository
-            .expect_update_user_password()
-            .return_once(move |_, _| Ok(USER_NO_OTP.clone()));
-        // Purge sessions
-        service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        repository
-            .expect_purge_sessions()
-            .return_once(|_, _| Ok(vec![SESSION.clone()]));
-        // Delete all the cached sessions
-        cache.expect_delete_session().return_once(|_| Ok(()));
-        // Set the reset pw token
-        cache.expect_set_pw_token().return_once(|_, _| Ok(()));
-        // Alert the user
-        email
-            .expect_alert_password_change()
-            .return_once(|_, _, _| Ok(()));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ChangePassword {
-            password: "12345678".to_string(),
-        };
-        auth.change_password(SESSION.clone(), data).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn reset_password() {
-        /*
-         * Valid token
-         */
-        let mut service = MockAuthenticationContract::new();
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let mut email = MockEmailContract::new();
-        // Expect to have a reset token
-        cache
-            .expect_get_pw_token()
-            .return_once(|_| Ok(USER_NO_OTP.id.clone()));
-        // Delete the cached token
-        cache.expect_delete_pw_token().returning(|_| Ok(()));
-        // Update the password to something random
-        repository
-            .expect_update_user_password()
-            .return_once(|_, _| Ok(USER_NO_OTP.clone()));
-        // And send it to the user
-        email
-            .expect_send_reset_password()
-            .return_once(|_, _, _| Ok(()));
-        // Purge all their sessions
-        service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        repository
-            .expect_purge_sessions()
-            .return_once(|_, _| Ok(vec![SESSION.clone()]));
-        // Delete the cached sessions
-        cache.expect_delete_session().returning(|_| Ok(()));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ResetPassword {
-            token: "12345".to_string(),
-        };
-        auth.reset_password(data).await.unwrap();
-        /*
-         * No token
-         */
-        let repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        cache
-            .expect_get_pw_token()
-            .return_once(|_| Err(Error::None));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ResetPassword {
-            token: "12345".to_string(),
-        };
-        let res = auth.reset_password(data).await;
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::InvalidToken("Password"))
-            )),
-        };
-    }
-
-    #[tokio::test]
-    async fn forgot_password() {
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let mut email = MockEmailContract::new();
-        // Get the user
-        repository
-            .expect_get_user_by_email()
-            .return_once(|_| Ok(USER_NO_OTP.clone()));
-        // Check email throttle
-        cache
-            .expect_get_email_throttle()
-            .return_once(|_| Err(Error::None));
-        // Send email
-        email
-            .expect_send_forgot_password()
-            .return_once(|_, _, _| Ok(()));
-        // Set a pw change token
-        cache.expect_set_pw_token().returning(|_, _| Ok(()));
-        // Set email throttle
-        cache.expect_set_email_throttle().returning(|_| Ok(()));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ForgotPassword {
-            email: USER_NO_OTP.email.clone(),
-        };
-        service.forgot_password(data).await.unwrap();
-        /*
-         * Invalid email
-         */
-        let mut repository = MockRepository::new();
-        let cache = MockCache::new();
-        let email = MockEmailContract::new();
-        repository
-            .expect_get_user_by_email()
-            .return_once(|_| Err(RepoAdapterError::DoesNotExist.into()));
-        let service = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ForgotPassword {
-            email: USER_NO_OTP.email.clone(),
-        };
-        let _msg = String::from("User");
-        service.forgot_password(data).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn verify_forgot_password() {
-        let mut service = MockAuthenticationContract::new();
-        let mut repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        // Get the user from the verify token
-        cache
-            .expect_get_pw_token()
-            .return_once(|_| Ok(USER_NO_OTP.id.clone()));
-        // Delete it
-        cache.expect_delete_pw_token().return_once(|_| Ok(()));
-        // Update the user pw
-        repository
-            .expect_update_user_password()
-            .return_once(|_, _| Ok(USER_NO_OTP.clone()));
-        // Purge all sessions
-        service.expect_purge_sessions().return_once(|_, _| Ok(()));
-        repository
-            .expect_purge_sessions()
-            .return_once(|_, _| Ok(vec![]));
-        // Establish a new one
-        repository
-            .expect_create_session()
-            .return_once(|_, _, _, _, _| Ok(SESSION.clone()));
-        cache.expect_delete_login_attempts().return_once(|_| Ok(()));
-        cache.expect_set_session().return_once(|_, _| Ok(()));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ForgotPasswordVerify {
-            password: "12345678".to_string(),
-            token: "12345".to_string(),
-        };
-        auth.verify_forgot_password(data).await.unwrap();
-        /*
-         * Wrong token
-         */
-        let repository = MockRepository::new();
-        let mut cache = MockCache::new();
-        let email = MockEmailContract::new();
-        cache
-            .expect_get_pw_token()
-            .return_once(|_| Err(Error::None));
-        let auth = Authentication {
-            repository,
-            cache,
-            email,
-        };
-        let data = ForgotPasswordVerify {
-            password: "12345678".to_string(),
-            token: "12345".to_string(),
-        };
-        let res = auth.verify_forgot_password(data).await;
-        match res {
-            Ok(_) => panic!("Not good"),
-            Err(e) => assert!(matches!(
-                e,
-                Error::Authentication(AuthenticationError::InvalidToken("Password"))
-            )),
+        if self.cache.get_email_throttle(&user.id).await.ok().is_some() {
+            return Err(AuthenticationError::AuthBlocked.into());
         }
+
+        let token = token(BASE64URL, 160);
+
+        self.cache.set_registration_token(&token, &user.id).await?;
+
+        self.email
+            .send_registration_token(&token, &user.username, &user.email)?;
+
+        self.cache.set_email_throttle(&user.id).await?;
+
+        Ok(response())
+    }
+
+    /// Generates an OTP secret for the user and returns it in a QR code in the response. Requires a valid
+    /// session beforehand.
+    async fn set_otp_secret(&self, session: Session) -> Result<HttpResponse, Error> {
+        let Session { ref user_id, .. } = session;
+
+        let secret = crypto::otp::generate_secret();
+
+        let user = self
+            .repository
+            .update_user_otp_secret(user_id, &secret)
+            .await?;
+
+        let qr = crypto::otp::generate_totp_qr_code(&secret, &user.email)?;
+
+        info!("Successfully set OTP secret for {}", user.id);
+
+        Ok(HttpResponseBuilder::new(StatusCode::OK)
+            .append_header((
+                header::CONTENT_TYPE,
+                header::HeaderValue::from_static("image/svg+xml"),
+            ))
+            .body(BoxBody::new(qr)))
+    }
+
+    /// Updates the user's password. Purges all sessions and sends an email with a reset token.
+    async fn change_password(
+        &self,
+        session: Session,
+        data: ChangePassword,
+    ) -> Result<HttpResponse, Error> {
+        let password = data.password.as_str();
+
+        let hashed = bcrypt_hash(password)?;
+
+        let user = self
+            .repository
+            .update_user_password(&session.user_id, &hashed)
+            .await?;
+
+        self.purge_sessions(&user.id, None).await?;
+
+        let token = token(BASE64URL, 128);
+
+        self.cache.set_pw_token(&token, &user.id).await?;
+
+        self.email
+            .alert_password_change(&user.username, &user.email, &token)?;
+
+        info!("Successfully changed password for {}", session.user_id);
+
+        Ok(MessageResponse::new("Successfully changed password. All sessions have been purged, please log in again to continue.")
+        .to_response(StatusCode::OK)
+        .finish())
+    }
+
+    /// Verify the forgot pw email token and update the user's password
+    async fn verify_forgot_password(
+        &self,
+        data: ForgotPasswordVerify,
+    ) -> Result<HttpResponse, Error> {
+        info!("Verifying forgot password");
+
+        let ForgotPasswordVerify {
+            ref password,
+            ref token,
+        } = data;
+
+        let user_id = match self.cache.get_pw_token(token).await {
+            Ok(id) => id,
+            Err(_) => return Err(AuthenticationError::InvalidToken("Password").into()),
+        };
+
+        self.cache.delete_pw_token(token).await?;
+
+        let hashed = bcrypt_hash(password)?;
+
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hashed)
+            .await?;
+
+        self.purge_sessions(&user.id, None).await?;
+
+        self.establish_session(user, false).await
+    }
+
+    /// Updates a user's password to a random string and sends it to them in the email
+    async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error> {
+        let pw_token = data.token.as_str();
+
+        // Check if there's a reset PW token in the cache
+        let user_id = match self.cache.get_pw_token(pw_token).await {
+            Ok(id) => id,
+            Err(_) => return Err(Error::new(AuthenticationError::InvalidToken("Password"))),
+        };
+
+        info!("Resetting password for {user_id}");
+
+        self.cache.delete_pw_token(pw_token).await?;
+
+        // Create a temporary password
+        let (temp_pw, hash) = pw_and_hash()?;
+        let user = self
+            .repository
+            .update_user_password(&user_id, &hash)
+            .await?;
+
+        self.email
+            .send_reset_password(&user.username, &user.email, &temp_pw)?;
+
+        self.purge_sessions(&user.id, None).await?;
+
+        Ok(
+            MessageResponse::new("Successfully reset password. Incoming email.")
+                .to_response(StatusCode::OK)
+                .finish(),
+        )
+    }
+
+    /// Resets the user's password and sends an email with a temporary one. Guarded by a half min throttle.
+    async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
+        info!("{} forgot password, sending email", data.email);
+
+        let email = data.email.as_str();
+
+        // If the user does not exist we need to prevent erroring so as to not share
+        // which emails exist in the db
+        let response = || {
+            MessageResponse::new(
+                "An email will be sent with further instructions if it exists in the database.",
+            )
+            .to_response(StatusCode::OK)
+            .finish()
+        };
+
+        let user = match self.repository.get_user_by_email(email).await {
+            Ok(u) => u,
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
+            Err(e) => return Err(e),
+        };
+
+        // Check throttle
+        if self.cache.get_email_throttle(&user.id).await.ok().is_some() {
+            return Err(AuthenticationError::AuthBlocked.into());
+        }
+
+        // Send and cache the temp password, throttle
+        let token = token(BASE32, 20);
+
+        self.email
+            .send_forgot_password(&user.username, email, &token)?;
+
+        self.cache.set_pw_token(&token, &user.id).await?;
+
+        self.cache.set_email_throttle(&user.id).await?;
+
+        Ok(response())
+    }
+
+    /// Deletes the user's current session and if purge is true expires all their sessions
+    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
+        info!("Logging out {}", session.username);
+
+        if data.purge {
+            self.purge_sessions(&session.user_id, None).await?;
+        } else {
+            let session = self.repository.expire_session(&session.id).await?;
+            self.cache.delete_session(&session.id).await?;
+        }
+
+        // Expire the cookie
+        let cookie = crate::helpers::cookie::create(COOKIE_S_ID, &session.id, true)?;
+
+        Ok(MessageResponse::new("Successfully logged out, bye!")
+            .to_response(StatusCode::OK)
+            .with_cookies(vec![cookie])
+            .finish())
+    }
+
+    /// Expires all sessions in the database and deletes all corresponding cached sessions
+    async fn purge_sessions<'a>(&self, user_id: &str, skip: Option<&'a str>) -> Result<(), Error> {
+        let sessions = self.repository.purge_sessions(user_id, skip).await?;
+        for s in sessions {
+            self.cache.delete_session(&s.id).await.ok();
+        }
+        Ok(())
+    }
+
+    /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
+    async fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
+        let csrf_token = uuid();
+
+        let session = self
+            .repository
+            .create_session(
+                &user,
+                &csrf_token,
+                { !remember }.then_some(SESSION_DURATION),
+                None,
+                None,
+            )
+            .await?;
+
+        let session_cookie = crate::helpers::cookie::create(COOKIE_S_ID, &session.id, false)?;
+
+        // Delete login attempts on success
+        match self.cache.delete_login_attempts(&user.id).await {
+            Ok(_) => debug!("Deleted cached login attempts for {}", user.id),
+            Err(_) => debug!("No login attempts found for user {}, proceeding", user.id),
+        };
+
+        // Cache the session
+        self.cache.set_session(&session.id, &session).await?;
+
+        info!("Successfully created session for {}", user.username);
+
+        // Respond with the x-csrf header and the session ID
+        Ok(AuthenticationSuccessResponse::new(user)
+            .to_response(StatusCode::OK)
+            .with_cookies(vec![session_cookie])
+            .with_headers(vec![(
+                HeaderName::from_static("x-csrf-token"),
+                HeaderValue::from_str(&csrf_token)?,
+            )])
+            .finish())
     }
 }

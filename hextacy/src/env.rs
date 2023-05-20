@@ -1,5 +1,4 @@
 use std::env::{self, VarError};
-use thiserror::Error;
 
 /// Gets an environment variable for the given key
 pub fn get(key: &str) -> Result<String, VarError> {
@@ -17,7 +16,7 @@ pub fn get_or_default(key: &str, default: &str) -> String {
 }
 
 /// Retrieves a vec of values for the given keys set in the env, in the order
-/// of the input vec. Panics if the requested variables are not set.
+/// of the input vec. Panics if any of the requested variables are not set.
 pub fn get_multiple(keys: &[&str]) -> Vec<String> {
     let mut results = vec![];
     for key in keys {
@@ -47,14 +46,6 @@ pub fn get_or_default_multiple(keys: &[(&str, &str)]) -> Vec<String> {
 }
 
 /// Reads a file and sets all of its declared variables in the shell environment
-pub fn load_from_file(path: &str) -> Result<(), ConfigError> {
-    dotenv::from_path(path).map_err(ConfigError::DotEnv)
-}
-
-#[derive(Debug, Error)]
-pub enum ConfigError {
-    #[error("IO Error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Error while loading .env: {0}")]
-    DotEnv(#[from] dotenv::Error),
+pub fn load_from_file(path: &str) -> Result<(), dotenv::Error> {
+    dotenv::from_path(path)
 }

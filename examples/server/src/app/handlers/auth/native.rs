@@ -1,11 +1,11 @@
-use super::super::data::{
+use crate::app::core::auth::data::{
     ChangePassword, ChangePasswordPayload, Credentials, CredentialsPayload, EmailToken,
     EmailTokenPayload, ForgotPassword, ForgotPasswordPayload, ForgotPasswordVerify,
     ForgotPasswordVerifyPayload, Logout, Otp, OtpPayload, RegistrationData,
     RegistrationDataPayload, ResendRegToken, ResendRegTokenPayload, ResetPassword,
     ResetPasswordPayload,
 };
-use super::service::AuthenticationContract;
+use crate::app::core::auth::native::AuthenticationContract;
 use crate::error::Error;
 use crate::helpers::request::extract_session;
 use actix_web::{web, HttpRequest, Responder};

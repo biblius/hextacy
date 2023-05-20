@@ -28,13 +28,12 @@ pub(super) mod auth_middleware {
 }
 
 pub(super) mod auth_service {
-
     use super::*;
     use crate::app::core::auth::{
         adapters::{
             cache::AuthenticationCache, email::Email, repository::AuthenticationRepository,
         },
-        native::service::Authentication,
+        native::Authentication,
     };
 
     pub type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
@@ -67,7 +66,7 @@ pub(super) mod oauth_service {
     use super::*;
     use crate::app::core::auth::{
         adapters::{cache::AuthenticationCache, repository::AuthenticationRepository},
-        o_auth::service::OAuthService as Service,
+        o_auth::OAuthService as Service,
     };
 
     pub type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
@@ -93,7 +92,6 @@ pub(super) mod oauth_service {
 }
 
 pub(super) mod user_service {
-
     use super::*;
     use crate::app::core::users::{adapters::Repository, service::UserService as Service};
 
