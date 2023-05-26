@@ -93,7 +93,7 @@ pub(super) mod oauth_service {
 
 pub(super) mod user_service {
     use super::*;
-    use crate::app::core::users::{adapters::Repository, service::UserService as Service};
+    use crate::app::core::users::{adapters::Repository, domain::UserService as Service};
 
     pub type RepoComponent = Repository<PostgresDiesel, DieselConnection, DieselUserAdapter>;
 

@@ -199,7 +199,7 @@ where
             Err(e) => return Err(e),
         }
 
-        let hashed = bcrypt_hash(password)?;
+        let hashed = bcrypt_hash(password, 10)?;
 
         let user = self
             .repository
@@ -328,7 +328,7 @@ where
     ) -> Result<HttpResponse, Error> {
         let password = data.password.as_str();
 
-        let hashed = bcrypt_hash(password)?;
+        let hashed = bcrypt_hash(password, 10)?;
 
         let user = self
             .repository
@@ -370,7 +370,7 @@ where
 
         self.cache.delete_pw_token(token).await?;
 
-        let hashed = bcrypt_hash(password)?;
+        let hashed = bcrypt_hash(password, 10)?;
 
         let user = self
             .repository
@@ -397,7 +397,7 @@ where
         self.cache.delete_pw_token(pw_token).await?;
 
         // Create a temporary password
-        let (temp_pw, hash) = pw_and_hash()?;
+        let (temp_pw, hash) = pw_and_hash(64, 10)?;
         let user = self
             .repository
             .update_user_password(&user_id, &hash)
@@ -486,7 +486,7 @@ where
 
     /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
     async fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
-        let csrf_token = uuid();
+        let csrf_token = uuid().to_string();
 
         let session = self
             .repository

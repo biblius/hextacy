@@ -11,6 +11,8 @@ impl RedisAdapterExt for RedisAdapter {}
 
 impl Cacher for RedisAdapter {}
 
+// Some return values are not properly set here, but for the case of example
+// it is sufficient just to demonstrate how an adapter should look like
 #[async_trait]
 impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
     async fn set_str(
@@ -23,7 +25,8 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         let key = Self::key(id, key);
         <Self as RedisAdapterExt>::set(conn, key, value, ex)
             .await
-            .map_err(CacheAdapterError::Cache)
+            .map_err(CacheAdapterError::Cache)?;
+        Ok(())
     }
 
     async fn set_i64(
@@ -36,7 +39,8 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         let key = Self::key(id, key);
         Self::set(conn, key, value, ex)
             .await
-            .map_err(CacheAdapterError::Cache)
+            .map_err(CacheAdapterError::Cache)?;
+        Ok(())
     }
 
     async fn get_string(

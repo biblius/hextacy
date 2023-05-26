@@ -143,7 +143,7 @@ where
         tokens: TR,
         user: User,
     ) -> Result<HttpResponse, Error> {
-        let csrf_token = uuid();
+        let csrf_token = uuid().to_string();
 
         let expiration = tokens.expires_in();
         let access_token = tokens.access_token();

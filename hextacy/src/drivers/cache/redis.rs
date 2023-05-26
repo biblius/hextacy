@@ -12,7 +12,7 @@ pub use redis;
 
 pub type RedisConnection = Connection;
 
-/// Contains a redis connection pool. An instance of this should be shared through the app with arcs.
+/// Contains a redis deadpool instance. Should be shared through the app with arcs.
 #[derive(Clone)]
 pub struct Redis {
     pool: Pool,
@@ -62,6 +62,7 @@ impl Connect for Redis {
     }
 }
 
+/// Utility trait for adapters that use Redis. Provides a basic set of functionality out of the box.
 #[async_trait]
 pub trait RedisAdapterExt {
     async fn get<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, CacheError>
@@ -73,22 +74,26 @@ pub trait RedisAdapterExt {
         Ok(result)
     }
 
+    /// Returns a simple string reply according to Redis' SET[EX] command.
+    /// The underlying Redis library still uses the SETEX command which is deprecated
+    /// so the return value could be changed to an `Option<String>` to reflect the lib
+    /// if/when it updates.
     async fn set<K, V>(
         conn: &mut RedisConnection,
         key: K,
         val: V,
         ex: Option<usize>,
-    ) -> Result<(), CacheError>
+    ) -> Result<String, CacheError>
     where
         K: ToRedisArgs + Send + Sync,
         V: ToRedisArgs + Send + Sync,
     {
         if let Some(ex) = ex {
-            conn.set_ex::<K, V, ()>(key, val, ex)
+            conn.set_ex::<K, V, String>(key, val, ex)
                 .await
                 .map_err(CacheError::Redis)
         } else {
-            conn.set::<K, V, ()>(key, val)
+            conn.set::<K, V, String>(key, val)
                 .await
                 .map_err(CacheError::Redis)
         }

@@ -1,4 +1,6 @@
+use actix_web::body::BoxBody;
 use actix_web::cookie::Cookie;
+use actix_web::Responder;
 use actix_web::{
     http::{
         header::{HeaderName, HeaderValue},
@@ -67,7 +69,7 @@ where
     }
 }
 
-/// Holds a single message. Implements the Response trait.
+/// Holds a single message. Implements the Response trait as well as actix' Responder.
 #[derive(Debug, Serialize)]
 pub struct MessageResponse<'a> {
     message: &'a str,
@@ -79,4 +81,12 @@ impl<'a> MessageResponse<'a> {
     }
 }
 
-impl<'a> Response<'a> for MessageResponse<'a> {}
+impl Response<'_> for MessageResponse<'_> {}
+
+impl Responder for MessageResponse<'_> {
+    type Body = BoxBody;
+
+    fn respond_to(self, _: &actix_web::HttpRequest) -> actix_web::HttpResponse<Self::Body> {
+        HttpResponseBuilder::new(StatusCode::OK).json(self)
+    }
+}

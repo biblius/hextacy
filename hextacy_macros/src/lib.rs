@@ -5,7 +5,7 @@ use syn::{spanned::Spanned, Ident, ItemImpl, TypePath};
 
 #[proc_macro_attribute]
 #[proc_macro_error]
-/// When deriving on an impl block for a struct, this will instead create a trait whose name
+/// When annotating an impl block for a struct, this will instead create a trait whose name
 /// is the original struct name suffixed with `Contract` and implements it on the struct. The trait
 /// has the same signatures as the functions in the impl block.
 ///
@@ -29,7 +29,10 @@ pub fn contract(
                 Ident::new(&format!("{}Contract", struct_name), Span::call_site()),
             )
         }
-        _ => abort!(ast.span(), "component not supported for this type of impl"),
+        _ => abort!(
+            ast.self_ty.span(),
+            "contract not supported for this type of impl"
+        ),
     };
 
     let mut fn_defs = vec![];
@@ -39,7 +42,7 @@ pub fn contract(
         .iter()
         .map(|item| {
             let syn::ImplItem::Fn(func) = item else {
-                abort!(item.span(), "component not supported for this type of impl")
+                abort!(item.span(), "contract not supported for this type of impl")
             };
 
             let sig = &func.sig;
@@ -51,7 +54,7 @@ pub fn contract(
 
     let visibility: Option<proc_macro2::TokenStream> = (!attr.is_empty()).then(|| {
         let attr: proc_macro2::TokenStream = attr.into();
-        quote! {(in #attr)}
+        quote! { (in #attr) }
     });
 
     quote!(
