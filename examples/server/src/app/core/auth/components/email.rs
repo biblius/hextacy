@@ -1,7 +1,7 @@
 use crate::config::constants::EMAIL_DIRECTORY;
 use crate::error::Error;
 use hextacy::contract;
-use hextacy::drivers::email;
+use hextacy::driver::email;
 use std::sync::Arc;
 use tracing::debug;
 

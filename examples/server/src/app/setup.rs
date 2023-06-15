@@ -5,7 +5,7 @@ use crate::db::adapters::postgres::seaorm::{
 };
 use crate::AppState;
 use actix_web::web;
-use hextacy::drivers::{
+use hextacy::driver::{
     cache::redis::{Redis, RedisConnection},
     db::postgres::{
         diesel::{DieselConnection, PostgresDiesel},
@@ -30,7 +30,7 @@ pub(super) mod auth_middleware {
 pub(super) mod auth_service {
     use super::*;
     use crate::app::core::auth::{
-        adapters::{
+        components::{
             cache::AuthenticationCache, email::Email, repository::AuthenticationRepository,
         },
         native::Authentication,
@@ -65,7 +65,7 @@ pub(super) mod auth_service {
 pub(super) mod oauth_service {
     use super::*;
     use crate::app::core::auth::{
-        adapters::{cache::AuthenticationCache, repository::AuthenticationRepository},
+        components::{cache::AuthenticationCache, repository::AuthenticationRepository},
         o_auth::OAuthService as Service,
     };
 

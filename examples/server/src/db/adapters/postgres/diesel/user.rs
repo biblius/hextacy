@@ -8,7 +8,7 @@ use crate::db::{
 use crate::services::oauth::OAuthProvider;
 use async_trait::async_trait;
 use diesel::{AsChangeset, ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
-use hextacy::drivers::db::postgres::diesel::DieselConnection;
+use hextacy::driver::db::postgres::diesel::DieselConnection;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]

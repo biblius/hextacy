@@ -1,7 +1,7 @@
-use super::super::Connect;
+use super::super::Driver;
 use crate::{
     db::{Atomic, DatabaseError},
-    drivers::DriverError,
+    driver::DriverError,
 };
 use async_trait::async_trait;
 use mongodb::{
@@ -53,7 +53,7 @@ impl Mongo {
 }
 
 #[async_trait]
-impl Connect for Mongo {
+impl Driver for Mongo {
     type Connection = ClientSession;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

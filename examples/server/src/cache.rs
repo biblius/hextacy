@@ -1,7 +1,7 @@
 pub mod adapters;
 pub mod contracts;
 
-use hextacy::{cache::CacheError, drivers::cache::redis::redis};
+use hextacy::{cache::CacheError, driver::cache::redis::redis};
 use std::fmt::Display;
 use thiserror::Error;
 

@@ -5,7 +5,7 @@ use super::super::data::{
     RegistrationData, ResendRegToken, ResetPassword,
 };
 use super::super::native::Authentication;
-use crate::app::core::auth::adapters::{
+use crate::app::core::auth::components::{
     cache::MockAuthenticationCacheContract as MockCache, email::MockEmailContract,
     repository::MockAuthenticationRepositoryContract as MockRepository,
 };
@@ -54,24 +54,25 @@ lazy_static! {
         username: "bibli".to_string(),
     };
     static ref USER_NO_OTP: User = User::__mock(
-        uuid(),
+        uuid().to_string(),
         "bibli@khan.com",
         "bibli",
-        Some(bcrypt_hash("123").unwrap()),
+        Some(bcrypt_hash("123", 10).unwrap()),
         false,
         true,
         false
     );
     static ref USER_OTP: User = User::__mock(
-        uuid(),
+        uuid().to_string(),
         "bibli@khan.com",
         "bibli",
-        Some(bcrypt_hash("123").unwrap()),
+        Some(bcrypt_hash("123", 10).unwrap()),
         true,
         true,
         false
     );
-    static ref SESSION: Session = Session::__mock(uuid(), &USER_OTP, uuid(), true);
+    static ref SESSION: Session =
+        Session::__mock(uuid().to_string(), &USER_OTP, uuid().to_string(), true);
 }
 
 #[tokio::test]

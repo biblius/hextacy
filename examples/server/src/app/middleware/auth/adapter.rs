@@ -4,7 +4,7 @@ use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
 use hextacy::adapt;
 use hextacy::contract;
-use hextacy::drivers::Connect;
+use hextacy::driver::Driver;
 
 adapt! {
     AuthMwRepo,
@@ -16,7 +16,7 @@ adapt! {
 impl<D, Connection, Session> AuthMwRepo<D, Connection, Session>
 where
     Connection: Send,
-    D: Connect<Connection = Connection> + Send + Sync,
+    D: Driver<Connection = Connection> + Send + Sync,
     Session: SessionRepository<Connection> + Send + Sync,
 {
     async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
@@ -45,7 +45,7 @@ impl<D, Conn, Cache> AuthMwCache<D, Conn, Cache>
 where
     Conn: Send,
     Cache: SimpleCacheAccess<Conn> + Send + Sync,
-    D: Connect<Connection = Conn> + Send + Sync,
+    D: Driver<Connection = Conn> + Send + Sync,
 {
     async fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
@@ -82,7 +82,7 @@ where
 
 impl<D, C, S> Clone for AuthMwRepo<D, C, S>
 where
-    D: Connect<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync,
     S: SessionRepository<C> + Send + Sync,
 {
     fn clone(&self) -> Self {
@@ -95,7 +95,7 @@ where
 
 impl<D, C, Cache> Clone for AuthMwCache<D, C, Cache>
 where
-    D: Connect<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync,
     Cache: SimpleCacheAccess<C> + Send + Sync,
 {
     fn clone(&self) -> Self {

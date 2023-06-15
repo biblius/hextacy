@@ -1,4 +1,4 @@
-use super::adapters::{
+use super::components::{
     cache::AuthenticationCacheContract, email::EmailContract,
     repository::AuthenticationRepositoryContract,
 };

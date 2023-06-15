@@ -47,6 +47,7 @@ impl FromSql<Text, Pg> for AuthType {
 /// The repository session model
 #[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
 pub struct Session {
+    // Never use strings for UUIDs pls
     pub id: String,
     pub user_id: String,
     pub username: String,

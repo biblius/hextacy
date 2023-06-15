@@ -2,38 +2,37 @@ use super::contract::RepositoryContract;
 use crate::db::models::user;
 use crate::db::repository::user::UserRepository;
 use crate::error::Error;
-use hextacy::drivers::Connect;
-use hextacy::drivers::Driver;
+use hextacy::driver::Driver;
 use std::sync::Arc;
 
 pub struct Repository<A, C, User>
 where
-    A: Connect<Connection = C>,
+    A: Driver<Connection = C>,
     User: UserRepository<C>,
 {
-    driver: Driver<A, C>,
+    driver: Arc<A>,
     _user: std::marker::PhantomData<User>,
 }
 
 impl<A, C, User> Repository<A, C, User>
 where
-    A: Connect<Connection = C>,
+    A: Driver<Connection = C>,
     User: UserRepository<C>,
 {
     pub fn new(driver: Arc<A>) -> Self {
         Self {
-            driver: Driver::new(driver),
+            driver,
             _user: std::marker::PhantomData,
         }
     }
 }
 
 #[async_trait::async_trait]
-impl<Driver, Conn, User> RepositoryContract for Repository<Driver, Conn, User>
+impl<D, Conn, User> RepositoryContract for Repository<D, Conn, User>
 where
     Conn: Send,
     User: UserRepository<Conn> + Send + Sync,
-    Driver: Connect<Connection = Conn> + Send + Sync,
+    D: Driver<Connection = Conn> + Send + Sync,
 {
     async fn get_paginated(
         &self,

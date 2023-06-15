@@ -7,7 +7,7 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::drivers::Connect;
+use hextacy::driver::Driver;
 use hextacy::{adapt, contract};
 
 adapt! {
@@ -20,7 +20,7 @@ adapt! {
 impl<D, C, Cache> AuthenticationCache<D, C>
 where
     C: Send,
-    D: Connect<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync,
     Cache: SimpleCacheAccess<C> + Send + Sync,
 {
     /// Sessions get cached behind the user's csrf token.

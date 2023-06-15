@@ -3,7 +3,7 @@ pub mod cors;
 
 use crate::app::router;
 use actix_web::web::ServiceConfig;
-use hextacy::drivers::{
+use hextacy::driver::{
     cache::redis::Redis,
     db::{
         mongo::Mongo,

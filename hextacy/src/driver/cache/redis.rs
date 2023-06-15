@@ -1,6 +1,6 @@
 use crate::{
     cache::CacheError,
-    drivers::{Connect, DriverError},
+    driver::{Driver, DriverError},
 };
 use async_trait::async_trait;
 use deadpool_redis::{Config, Connection, Pool, Runtime};
@@ -55,7 +55,7 @@ fn connection_info(
 }
 
 #[async_trait]
-impl Connect for Redis {
+impl Driver for Redis {
     type Connection = Connection;
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
         self.pool.get().await.map_err(DriverError::RedisConnection)

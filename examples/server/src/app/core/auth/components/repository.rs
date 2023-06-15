@@ -7,12 +7,12 @@ use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
 use hextacy::db::Atomic;
-use hextacy::drivers::Connect;
+use hextacy::driver::Driver;
 use hextacy::{adapt, contract};
 use tracing::info;
 
 #[allow(unused_imports)]
-use hextacy::drivers::db::postgres::diesel::{DieselConnection, PostgresDiesel};
+use hextacy::driver::db::postgres::diesel::{DieselConnection, PostgresDiesel};
 
 adapt! {
     AuthenticationRepository,
@@ -28,7 +28,7 @@ adapt! {
 impl<D, C, User, Session, OAuth> AuthenticationRepository<D, C, User, Session, OAuth>
 where
     C: Atomic + Send,
-    D: Connect<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync,
     Session: SessionRepository<C> + Send + Sync,
     OAuth: OAuthRepository<C> + OAuthRepository<<C as Atomic>::TransactionResult> + Send + Sync,
     User: UserRepository<C> + UserRepository<<C as Atomic>::TransactionResult> + Send + Sync,
@@ -220,8 +220,8 @@ impl<Pg, Mg, Connection, MgConn, User, Session, OAuth> RepositoryApi
     for AuthenticationRepository<Pg, Mg, Connection, MgConn, User, Session, OAuth>
 where
     Self: RepositoryAccess<Connection> + RepositoryAccess<MgConn>,
-    Pg: Connect<Connection = Connection>,
-    Mg: Connect<Connection = MgConn>,
+    Pg: Driver<Connection = Connection>,
+    Mg: Driver<Connection = MgConn>,
     User: UserRepository<MgConn>,
     Session: SessionRepository<Connection>,
     OAuth: OAuthRepository<Connection>,
@@ -233,8 +233,8 @@ where
 impl<Pg, Mg, Connection, MgConn, User, Session, OAuth>
     Repository<Pg, Mg, Connection, MgConn, User, Session, OAuth>
 where
-    Pg: Connect<Connection = Connection>,
-    Mg: Connect<Connection = MgConn>,
+    Pg: Driver<Connection = Connection>,
+    Mg: Driver<Connection = MgConn>,
     User: UserRepository<MgConn>,
     Session: SessionRepository<Connection>,
     OAuth: OAuthRepository<Connection>,
@@ -254,7 +254,7 @@ where
 /* #[derive(Debug, hextacy::derive::Repository)]
 pub struct AuthenticationRepository<Pg, Connection, User, Session, OAuth>
 where
-    Pg: Connect<Connection = Connection>,
+    Pg: Driver<Connection = Connection>,
 {
     #[diesel(Connection)]
     postgres: hextacy::drivers::db::Driver<Pg, Connection>,

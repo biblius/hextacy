@@ -1,4 +1,4 @@
-use super::adapters::{
+use super::components::{
     cache::AuthenticationCacheContract, repository::AuthenticationRepositoryContract,
 };
 use super::data::OAuthCodeExchange;

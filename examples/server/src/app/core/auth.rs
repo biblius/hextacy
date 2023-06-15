@@ -1,4 +1,4 @@
-pub mod adapters;
+pub mod components;
 pub mod data;
 pub mod native;
 pub mod o_auth;

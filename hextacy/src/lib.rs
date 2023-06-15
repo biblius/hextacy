@@ -13,7 +13,7 @@ pub mod cache;
 pub mod db;
 
 /// Drivers for connecting to the database, cache and smtp.
-pub mod drivers;
+pub mod driver;
 
 /// Cryptographic utilities
 pub mod crypto;

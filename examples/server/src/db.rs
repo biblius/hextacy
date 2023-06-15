@@ -9,7 +9,7 @@ pub enum RepoAdapterError {
     #[error("Entry does not exist")]
     DoesNotExist,
     #[error("Driver: {0}")]
-    Driver(#[from] hextacy::drivers::DriverError),
+    Driver(#[from] hextacy::driver::DriverError),
     #[error("Diesel: {0}")]
     Diesel(diesel::result::Error),
     #[error("Mongo: {0}")]

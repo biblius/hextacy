@@ -84,12 +84,12 @@ macro_rules! adapt {
                pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::Connect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
                   $(
-                    $( pub (in $field_vis) )? $field: hextacy::drivers::Driver<$driver, $conn_name>,
+                    $( pub (in $field_vis) )? $field: ::std::sync::Arc<$driver>,
                   )+
                    $($id: ::std::marker::PhantomData<$id>),*
                }
@@ -98,14 +98,14 @@ macro_rules! adapt {
                impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
                where
                   $(
-                      $driver: hextacy::drivers::Connect<Connection = $conn_name> + Send + Sync,
+                      $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
                   )+
                    $($id: $repository <$connection> + Send + Sync),*
                {
                    pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
                        Self {
                           $(
-                              $field: hextacy::drivers::Driver::new($driver),
+                              $field: $driver,
                           )+
                            $($id: ::std::marker::PhantomData),*
                        }
@@ -117,7 +117,7 @@ macro_rules! adapt {
 #[derive(Debug, Error)]
 pub enum DatabaseError {
     #[error("Error while attempting to establish connection: {0}")]
-    Driver(#[from] super::drivers::DriverError),
+    Driver(#[from] super::driver::DriverError),
 
     #[cfg(any(feature = "db", feature = "full", feature = "postgres-diesel"))]
     #[error("Diesel Error: {0}")]

@@ -6,7 +6,7 @@ use crate::{
     db::{models::role::Role, repository::session::SessionRepository},
 };
 use adapter::*;
-use hextacy::drivers::Connect;
+use hextacy::driver::Driver;
 use interceptor::*;
 use std::{rc::Rc, sync::Arc};
 
@@ -16,8 +16,8 @@ impl<RepoDriver, CacheDriver, CacheConn, Cache, RepoConn, Session>
         AuthMwCache<CacheDriver, CacheConn, Cache>,
     >
 where
-    CacheDriver: Connect<Connection = CacheConn> + Send + Sync,
-    RepoDriver: Connect<Connection = RepoConn> + Send + Sync,
+    CacheDriver: Driver<Connection = CacheConn> + Send + Sync,
+    RepoDriver: Driver<Connection = RepoConn> + Send + Sync,
     Cache: SimpleCacheAccess<CacheConn> + Send + Sync,
     Session: SessionRepository<RepoConn> + Send + Sync,
 {
@@ -36,8 +36,8 @@ impl<RepoDriver, CacheDriver, CacheConn, Cache, RepoConn, Session>
         AuthMwCache<CacheDriver, CacheConn, Cache>,
     >
 where
-    CacheDriver: Connect<Connection = CacheConn> + Send + Sync,
-    RepoDriver: Connect<Connection = RepoConn> + Send + Sync,
+    CacheDriver: Driver<Connection = CacheConn> + Send + Sync,
+    RepoDriver: Driver<Connection = RepoConn> + Send + Sync,
     Cache: SimpleCacheAccess<CacheConn> + Send + Sync,
     Session: SessionRepository<RepoConn> + Send + Sync,
 {

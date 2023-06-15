@@ -8,21 +8,21 @@ The kind of project structure this repository uses is heavily based on [hexagona
 
 ## **Architecture**
 
-The following is the server architecture intended to be used with the various hextacy helpers, but in order to understand why it is built the way it is, you first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
+The following is the server architecture intended to be used with the various hextacy helpers, but in order to understand why it is built the way it is, we first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
 
 Backend servers usually, if not always, consists of data stores. _Repositories_ provide methods through which an application's _Adapters_ can interact with to get access to database _Models_.
 
 In this architecture, a repository contains no implementation details. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model. For this reason, repository methods must always take in a completely generic connection parameter which is made concrete in adapter implementations.
 
-When business level services need access to the database, they can obtain it by having a service adapter struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
+When business level services need access to the database, they can obtain it by having a service component struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
 
-In the service's definition, its adapter must be constrained by any repository traits the service requires. This will require that the service adapter also takes in generic connection parameters. Since the service should be oblivious to the repository implementation, this means that the driver this service adapter uses to establish database connections must also be generic, since the service cannot know in advance which adapter it will be using.
+In the service's definition, its components must be constrained by any repository traits the service requires. This will require that the service components also takes in generic connection parameters. Since the service should be oblivious to the repository implementation, this means that the driver this service component uses to establish database connections must also be generic, since the service cannot know in advance which adapter it will be using.
 
 The generic connection could be mitigated by moving the driver from the business level to the adapter level, but unfortunately we would then lose the ability perfom database transactions (without a nightmare API). The business level must retain its ability to perform atomic queries.
 
 So far, we have 2 generic parameters, the driver and the connection, and we have repositories, interfaces our service repositories can utilise to obtain data, so good!
 
-Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every service adapter we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
+Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every service component we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
 
 First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](./examples/server/src/) in the examples repo to see how everything is ultimately set up.
 
@@ -84,7 +84,7 @@ Notice that we have a `ServiceContract` bound in our handler. Services define th
       pub repository: R,
   }
 
-  #[hextacy::component]
+  #[hextacy::contract]
   impl<R> Service<R> where
       R: RepositoryComponentContract,
   {
@@ -104,37 +104,37 @@ Notice that we have a `ServiceContract` bound in our handler. Services define th
 
 The service has a single field that is completely generic, however in the impl block we bind it to the contract.
 
-The `#[component]` attribute macro will create a `ServiceContract` trait with signatures from the impl block and will implement the trait for the struct. This is done so that the api remains consistent because some components could potentially be swappable. Therefore, the macro should only be used when creating one-of components and is solely here to prevent writing the same items twice and to make the component easily mockable. When using multiple adapters that can be injected into the service, a proper trait should be written out.
+The `#[contract]` attribute macro will create a `ServiceContract` trait with signatures from the impl block and will implement the trait for the struct. This is done so that the api remains consistent because some components could potentially be swappable. Therefore, the macro should only be used when creating one-of components and is solely here to prevent writing the same items twice and to make the component easily mockable. When using multiple adapters that can be injected into the service, a proper trait should be written out.
 
-The contract provides an api that serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryContract`. This helps with the generic bounds in the upcoming adapter and makes testing the services a breeze!
+The contract provides an api that serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryContract`. This helps with the generic bounds in the upcoming component and makes testing the services a breeze!
 
-Now we have to define our adapter and is when we enter the esoteric realms of rust generics:
+Now we have to define our component and is when we enter the esoteric realms of rust generics:
 
-- **adapter.rs**
+- **components.rs**
 
   ```rust
-  use hextacy::drivers::db::{Driver, Connect};
+  use hextacy::drivers::db::{Driver, Driver};
   use std::{marker::PhantomData, sync::Arc};
 
   #[derive(Debug, Clone)]
   pub struct Repository<D, Conn, User>
   where
-      D: Connect<Connection = Conn>,
+      D: Driver<Connection = Conn>,
       User: UserRepository<Conn>,
   {
-      driver: Driver<D, Conn>,
+      driver: Arc<D>,
       user: PhantomData<User>,
   }
 
   // This one's for convenience
   impl<D, Conn, User> Repository<D, Conn, User>
   where
-      D: Connect<Connection = Conn>,
+      D: Driver<Connection = Conn>,
       User: UserRepository<Conn>
   {
       pub fn new(driver: Arc<A>) -> Self {
           Self {
-              driver: Driver::new(driver),
+              driver,
               user: PhantomData
           }
       }
@@ -143,7 +143,7 @@ Now we have to define our adapter and is when we enter the esoteric realms of ru
   #[hextacy::component]
   impl<D, Conn, User> RepositoryContract for Repository<D, Conn, User>
   where
-      D: Connect<Connection = Conn>,
+      D: Driver<Connection = Conn>,
       User: UserRepository<Conn>
   {
     async fn get_paginated(
@@ -160,26 +160,17 @@ Now we have to define our adapter and is when we enter the esoteric realms of ru
 
 That's a lot of stuff for just fetching users, so let's elaborate.
 
-`Connect` is a trait used by drivers to establish an actual connection. All concrete drivers implement it in their specific ways. It is also implemented by the `Driver` struct. A `Driver` is nothing more than a simple struct:
+`Driver` is a trait used by drivers to establish an actual connection. All concrete clients implement it in their specific ways.
 
 ```rust
-// The driver in combination with the Connect trait allows us to fully decouple
-// the business logic from the underlying data source implementations
-struct Driver<A, C>
-where
-    A: Connect<Connection = C>,
-{
-    pub inner: Arc<A>,
-}
-
 #[async_trait]
-pub trait Connect {
+pub trait Driver {
     type Connection;
     async fn connect(&self) -> Result<Self::Connection, DriverError>;
 }
 ```
 
-As you can see, the component's `D` parameter must implement `Connect` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds. This takes care of how we're connecting to the DB.
+As you can see, the component's `D` parameter must implement `Driver` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds. This takes care of how we're connecting to the DB.
 
 The `User` bound is simply a bound to a repository the service component will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
 
@@ -187,7 +178,7 @@ So far we haven't coupled any implementation details to the service, all the ser
 
 This fact is at the core of this architecture and is precisely what makes it so powerful. Not only does this make testing a piece of cake, but it also allows us to switch up our adapters any way we want without ever having to change the business logic. They are completely decoupled.
 
-Do note that the underlying functionality of the repository does not necessarily have to involve a database. The service doesn't care from where the repository obtains its data, it just cares about the signatures. For example, a wrapper around a reqwest client could implement the `Connect` trait with its connection type as the reqwest `Client` struct and could be used to fetch data from an external data source. Neat!
+Do note that the underlying functionality of the repository does not necessarily have to involve a database. The service doesn't care from where the repository obtains its data, it just cares about the signatures. For example, a wrapper around a reqwest client could implement the `Driver` trait with its connection type as the reqwest `Client` struct and could be used to fetch data from an external data source. Neat!
 
 Finally, we'll concretise everything in the setup:
 
@@ -228,12 +219,12 @@ To reduce some of the unpleasentness with dealing with so many generics, macros 
     User: UserRepository<Connection>
   }
 
-  #[hextacy::component]
-  impl<D, Connection, User> Repository<D, Connection, User> 
+  #[hextacy::contract]
+  impl<D, C, User> Repository<D, C, User> 
   where
-    Connection: Send,
-    D: Connect<Connection = Connection> + Send + Sync,
-    User: UserRepository<Connection> + Send + Sync
+    C: Send,
+    D: Driver<Connection = C> + Send + Sync,
+    User: UserRepository<C> + Send + Sync
   {
       async fn get_paginated(
           &self,
@@ -258,12 +249,12 @@ Transactions could theoretically be started in the business level, but I prefer 
 The `Atomic` trait provides an interface for any repository to start, commit or rollback a transaction by binding the generic connection used in the repository to the `Atomic` trait. This bound can be introduced in the API implementation for the service adapter:
 
 ```rust
-#[hextacy::component]
-impl<D, Connection, User> RepositoryContract for Repository<D, Connection, User>
+#[hextacy::contract]
+impl<D, C, User> Repository<D, C, User>
 where
-    D: Connect<Connection = Connection> + Send + Sync,
-    User: UserRepository<Connection> + UserRepository<<Connection as Atomic>::TransactionResult> + Send + Sync,
-    Connection: Atomic + Send, // Like thus
+    C: Atomic + Send, // Like thus
+    D: Driver<Connection = C> + Send + Sync,
+    User: UserRepository<C> + UserRepository<<C as Atomic>::TransactionResult> + Send + Sync,
 {
   async fn get_paginated(
       &self,

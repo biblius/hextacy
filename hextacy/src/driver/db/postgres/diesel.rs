@@ -1,6 +1,6 @@
 use crate::db::DatabaseError;
-use crate::drivers::DriverError;
-use crate::{db::Atomic, drivers::Connect};
+use crate::driver::DriverError;
+use crate::{db::Atomic, driver::Driver};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,
@@ -45,7 +45,7 @@ impl PostgresDiesel {
 }
 
 #[async_trait]
-impl Connect for PostgresDiesel {
+impl Driver for PostgresDiesel {
     type Connection = DieselConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

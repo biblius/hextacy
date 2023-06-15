@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize, Serialize, Queryable)]
 pub struct User {
+    // Never use strings for UUIDs pls
     pub id: String,
     pub email: String,
     pub username: String,
