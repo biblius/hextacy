@@ -1,4 +1,6 @@
+#[cfg(feature = "redis")]
 pub mod cache;
+#[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "email")]
 pub mod email;
@@ -23,23 +25,15 @@ pub enum DriverError {
 
     #[cfg(any(feature = "full", feature = "db", feature = "postgres-diesel"))]
     #[error("Postgres pool error: {0}")]
-    DieselConnection(String),
+    DieselConnection(#[from] r2d2::Error),
 
     #[cfg(any(feature = "full", feature = "db", feature = "postgres-diesel"))]
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),
 
-    #[cfg(any(feature = "full", feature = "db", feature = "postgres-diesel"))]
-    #[error("PG Connection error: {0}")]
-    PgDirectConnection(#[from] diesel::ConnectionError),
-
     #[cfg(any(feature = "full", feature = "db", feature = "redis"))]
     #[error("Redis pool error: {0}")]
-    RedisConnection(PoolError),
-
-    #[cfg(any(feature = "full", feature = "db", feature = "redis"))]
-    #[error("RD Connection error: {0}")]
-    RdDirectConnection(#[from] redis::RedisError),
+    RedisConnection(#[from] PoolError),
 
     #[cfg(feature = "email")]
     #[error("Transport error: {0}")]
@@ -48,4 +42,8 @@ pub enum DriverError {
     #[cfg(feature = "email")]
     #[error("Email error: {0}")]
     Email(#[from] lettre::error::Error),
+
+    #[cfg(any(feature = "db", feature = "full", feature = "postgres-seaorm"))]
+    #[error("SeaORM Error: {0}")]
+    SeaormConnection(#[from] sea_orm::DbErr),
 }

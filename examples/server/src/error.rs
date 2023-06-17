@@ -14,8 +14,6 @@ pub enum Error {
     Var(#[from] std::env::VarError),
     #[error("Driver Error: {0}")]
     Driver(#[from] hextacy::driver::DriverError),
-    #[error("Database Error: {0}")]
-    Database(#[from] hextacy::db::DatabaseError),
     #[error("Cache Error: {0}")]
     Cache(#[from] crate::cache::CacheAdapterError),
     #[error("Adapter Error: {0}")]
@@ -34,10 +32,12 @@ pub enum Error {
     ToStr(#[from] reqwest::header::ToStrError),
     #[error("Validation Error")]
     Validation(Vec<ValidationError>),
-    #[error("Http Error")]
+    #[error("Http Error: {0}")]
     Http(#[from] hextacy::web::http::HttpError),
-    #[error("OAuth Provider Error")]
+    #[error("OAuth Provider Error: {0}")]
     OAuthProvider(#[from] crate::services::oauth::OAuthProviderError),
+    #[error("Lettre Error: {0}")]
+    Lettre(#[from] lettre::transport::smtp::Error),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]

@@ -52,3 +52,45 @@ macro_rules! route {
         );*
     };
 }
+
+#[macro_export]
+macro_rules! scope {
+    (
+        $service:path,
+        $cfg:ident,
+        $scope:literal,
+        $(
+            $method:ident => $route:literal => $(| $($mw:ident),* =>)? $function:ident
+        );* $(;)?
+    ) => {
+        $cfg.service(
+            actix_web::web::scope($scope)
+                $(
+                    .service(
+                        actix_web::web::resource($route)
+                        .route(actix_web::web::$method().to($function::<$service>))
+                        $( $( .wrap($mw.clone()) )* )?
+                    )
+                )*
+        )
+    };
+
+    (
+        $cfg:ident,
+        $scope:literal,
+        $(
+            $method:ident => $route:literal => $(| $($mw:ident),* =>)? $function:ident
+        );* $(;)?
+    ) => {
+        $cfg.service(
+            actix_web::web::scope($scope)
+                $(
+                    .service(
+                        actix_web::web::resource($route)
+                        .route(actix_web::web::$method().to($function))
+                        $( $( .wrap($mw.clone()) )* )?
+                    )
+                )*
+        )
+    };
+}

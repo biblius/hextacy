@@ -4,8 +4,8 @@ pub mod resources;
 use crate::config::AppState;
 use crate::db::models::role::Role;
 use actix_web::web;
-use hextacy::route;
 use hextacy::web::Configure;
+use hextacy::{route, scope};
 
 use super::setup::auth_middleware::AuthenticationMiddleware;
 
@@ -28,19 +28,19 @@ fn auth_service(
     use super::handlers::auth::native::*;
     use super::setup::auth_service::*;
     AuthenticationService::configure(state, cfg);
-    route!(
-        AuthenticationService, cfg,
-        post => "/auth/login" => login;
-        post => "/auth/register" =>  start_registration;
-        get => "/auth/verify-registration-token" => verify_registration_token;
-        post => "/auth/resend-registration-token" => resend_registration_token;
-        get => "/auth/set-otp" => set_otp_secret;
-        post => "/auth/verify-otp" => verify_otp;
-        post => "/auth/change-password" => | auth_guard => change_password;
-        post => "/auth/forgot-password" => forgot_password;
-        post => "/auth/verify-forgot-password" => verify_forgot_password;
-        get => "/auth/reset-password" => reset_password;
-        post => "/auth/logout" => | auth_guard => logout;
+    scope!(
+        AuthenticationService, cfg, "/auth",
+        post => "/login" => login;
+        post => "/register" =>  start_registration;
+        get => "/verify-registration-token" => verify_registration_token;
+        post => "/resend-registration-token" => resend_registration_token;
+        get => "/set-otp" => set_otp_secret;
+        post => "/verify-otp" => verify_otp;
+        post => "/change-password" => | auth_guard => change_password;
+        post => "/forgot-password" => forgot_password;
+        post => "/verify-forgot-password" => verify_forgot_password;
+        get => "/reset-password" => reset_password;
+        post => "/logout" => | auth_guard => logout;
     );
 }
 
@@ -52,10 +52,10 @@ fn oauth_service(
     use super::handlers::auth::o_auth::*;
     use super::setup::oauth_service::*;
     OAuthService::configure(state, cfg);
-    route!(
-        OAuthService, cfg,
-        post => "/auth/oauth/{provider}/login" => login;
-        post => "/auth/oauth/{provider}/scope" => | auth_guard => request_scopes;
+    scope!(
+        OAuthService, cfg, "/oauth/{provider}",
+        post => "/login" => login;
+        post => "/scope" => | auth_guard => request_scopes;
     );
 }
 

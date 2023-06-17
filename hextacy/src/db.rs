@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use thiserror::Error;
+
+use crate::driver::DriverError;
 
 /// Used for creating bounds on generic connections when the adapter needs to have atomic repository access.
 ///
@@ -16,9 +17,10 @@ use thiserror::Error;
 #[async_trait]
 pub trait Atomic: Sized {
     type TransactionResult: Send;
-    async fn start_transaction(self) -> Result<Self::TransactionResult, DatabaseError>;
-    async fn commit_transaction(tx: Self::TransactionResult) -> Result<(), DatabaseError>;
-    async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DatabaseError>;
+
+    async fn start_transaction(self) -> Result<Self::TransactionResult, DriverError>;
+    async fn commit_transaction(tx: Self::TransactionResult) -> Result<(), DriverError>;
+    async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DriverError>;
 }
 
 #[macro_export]
@@ -112,22 +114,4 @@ macro_rules! adapt {
                    }
                }
           };
-}
-
-#[derive(Debug, Error)]
-pub enum DatabaseError {
-    #[error("Error while attempting to establish connection: {0}")]
-    Driver(#[from] super::driver::DriverError),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "postgres-diesel"))]
-    #[error("Diesel Error: {0}")]
-    Diesel(#[from] diesel::result::Error),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "mongo"))]
-    #[error("Mongo Error: {0}")]
-    Mongo(#[from] mongodb::error::Error),
-
-    #[cfg(any(feature = "db", feature = "full", feature = "postgres-seaorm"))]
-    #[error("SeaORM Error: {0}")]
-    SeaORM(#[from] sea_orm::DbErr),
 }

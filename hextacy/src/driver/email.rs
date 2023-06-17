@@ -1,6 +1,4 @@
-pub use lettre;
-
-use super::DriverError;
+use lettre::transport;
 use lettre::transport::smtp::authentication::Credentials;
 use lettre::{message::header::ContentType, Message, SmtpTransport, Transport};
 use std::{fmt::Write, fs, path::Path};
@@ -28,6 +26,7 @@ impl Email {
     pub fn new() -> Self {
         Self::build_driver()
     }
+
     /// Build an email driver from the environment.
     pub fn build_driver() -> Self {
         let mut params =
@@ -61,7 +60,7 @@ impl Email {
         to_email: &str,
         subject: &str,
         body: String,
-    ) -> Result<(), DriverError> {
+    ) -> Result<(), transport::smtp::Error> {
         let sender = crate::env::get_or_default("EMAIL_SENDER", "crazycompanyxxl@gmail.com");
 
         let from = from.map_or_else(|| format!("Xtc <{sender}>"), |s| format!("{s} <{sender}>"));
@@ -74,7 +73,8 @@ impl Email {
             .to(to.parse().unwrap())
             .header(ContentType::TEXT_HTML)
             .subject(subject)
-            .body(body)?;
+            .body(body)
+            .unwrap(); // TODO
 
         self.driver.send(&email)?;
         Ok(())

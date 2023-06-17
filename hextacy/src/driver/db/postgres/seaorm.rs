@@ -1,7 +1,5 @@
-use crate::{
-    db::{Atomic, DatabaseError},
-    driver::{Driver, DriverError},
-};
+use crate::driver::DriverError;
+use crate::{db::Atomic, driver::Driver};
 use async_trait::async_trait;
 use sea_orm::TransactionTrait;
 use sea_orm::{ConnectOptions, Database, DatabaseTransaction};
@@ -58,18 +56,21 @@ impl Driver for PostgresSea {
 impl Atomic for DatabaseConnection {
     type TransactionResult = DatabaseTransaction;
 
-    async fn start_transaction(mut self) -> Result<Self::TransactionResult, DatabaseError> {
-        let tx = DatabaseConnection::begin(&self).await?;
-        Ok(tx)
+    async fn start_transaction(mut self) -> Result<Self::TransactionResult, DriverError> {
+        DatabaseConnection::begin(&self)
+            .await
+            .map_err(DriverError::SeaormConnection)
     }
 
-    async fn commit_transaction(tx: Self::TransactionResult) -> Result<(), DatabaseError> {
-        DatabaseTransaction::commit(tx).await?;
-        Ok(())
+    async fn commit_transaction(tx: Self::TransactionResult) -> Result<(), DriverError> {
+        DatabaseTransaction::commit(tx)
+            .await
+            .map_err(DriverError::SeaormConnection)
     }
 
-    async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DatabaseError> {
-        DatabaseTransaction::rollback(tx).await?;
-        Ok(())
+    async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DriverError> {
+        DatabaseTransaction::rollback(tx)
+            .await
+            .map_err(DriverError::SeaormConnection)
     }
 }

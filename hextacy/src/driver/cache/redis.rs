@@ -4,7 +4,7 @@ use crate::{
 };
 use async_trait::async_trait;
 use deadpool_redis::{Config, Connection, Pool, Runtime};
-use redis::{AsyncCommands, ConnectionInfo, FromRedisValue, IntoConnectionInfo, ToRedisArgs};
+use redis::{AsyncCommands, FromRedisValue, IntoConnectionInfo, ToRedisArgs};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -27,7 +27,11 @@ impl Redis {
         db: i64,
         max_size: usize,
     ) -> Self {
-        let conn_info = connection_info(host, port, user, password, db);
+        let db_url = format!("redis://{host}:{port}");
+        let mut conn_info = db_url.into_connection_info().unwrap();
+        conn_info.redis.password = password.map(|pw| pw.to_string());
+        conn_info.redis.username = user.map(|uname| uname.to_string());
+        conn_info.redis.db = db;
         let pool = Config::from_connection_info(conn_info)
             .builder()
             .expect("Could not create redis pool builder")
@@ -39,24 +43,10 @@ impl Redis {
     }
 }
 
-fn connection_info(
-    host: &str,
-    port: u16,
-    user: Option<&str>,
-    password: Option<&str>,
-    db: i64,
-) -> ConnectionInfo {
-    let db_url = format!("redis://{host}:{port}");
-    let mut conn_info = db_url.into_connection_info().unwrap();
-    conn_info.redis.password = password.map(|pw| pw.to_string());
-    conn_info.redis.username = user.map(|uname| uname.to_string());
-    conn_info.redis.db = db;
-    conn_info
-}
-
 #[async_trait]
 impl Driver for Redis {
     type Connection = Connection;
+
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
         self.pool.get().await.map_err(DriverError::RedisConnection)
     }

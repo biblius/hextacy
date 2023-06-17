@@ -12,7 +12,7 @@ pub mod cache;
 ))]
 pub mod db;
 
-/// Drivers for connecting to the database, cache and smtp.
+/// Out of the box drivers for connecting to the database, cache and smtp.
 pub mod driver;
 
 /// Cryptographic utilities
@@ -31,5 +31,5 @@ pub mod time;
 /// as well as some HTTP helpers.
 pub mod web;
 
-/// Derive macros for quick implementations of generic repository traits.
+/// Derive macro for quick implementation of component traits.
 pub use hextacy_macros::contract;

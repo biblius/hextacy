@@ -1,8 +1,5 @@
 use super::super::Driver;
-use crate::{
-    db::{Atomic, DatabaseError},
-    driver::DriverError,
-};
+use crate::{db::Atomic, driver::DriverError};
 use async_trait::async_trait;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
@@ -57,25 +54,28 @@ impl Driver for Mongo {
     type Connection = ClientSession;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        let session = self.driver.start_session(None).await?;
-        Ok(session)
+        self.driver
+            .start_session(None)
+            .await
+            .map_err(DriverError::Mongo)
     }
 }
 
 #[async_trait]
 impl Atomic for ClientSession {
     type TransactionResult = Self;
-    async fn start_transaction(mut self) -> Result<Self, DatabaseError> {
+
+    async fn start_transaction(mut self) -> Result<Self, DriverError> {
         ClientSession::start_transaction(&mut self, None).await?;
         Ok(self)
     }
 
-    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DatabaseError> {
+    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
         ClientSession::commit_transaction(&mut tx).await?;
         Ok(())
     }
 
-    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DatabaseError> {
+    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
         ClientSession::abort_transaction(&mut tx).await?;
         Ok(())
     }

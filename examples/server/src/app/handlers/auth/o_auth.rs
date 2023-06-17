@@ -16,9 +16,9 @@ pub async fn login<T: OAuthServiceContract>(
     data: web::Json<OAuthCodeExchangePayload>,
     service: web::Data<T>,
 ) -> Result<impl Responder, Error> {
-    info!("Starting OAuth login");
+    info!("Starting OAuth login {:?}", path);
     let code = OAuthCodeExchange::validify(data.0)?;
-    let provider: OAuthProvider = path.to_string().try_into()?;
+    let provider: OAuthProvider = path.into_inner().try_into()?;
     match provider {
         OAuthProvider::Google => service.login(GoogleOAuth, code).await,
         OAuthProvider::Github => service.login(GithubOAuth, code).await,

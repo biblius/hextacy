@@ -21,7 +21,7 @@ async-trait = "0.1.42"
 bcrypt = "0.14.0"
 chrono = { version = "0.4", features = ["serde"] }
 data-encoding = "2.3.2"
-deadpool-redis = { version = "0.12.0", features = ["serde"] }
+deadpool-redis = { version = "0.12.0", features = ["serde"], optional = true }
 diesel = { version = "2.0.1", features = [
   "chrono",
   "postgres",
@@ -60,7 +60,7 @@ uuid = { version = "1.1.2", features = ["v4"] }
 
 [features]
 default = ["full"]
-full = ["db", "email", "ws"]
+full = ["db", "email", "redis", "ws"]
 
 db = ["dep:diesel", "dep:mongodb", "dep:r2d2", "dep:redis", "dep:sea-orm"]
 ws = ["dep:actix", "dep:actix-web-actors"]
@@ -69,4 +69,4 @@ email = ["dep:lettre"]
 mongo = ["dep:mongodb"]
 postgres-diesel = ["dep:diesel"]
 postgres-seaorm = ["dep:sea-orm"]
-redis = ["dep:r2d2", "dep:redis"]
+redis = ["dep:deadpool-redis", "dep:redis"]

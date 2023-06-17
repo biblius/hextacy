@@ -36,15 +36,15 @@ pub(super) mod auth_service {
         native::Authentication,
     };
 
-    pub type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
-    pub type RepoComponent = AuthenticationRepository<
+    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
+    type RepoComponent = AuthenticationRepository<
         PostgresSea,
         DatabaseConnection,
         PgUserAdapter,
         PgSessionAdapter,
         PgOAuthAdapter,
     >;
-    pub type EmailComponent = Email;
+    type EmailComponent = Email;
 
     pub type AuthenticationService = Authentication<RepoComponent, CacheComponent, Email>;
 
@@ -69,8 +69,8 @@ pub(super) mod oauth_service {
         o_auth::OAuthService as Service,
     };
 
-    pub type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
-    pub type RepoComponent = AuthenticationRepository<
+    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
+    type RepoComponent = AuthenticationRepository<
         PostgresSea,
         DatabaseConnection,
         PgUserAdapter,
@@ -95,7 +95,7 @@ pub(super) mod user_service {
     use super::*;
     use crate::app::core::users::{adapters::Repository, domain::UserService as Service};
 
-    pub type RepoComponent = Repository<PostgresDiesel, DieselConnection, DieselUserAdapter>;
+    type RepoComponent = Repository<PostgresDiesel, DieselConnection, DieselUserAdapter>;
 
     pub type UserService = Service<RepoComponent>;
 

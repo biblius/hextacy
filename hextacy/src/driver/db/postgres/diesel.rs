@@ -1,6 +1,7 @@
-use crate::db::DatabaseError;
-use crate::driver::DriverError;
-use crate::{db::Atomic, driver::Driver};
+use crate::{
+    db::Atomic,
+    driver::{Driver, DriverError},
+};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,
@@ -49,27 +50,25 @@ impl Driver for PostgresDiesel {
     type Connection = DieselConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        match self.pool.get() {
-            Ok(conn) => Ok(conn),
-            Err(e) => Err(DriverError::DieselConnection(e.to_string())),
-        }
+        self.pool.get().map_err(DriverError::DieselConnection)
     }
 }
 
 #[async_trait]
 impl Atomic for DieselConnection {
     type TransactionResult = Self;
-    async fn start_transaction(mut self) -> Result<Self, DatabaseError> {
+
+    async fn start_transaction(mut self) -> Result<Self, DriverError> {
         diesel::connection::AnsiTransactionManager::begin_transaction(&mut *self)?;
         Ok(self)
     }
 
-    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DatabaseError> {
+    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
         diesel::connection::AnsiTransactionManager::commit_transaction(&mut *tx)?;
         Ok(())
     }
 
-    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DatabaseError> {
+    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
         diesel::connection::AnsiTransactionManager::rollback_transaction(&mut *tx)?;
         Ok(())
     }
