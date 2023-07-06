@@ -9,13 +9,18 @@ pub fn generate_secret() -> String {
 }
 
 /// Generates a QR code svg with the given secret
-pub fn generate_totp_qr_code(secret: &str, user_email: &str) -> Result<String, CryptoError> {
+pub fn generate_totp_qr_code(
+    secret: &str,
+    user_email: &str,
+    label: &str,
+    issuer: &str,
+) -> Result<String, CryptoError> {
     debug!("Generating TOTP QR");
     let uri = thotp::qr::otp_uri(
         "totp",
         secret,
-        &format!("RPSChat:{user_email}"),
-        "RPS Chat",
+        &format!("{label}:{user_email}"),
+        issuer,
         None,
     )?;
     thotp::qr::generate_code_svg(&uri, None, None, thotp::qr::EcLevel::M).map_err(Into::into)

@@ -1,4 +1,4 @@
-pub mod components;
+pub mod contracts;
 pub mod data;
 pub mod native;
 pub mod o_auth;

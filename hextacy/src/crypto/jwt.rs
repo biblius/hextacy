@@ -2,8 +2,6 @@ use super::CryptoError;
 use jsonwebtoken::*;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::Path;
 
 /// Used for jwts. sub is the actual payload, iat and exp are unix timestamps representing the issued at and expiration times respectively.
 /// As per https://www.rfc-editor.org/rfc/rfc7519#section-4.1.6
@@ -26,15 +24,17 @@ impl Claims {
     }
 }
 
-/// Generates a JWT using the provided algorithm
+/// Generates a JWT using the provided algorithm.
+///
+/// `priv_key` has to be a valid RSA key.
 pub fn generate(
+    priv_key: &[u8],
     sub: String,
     issuer: String,
     expires_in: chrono::Duration,
     algo: Algorithm,
 ) -> Result<String, CryptoError> {
-    let priv_key = fs::read(Path::new("../encryption/key_pair/priv_key.pem"))?;
-    let encoding_key = EncodingKey::from_rsa_pem(&priv_key)?;
+    let encoding_key = EncodingKey::from_rsa_pem(priv_key)?;
 
     let now = jsonwebtoken::get_current_timestamp();
     let exp_timestamp = now + expires_in.num_seconds() as u64;
@@ -46,14 +46,14 @@ pub fn generate(
 }
 
 /// Parses the token issued by the generate_jwt function.
-pub fn parse<T: Serialize + DeserializeOwned>(token: &str) -> Result<T, CryptoError> {
-    // Fetch public key
-    let pub_key = fs::read(Path::new("../encryption/key_pair/pub_key.pem"))?;
+pub fn parse<T: Serialize + DeserializeOwned>(
+    pub_key: &[u8],
+    token: &str,
+    algo: Algorithm,
+) -> Result<T, CryptoError> {
+    let decoding_key = DecodingKey::from_rsa_pem(pub_key)?;
 
-    let decoding_key = DecodingKey::from_rsa_pem(&pub_key)?;
-
-    let token_data =
-        jsonwebtoken::decode::<Claims>(token, &decoding_key, &Validation::new(Algorithm::RS256))?;
+    let token_data = jsonwebtoken::decode::<Claims>(token, &decoding_key, &Validation::new(algo))?;
 
     let result: T = serde_json::from_str(&token_data.claims.sub)?;
     Ok(result)
@@ -86,7 +86,7 @@ mod tests {
         let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("Failed to generate private key");
         let pub_key = RsaPublicKey::from(&priv_key);
 
-        //Transmogrify the key key par to the encoding and decoding keys as arrays of u8
+        //Transmogrify the key pair to the encoding and decoding keys as arrays of u8
         let encoding_key = jsonwebtoken::EncodingKey::from_rsa_pem(
             priv_key
                 .to_pkcs1_pem(pkcs8::LineEnding::LF)

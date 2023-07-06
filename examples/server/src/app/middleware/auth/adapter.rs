@@ -2,11 +2,11 @@ use crate::cache::contracts::SimpleCacheAccess;
 use crate::cache::AuthID;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
-use hextacy::adapt;
 use hextacy::contract;
+use hextacy::drive;
 use hextacy::driver::Driver;
 
-adapt! {
+drive! {
     AuthMwRepo,
     use D for Connection as driver;
     S: SessionRepository<Connection>,
@@ -34,7 +34,7 @@ where
     }
 }
 
-adapt! {
+drive! {
     AuthMwCache,
     use Driver for Connection as driver;
     Cache: SimpleCacheAccess<Connection>
@@ -82,7 +82,7 @@ where
 
 impl<D, C, S> Clone for AuthMwRepo<D, C, S>
 where
-    D: Driver<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync + Clone,
     S: SessionRepository<C> + Send + Sync,
 {
     fn clone(&self) -> Self {
@@ -95,7 +95,7 @@ where
 
 impl<D, C, Cache> Clone for AuthMwCache<D, C, Cache>
 where
-    D: Driver<Connection = C> + Send + Sync,
+    D: Driver<Connection = C> + Send + Sync + Clone,
     Cache: SimpleCacheAccess<C> + Send + Sync,
 {
     fn clone(&self) -> Self {

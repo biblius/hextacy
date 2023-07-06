@@ -204,21 +204,21 @@ Finally, we'll concretise everything in the setup:
 
 I'll admit it, the trait bounds do look kind of ugly, but seeing as this is the only place where we concretise our types, we never have to worry about the rest of the service breaking when we makes changes in our adapters. The concrete repository can be extracted to a type definition to reduce the amount of places where it needs to be changed and for visibility.
 
-To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `adapt!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
+To reduce some of the unpleasentness with dealing with so many generics, macros exist to aid the process. If we utilise the `drive!` macro, our `adapter.rs` file becomes a bit more easy on the eyes:
 
 - **_adapter.rs_**
 
   ```rust
   /* ..imports.. */
 
-  adapt! {
+  drive! {
     Repository,
     use D for Connection as driver;
     User: UserRepository<Connection>
   }
 
   #[hextacy::contract]
-  impl<D, C, User> Repository<D, C, User> 
+  impl<D, C, User> Repository<D, C, User>
   where
     C: Send,
     D: Driver<Connection = C> + Send + Sync,

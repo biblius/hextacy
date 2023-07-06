@@ -2,7 +2,7 @@
 
 ## 0.1.3
 
-Change the `=>` in the `adapt!` macro to `as` because it makes more sense.
+Change the `=>` in the `drive!` macro to `as` because it makes more sense.
 
 ## 0.1.2
 

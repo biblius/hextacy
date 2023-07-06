@@ -1,6 +1,8 @@
 
 # **Get started**
 
+Read more about the openssl setup in `openssl/README.md`.
+
 1. Create a real `.env` file filling out the example file with your desired parameters and create the database you entered in the file. You do not have to fill out fields you don't intend to use.
 
     - For the Email part, to use an existing gmail, use [this spec](https://support.google.com/mail/answer/7126229?hl=en#zippy=%2Cstep-change-smtp-other-settings-in-your-email-client) to set up the SMTP host(smtp.gmail.com) and port(465) and [follow these instructions](https://support.google.com/accounts/answer/185833?hl=en#zippy=%2Cwhy-you-may-need-an-app-password) to generate an app password. The password can then be used for the `SMTP_PASSWORD` variable. For the sender and username enter your email address.
@@ -67,33 +69,6 @@ Users who forgot their passwords can request a password reset. They will receive
   If you take an even closer look at what happens in `wrap` you'll see that it triggers `new_transform` internally, meaning the instantiated `AuthGuard` transforms into an `AuthGuardMiddleware` which executes all the business.
 
   The structure is exactly the same as that of endpoints with the exception of **interceptor.rs** which contains our `Transform` and `Service` implementations. The main functionality of the middleware is located in the `call` function of the `Service` implementation.
-
-### **The config file**
-
-  We tie all our handlers together in the `config.rs` file in the server's `src` directory. With only this one endpoint it would look something like:
-
-  ```rust
-  pub(super) fn init(cfg: &mut ServiceConfig) {
-      let pg = Arc::new(Postgres::new());
-
-      users::setup::routes(pg, cfg);
-  }
-  ```
-
-  We would then pass this function to our server setup.
-
-  ```rust
-      HttpServer::new(move || {
-          App::new()
-              .configure(config::init)
-              .wrap(Logger::default())
-      })
-      .bind_openssl(addr, builder)?
-      .run()
-      .await
-  ```
-
-  Read more about the openssl setup in `openssl/README.md`
 
 The helpers module contains various helper functions usable throughout the server.
 

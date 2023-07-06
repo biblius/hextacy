@@ -8,16 +8,16 @@ use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
 use hextacy::db::Atomic;
 use hextacy::driver::Driver;
-use hextacy::{adapt, contract};
+use hextacy::{contract, drive};
 use tracing::info;
 
 #[allow(unused_imports)]
 use hextacy::driver::db::postgres::diesel::{DieselConnection, PostgresDiesel};
 
-adapt! {
+drive! {
     AuthenticationRepository,
 
-    use Postgres for Connection as driver;
+    use Driver for Connection as driver;
 
     U: UserRepository<Connection>,
     S: SessionRepository<Connection>,

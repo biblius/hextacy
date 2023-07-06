@@ -30,7 +30,7 @@ pub(super) mod auth_middleware {
 pub(super) mod auth_service {
     use super::*;
     use crate::app::core::auth::{
-        components::{
+        contracts::{
             cache::AuthenticationCache, email::Email, repository::AuthenticationRepository,
         },
         native::Authentication,
@@ -65,7 +65,7 @@ pub(super) mod auth_service {
 pub(super) mod oauth_service {
     use super::*;
     use crate::app::core::auth::{
-        components::{cache::AuthenticationCache, repository::AuthenticationRepository},
+        contracts::{cache::AuthenticationCache, repository::AuthenticationRepository},
         o_auth::OAuthService as Service,
     };
 

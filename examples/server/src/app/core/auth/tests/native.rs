@@ -5,7 +5,7 @@ use super::super::data::{
     RegistrationData, ResendRegToken, ResetPassword,
 };
 use super::super::native::Authentication;
-use crate::app::core::auth::components::{
+use crate::app::core::auth::contracts::{
     cache::MockAuthenticationCacheContract as MockCache, email::MockEmailContract,
     repository::MockAuthenticationRepositoryContract as MockRepository,
 };

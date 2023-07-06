@@ -8,9 +8,9 @@ use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
 use hextacy::driver::Driver;
-use hextacy::{adapt, contract};
+use hextacy::{contract, drive};
 
-adapt! {
+drive! {
     AuthenticationCache,
     use Driver for Connection as driver;
     Cache: SimpleCacheAccess<Connection>

@@ -1,4 +1,4 @@
-use super::components::{
+use super::contracts::{
     cache::AuthenticationCacheContract, email::EmailContract,
     repository::AuthenticationRepositoryContract,
 };
@@ -308,7 +308,8 @@ where
             .update_user_otp_secret(user_id, &secret)
             .await?;
 
-        let qr = crypto::otp::generate_totp_qr_code(&secret, &user.email)?;
+        let qr =
+            crypto::otp::generate_totp_qr_code(&secret, &user.email, "supercoolapp", "it_is_I")?;
 
         info!("Successfully set OTP secret for {}", user.id);
 

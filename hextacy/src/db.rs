@@ -30,7 +30,7 @@ pub trait Atomic: Sized {
 /// ### Example
 ///
 /// ```ignore
-/// adapt! {
+/// drive! {
 ///     Adapter in super, // Name of the generated struct, optional visibility
 ///
 ///     // This line adds the generics `D` and `Connection` to the struct
@@ -67,7 +67,7 @@ pub trait Atomic: Sized {
 /// would look like.
 ///
 /// This macro also provides a `new()` method whose input is anything that implements `Connect` for convenience.
-macro_rules! adapt {
+macro_rules! drive {
     (
         $name:ident $(in $vis:path)?,
         $(
@@ -80,38 +80,38 @@ macro_rules! adapt {
             $id:ident : $repository:ident < $connection:ident >
         ),*
         $(,)?
-        ) => {
-               #[allow(non_snake_case)]
-               #[derive(Debug)]
-               pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
-               where
-                  $(
-                      $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
-                  )+
-                   $($id: $repository <$connection> + Send + Sync),*
-               {
-                  $(
-                    $( pub (in $field_vis) )? $field: ::std::sync::Arc<$driver>,
-                  )+
-                   $($id: ::std::marker::PhantomData<$id>),*
-               }
+    ) => {
+            #[allow(non_snake_case)]
+            #[derive(Debug)]
+            pub $((in $vis))? struct $name<$($driver),+, $($conn_name),+, $($id),*>
+            where
+               $(
+                   $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
+               )+
+                $($id: $repository <$connection> + Send + Sync),*
+            {
+               $(
+                 $( pub (in $field_vis) )? $field: ::std::sync::Arc<$driver>,
+               )+
+                $($id: ::std::marker::PhantomData<$id>),*
+            }
 
-               #[allow(non_snake_case)]
-               impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
-               where
-                  $(
-                      $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
-                  )+
-                   $($id: $repository <$connection> + Send + Sync),*
-               {
-                   pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
-                       Self {
-                          $(
-                              $field: $driver,
-                          )+
-                           $($id: ::std::marker::PhantomData),*
-                       }
-                   }
-               }
-          };
+            #[allow(non_snake_case)]
+            impl<$($driver),+, $($conn_name),+, $($id),*> $name <$($driver),+, $($conn_name),+, $($id),*>
+            where
+               $(
+                   $driver: hextacy::driver::Driver<Connection = $conn_name> + Send + Sync,
+               )+
+                $($id: $repository <$connection> + Send + Sync),*
+            {
+                pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
+                    Self {
+                       $(
+                           $field: $driver,
+                       )+
+                        $($id: ::std::marker::PhantomData),*
+                    }
+                }
+            }
+        };
 }
