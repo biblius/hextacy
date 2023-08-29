@@ -1,10 +1,7 @@
-use crate::{
-    cache::CacheError,
-    driver::{Driver, DriverError},
-};
+use crate::driver::{Driver, DriverError};
 use async_trait::async_trait;
 use deadpool_redis::{Config, Connection, Pool, Runtime};
-use redis::{AsyncCommands, FromRedisValue, IntoConnectionInfo, ToRedisArgs};
+use redis::{AsyncCommands, FromRedisValue, IntoConnectionInfo, RedisError, ToRedisArgs};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
 
@@ -16,6 +13,12 @@ pub type RedisConnection = Connection;
 #[derive(Clone)]
 pub struct Redis {
     pool: Pool,
+}
+
+impl Debug for Redis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Redis").field("pool", &"{ ... }").finish()
+    }
 }
 
 impl Redis {
@@ -45,7 +48,7 @@ impl Redis {
 
 #[async_trait]
 impl Driver for Redis {
-    type Connection = Connection;
+    type Connection = RedisConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
         self.pool.get().await.map_err(DriverError::RedisConnection)
@@ -55,7 +58,9 @@ impl Driver for Redis {
 /// Utility trait for adapters that use Redis. Provides a basic set of functionality out of the box.
 #[async_trait]
 pub trait RedisAdapterExt {
-    async fn get<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, CacheError>
+    type Error: From<RedisError> + From<serde_json::Error>;
+
+    async fn get<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, Self::Error>
     where
         K: ToRedisArgs + Send + Sync,
         V: FromRedisValue + Send + Sync,
@@ -64,7 +69,7 @@ pub trait RedisAdapterExt {
         Ok(result)
     }
 
-    /// Returns a simple string reply according to Redis' SET[EX] command.
+    /// Returns a simple string reply according to Redis' SET\[EX] command.
     /// The underlying Redis library still uses the SETEX command which is deprecated
     /// so the return value could be changed to an `Option<String>` to reflect the lib
     /// if/when it updates.
@@ -73,7 +78,7 @@ pub trait RedisAdapterExt {
         key: K,
         val: V,
         ex: Option<usize>,
-    ) -> Result<String, CacheError>
+    ) -> Result<String, Self::Error>
     where
         K: ToRedisArgs + Send + Sync,
         V: ToRedisArgs + Send + Sync,
@@ -81,28 +86,28 @@ pub trait RedisAdapterExt {
         if let Some(ex) = ex {
             conn.set_ex::<K, V, String>(key, val, ex)
                 .await
-                .map_err(CacheError::Redis)
+                .map_err(Self::Error::from)
         } else {
             conn.set::<K, V, String>(key, val)
                 .await
-                .map_err(CacheError::Redis)
+                .map_err(Self::Error::from)
         }
     }
 
-    async fn delete<K>(conn: &mut RedisConnection, key: K) -> Result<(), CacheError>
+    async fn delete<K>(conn: &mut RedisConnection, key: K) -> Result<(), Self::Error>
     where
         K: ToRedisArgs + Send + Sync,
     {
-        conn.del::<K, ()>(key).await.map_err(CacheError::Redis)
+        conn.del::<K, ()>(key).await.map_err(Self::Error::from)
     }
 
-    async fn get_json<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, CacheError>
+    async fn get_json<K, V>(conn: &mut RedisConnection, key: K) -> Result<V, Self::Error>
     where
         K: ToRedisArgs + Send + Sync,
         V: DeserializeOwned,
     {
         let result = conn.get::<K, String>(key).await?;
-        serde_json::from_str::<V>(&result).map_err(CacheError::Serde)
+        serde_json::from_str::<V>(&result).map_err(Self::Error::from)
     }
 
     async fn set_json<K, V>(
@@ -110,7 +115,7 @@ pub trait RedisAdapterExt {
         key: K,
         val: V,
         ex: Option<usize>,
-    ) -> Result<(), CacheError>
+    ) -> Result<(), Self::Error>
     where
         K: ToRedisArgs + Send + Sync,
         V: Serialize + Send + Sync,
@@ -119,17 +124,11 @@ pub trait RedisAdapterExt {
         if let Some(ex) = ex {
             conn.set_ex::<K, String, ()>(key, value, ex)
                 .await
-                .map_err(CacheError::Redis)
+                .map_err(Self::Error::from)
         } else {
             conn.set::<K, String, ()>(key, value)
                 .await
-                .map_err(CacheError::Redis)
+                .map_err(Self::Error::from)
         }
-    }
-}
-
-impl Debug for Redis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Redis").field("pool", &"{ ... }").finish()
     }
 }

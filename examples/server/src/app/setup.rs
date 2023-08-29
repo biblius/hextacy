@@ -5,7 +5,7 @@ use crate::db::adapters::postgres::seaorm::{
 };
 use crate::AppState;
 use actix_web::web;
-use hextacy::driver::{
+use hextacy::adapters::{
     cache::redis::{Redis, RedisConnection},
     db::postgres::{
         diesel::{DieselConnection, PostgresDiesel},

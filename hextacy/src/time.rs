@@ -15,3 +15,5 @@ pub fn datetime_now() -> chrono::NaiveDateTime {
 pub fn date_now() -> chrono::NaiveDate {
     chrono::Utc::now().date_naive()
 }
+
+pub use chrono;

@@ -1,13 +1,9 @@
-use actix_web::web::ServiceConfig;
-
 pub mod http;
-
-#[cfg(any(feature = "full", feature = "ws"))]
+pub mod middleware;
+pub mod router;
 pub mod ws;
 
-pub mod router;
-
-pub mod middleware;
+use actix_web::web::ServiceConfig;
 
 /// A trait for hooking services up to actix' [ServiceConfig]. The usual application is simply
 /// instantiating a service, wrapping it in [Data][actix_web::web::Data] and calling `cfg.app_data()` with it.

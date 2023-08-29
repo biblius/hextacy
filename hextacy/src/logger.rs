@@ -1,4 +1,5 @@
 use env_logger::fmt::Color;
+use log::{Level, LevelFilter};
 use log4rs::{
     append::file::FileAppender,
     config::{Appender, Root},
@@ -6,7 +7,6 @@ use log4rs::{
     Config,
 };
 use std::{env, io::Write};
-use tracing::log::{Level, LevelFilter};
 
 /// Errors and warns are always logged.
 pub fn init(level: &str) {
@@ -30,12 +30,6 @@ pub fn init(level: &str) {
                 Level::Debug => style.set_color(Color::Rgb(100, 200, 255)),
                 Level::Trace => style.set_color(Color::Rgb(255, 100, 255)),
             };
-
-            // Pings in this module are at debug level for some reason so we don't want to
-            // include it in the output
-            if record.target().contains("h2::codec") {
-                return Ok(());
-            }
 
             writeln!(
                 buf,

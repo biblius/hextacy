@@ -1,6 +1,6 @@
 # **⬡ Hextacy ⬡**
 
-A repository designed to quick start web server development with [actix_web](https://actix.rs/) by providing an extensible infrastructure and a CLI tool to reduce manually writing boilerplate while maintaining best practices.
+A repository designed to quick start server development by providing an extensible infrastructure, a CLI tool to reduce manually writing boilerplate, and out of the box implementations for a few database and cache drivers.
 
 The kind of project structure this repository uses is heavily based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 

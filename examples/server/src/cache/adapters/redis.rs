@@ -1,13 +1,15 @@
 use crate::cache::{contracts::SimpleCacheAccess, CacheAdapterError, Cacher, KeyPrefix};
 use async_trait::async_trait;
 use chrono::Utc;
-use hextacy::driver::cache::redis::{redis::AsyncCommands, RedisAdapterExt, RedisConnection};
+use hextacy::adapters::cache::redis::{redis::AsyncCommands, RedisAdapterExt, RedisConnection};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct RedisAdapter;
 
-impl RedisAdapterExt for RedisAdapter {}
+impl RedisAdapterExt for RedisAdapter {
+    type Error = CacheAdapterError;
+}
 
 impl Cacher for RedisAdapter {}
 
@@ -23,9 +25,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         ex: Option<usize>,
     ) -> Result<(), CacheAdapterError> {
         let key = Self::key(id, key);
-        <Self as RedisAdapterExt>::set(conn, key, value, ex)
-            .await
-            .map_err(CacheAdapterError::Cache)?;
+        <Self as RedisAdapterExt>::set(conn, key, value, ex).await?;
         Ok(())
     }
 
@@ -37,9 +37,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         ex: Option<usize>,
     ) -> Result<(), CacheAdapterError> {
         let key = Self::key(id, key);
-        Self::set(conn, key, value, ex)
-            .await
-            .map_err(CacheAdapterError::Cache)?;
+        Self::set(conn, key, value, ex).await?;
         Ok(())
     }
 
@@ -50,9 +48,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
     ) -> Result<String, CacheAdapterError> {
         let key = Self::key(id, key);
 
-        <Self as RedisAdapterExt>::get(conn, key)
-            .await
-            .map_err(CacheAdapterError::Cache)
+        <Self as RedisAdapterExt>::get(conn, key).await
     }
 
     async fn get_i64(
@@ -62,9 +58,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
     ) -> Result<i64, CacheAdapterError> {
         let key = Self::key(id, key);
 
-        <Self as RedisAdapterExt>::get(conn, key)
-            .await
-            .map_err(CacheAdapterError::Cache)
+        <Self as RedisAdapterExt>::get(conn, key).await
     }
 
     async fn delete(
@@ -73,9 +67,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         key: &str,
     ) -> Result<(), CacheAdapterError> {
         let key = Self::key(id, key);
-        <Self as RedisAdapterExt>::delete(conn, key)
-            .await
-            .map_err(CacheAdapterError::Cache)
+        <Self as RedisAdapterExt>::delete(conn, key).await
     }
 
     async fn get_json<T>(
@@ -87,9 +79,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         T: DeserializeOwned,
     {
         let key = Self::key(id, key);
-        <Self as RedisAdapterExt>::get_json(conn, key)
-            .await
-            .map_err(CacheAdapterError::Cache)
+        <Self as RedisAdapterExt>::get_json(conn, key).await
     }
 
     async fn set_json<T>(
@@ -103,9 +93,7 @@ impl SimpleCacheAccess<RedisConnection> for RedisAdapter {
         T: Serialize + Send + Sync,
     {
         let key = Self::key(id, key);
-        <Self as RedisAdapterExt>::set_json(conn, key, val, ex)
-            .await
-            .map_err(CacheAdapterError::Cache)
+        <Self as RedisAdapterExt>::set_json(conn, key, val, ex).await
     }
 
     async fn refresh(

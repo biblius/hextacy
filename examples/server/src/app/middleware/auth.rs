@@ -6,7 +6,7 @@ use crate::{
     db::{models::role::Role, repository::session::SessionRepository},
 };
 use adapter::*;
-use hextacy::driver::Driver;
+use hextacy::Driver;
 use interceptor::*;
 use std::{rc::Rc, sync::Arc};
 

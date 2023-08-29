@@ -1,7 +1,4 @@
-use crate::{
-    db::Atomic,
-    driver::{Driver, DriverError},
-};
+use crate::driver::{Atomic, Driver, DriverError};
 use async_trait::async_trait;
 use diesel::{
     connection::TransactionManager,

@@ -1,5 +1,4 @@
-use crate::driver::DriverError;
-use crate::{db::Atomic, driver::Driver};
+use crate::driver::{Atomic, Driver, DriverError};
 use async_trait::async_trait;
 use sea_orm::TransactionTrait;
 use sea_orm::{ConnectOptions, Database, DatabaseTransaction};

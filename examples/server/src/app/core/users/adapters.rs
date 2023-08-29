@@ -2,7 +2,7 @@ use super::contract::RepositoryContract;
 use crate::db::models::user;
 use crate::db::repository::user::UserRepository;
 use crate::error::Error;
-use hextacy::driver::Driver;
+use hextacy::Driver;
 use std::sync::Arc;
 
 pub struct Repository<A, C, User>

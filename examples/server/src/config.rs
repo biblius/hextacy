@@ -1,15 +1,14 @@
 pub mod constants;
 pub mod cors;
 
-use crate::app::router;
+use crate::{app::router, services::email::Email};
 use actix_web::web::ServiceConfig;
-use hextacy::driver::{
+use hextacy::adapters::{
     cache::redis::Redis,
     db::{
         mongo::Mongo,
         postgres::{diesel::PostgresDiesel, seaorm::PostgresSea},
     },
-    email::Email,
 };
 use std::sync::Arc;
 use tracing::info;

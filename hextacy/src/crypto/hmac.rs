@@ -3,7 +3,7 @@ use data_encoding::Encoding;
 use hmac::Mac;
 use sha2::Sha256;
 
-// Generate an HMAC token with the given environment secret and the provided buffer.
+// Generate an HMAC token with the given secret and the provided buffer.
 ///
 /// The token is encoded to the provided encoding.
 pub fn generate_hmac(

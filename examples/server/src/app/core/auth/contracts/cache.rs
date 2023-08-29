@@ -7,7 +7,7 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::driver::Driver;
+use hextacy::Driver;
 use hextacy::{contract, drive};
 
 drive! {

@@ -17,6 +17,8 @@ pub fn get_or_default(key: &str, default: &str) -> String {
 
 /// Retrieves a vec of values for the given keys set in the env, in the order
 /// of the input vec. Panics if any of the requested variables are not set.
+///
+/// TODO: Make this return a Result
 pub fn get_multiple(keys: &[&str]) -> Vec<String> {
     let mut results = vec![];
     for key in keys {

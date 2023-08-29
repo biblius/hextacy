@@ -1,16 +1,17 @@
 pub mod adapters;
 pub mod contracts;
 
-use hextacy::{cache::CacheError, driver::cache::redis::redis};
+use hextacy::adapters::cache::redis::redis;
 use std::fmt::Display;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum CacheAdapterError {
-    #[error("Hextacy cache error: {0}")]
-    Cache(#[from] CacheError),
     #[error("Redis error: {0}")]
     Redis(#[from] redis::RedisError),
+
+    #[error("Serde error: {0}")]
+    Serde(#[from] serde_json::Error),
 }
 
 pub trait Cacher {
@@ -27,21 +28,21 @@ pub trait KeyPrefix {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum AuthID {
-    /// For keeping track of login attempts
+    /// Keeps track of login attempts
     LoginAttempts,
-    /// For caching sessions
+    /// Session caching
     Session,
-    /// For keeping track of registration tokens
+    /// Keeps track of registration tokens
     RegToken,
-    /// For keeping track of password reset tokens
+    /// Keeps track of password reset tokens
     PWToken,
-    /// For 2FA login, OTPs won't be accepted without this token in the cache
+    /// 2FA login, OTPs won't be accepted without this token in the cache
     OTPToken,
-    /// For 2FA login failure
+    /// 2FA login failure
     OTPThrottle,
-    /// For 2FA login failure
+    /// 2FA login failure
     OTPAttempts,
-    /// For stopping email craziness
+    /// Stopping email craziness
     EmailThrottle,
 }
 

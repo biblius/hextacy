@@ -6,7 +6,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::{Duration, NaiveDateTime, Utc};
 use diesel::{ExpressionMethods, Insertable, QueryDsl, RunQueryDsl};
-use hextacy::driver::db::postgres::diesel::DieselConnection;
+use hextacy::adapters::db::postgres::diesel::DieselConnection;
 use std::fmt::Debug;
 
 #[derive(Debug, Insertable)]

@@ -4,7 +4,7 @@ use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
 use hextacy::contract;
 use hextacy::drive;
-use hextacy::driver::Driver;
+use hextacy::Driver;
 
 drive! {
     AuthMwRepo,

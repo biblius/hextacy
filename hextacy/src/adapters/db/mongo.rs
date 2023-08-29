@@ -1,5 +1,4 @@
-use super::super::Driver;
-use crate::{db::Atomic, driver::DriverError};
+use crate::driver::{Atomic, Driver, DriverError};
 use async_trait::async_trait;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},

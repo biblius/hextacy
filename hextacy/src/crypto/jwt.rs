@@ -26,7 +26,7 @@ impl Claims {
 
 /// Generates a JWT using the provided algorithm.
 ///
-/// `priv_key` has to be a valid RSA key.
+/// `priv_key` has to be a valid RSA private key.
 pub fn generate(
     priv_key: &[u8],
     sub: String,

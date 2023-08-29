@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use hextacy::driver::cache::redis::redis;
+use hextacy::adapters::cache::redis::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;
@@ -13,7 +13,7 @@ pub enum Error {
     #[error("Env var Error: {0}")]
     Var(#[from] std::env::VarError),
     #[error("Driver Error: {0}")]
-    Driver(#[from] hextacy::driver::DriverError),
+    Driver(#[from] hextacy::DriverError),
     #[error("Cache Error: {0}")]
     Cache(#[from] crate::cache::CacheAdapterError),
     #[error("Adapter Error: {0}")]

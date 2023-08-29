@@ -4,6 +4,7 @@ use lettre::{message::header::ContentType, Message, SmtpTransport, Transport};
 use std::{fmt::Write, fs, path::Path};
 use tracing::debug;
 
+// This implementation is concrete because I cba to write it via Drivers
 pub struct Email {
     driver: SmtpTransport,
 }
@@ -28,7 +29,7 @@ impl Email {
     }
 
     /// Build an email driver from the environment.
-    pub fn build_driver() -> Self {
+    fn build_driver() -> Self {
         let mut params =
             crate::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
 
