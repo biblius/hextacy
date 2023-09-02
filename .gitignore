@@ -5,3 +5,4 @@
 **/.env
 **/*.pem
 **/*.crt
+.vscode

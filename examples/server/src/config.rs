@@ -3,41 +3,71 @@ pub mod cors;
 
 use crate::{app::router, services::email::Email};
 use actix_web::web::ServiceConfig;
-use hextacy::adapters::{
-    cache::redis::Redis,
-    db::{
-        mongo::Mongo,
-        postgres::{diesel::PostgresDiesel, seaorm::PostgresSea},
+use hextacy::{
+    adapters::{
+        cache::redis::Redis,
+        db::{
+            mongo::Mongo,
+            postgres::{diesel::PostgresDiesel, seaorm::PostgresSea},
+        },
     },
+    Configuration,
 };
 use std::sync::Arc;
 use tracing::info;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Configuration)]
 pub struct AppState {
+    #[env(
+        "PG_HOST",
+        "PG_PORT" as u16,
+        "PG_USER",
+        "PG_PASSWORD",
+        "PG_DATABASE",
+        "PG_POOL_SIZE" as Option<u32>
+    )]
     pub pg_diesel: Arc<PostgresDiesel>,
+
+    /*     #[env(
+        "PG_HOST",
+        "PG_PORT",
+        "PG_USER",
+        "PG_PASSWORD",
+        "PG_DATABASE",
+        "PG_POOL_SIZE"
+    )] */
     pub pg_sea: Arc<PostgresSea>,
+    // #[raw("localhost", 6379, None, None, 0, 8)]
+    #[env(
+        "RD_HOST",
+        "RD_PORT" as u16,
+        "RD_USER" as Option,
+        "RD_PASSWORD" as Option,
+        "RD_DATABASE" as i64,
+        "RD_POOL_SIZE" as usize
+    )]
     pub redis: Arc<Redis>,
     pub smtp: Arc<Email>,
-    pub mongo: Arc<Mongo>,
+    //    #[env("MONGO_HOST", "MONGO_PORT")]
+    pub mongo: std::sync::Arc<Mongo>,
 }
 
 impl AppState {
     pub async fn init() -> Self {
         let pg_diesel = init_diesel_pg();
-        info!("PostgresDiesel pool initialized");
+        // info!("PostgresDiesel pool initialized");
 
         let pg_sea = init_sea_pg().await;
-        info!("PostgresSea pool initialized");
+        // info!("PostgresSea pool initialized");
 
         let mongo = init_mongo();
-        info!("Mongo pool initialized");
+        // info!("Mongo pool initialized");
 
         let redis = init_rd();
-        info!("Redis pool initialized");
+        // info!("Redis pool initialized");
 
-        let smtp = Arc::new(Email::new());
-        info!("Email client initialized");
+        let smtp = init_email();
+        // info!("Email client initialized");
 
         Self {
             pg_diesel,
@@ -49,12 +79,29 @@ impl AppState {
     }
 }
 
+fn init_email() -> Arc<Email> {
+    let params =
+        crate::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
+
+    let password = &params["SMTP_PASSWORD"];
+    let username = &params["SMTP_USERNAME"];
+    let port = &params["SMTP_PORT"];
+    let host = &params["SMTP_HOST"];
+
+    Arc::new(Email::new(
+        host,
+        port.parse::<u16>().expect("Invalid SMTP port"),
+        username.to_string(),
+        password.to_string(),
+    ))
+}
+
 pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
     router::route(state, cfg);
 }
 
 async fn init_sea_pg() -> Arc<PostgresSea> {
-    let mut params = hextacy::env::get_multiple(&[
+    let params = hextacy::env::get_multiple(&[
         "PG_USER",
         "PG_PASSWORD",
         "PG_HOST",
@@ -62,20 +109,21 @@ async fn init_sea_pg() -> Arc<PostgresSea> {
         "PG_DATABASE",
         "PG_POOL_SIZE",
     ]);
-    let pool_size = params.pop().expect("PG_POOL_SIZE must be set");
-    let db = params.pop().expect("PG_DATABASE must be set");
-    let port = params.pop().expect("PG_PORT must be set");
-    let host = params.pop().expect("PG_HOST must be set");
-    let pw = params.pop().expect("PG_PASSWORD must be set");
-    let user = params.pop().expect("PG_USER must be set");
+
+    let pool_size = &params["PG_POOL_SIZE"];
+    let db = &params["PG_DATABASE"];
+    let port = &params["PG_PORT"];
+    let host = &params["PG_HOST"];
+    let pw = &params["PG_PASSWORD"];
+    let user = &params["PG_USER"];
 
     Arc::new(
         PostgresSea::new(
-            &host,
+            host,
             port.parse().expect("Invalid PG_PORT"),
-            &user,
-            &pw,
-            &db,
+            user,
+            pw,
+            db,
             pool_size.parse().expect("Invalid PG_POOL_SIZE"),
         )
         .await,
@@ -83,7 +131,7 @@ async fn init_sea_pg() -> Arc<PostgresSea> {
 }
 
 fn init_diesel_pg() -> Arc<PostgresDiesel> {
-    let mut params = hextacy::env::get_multiple(&[
+    let params = hextacy::env::get_multiple(&[
         "PG_USER",
         "PG_PASSWORD",
         "PG_HOST",
@@ -91,25 +139,26 @@ fn init_diesel_pg() -> Arc<PostgresDiesel> {
         "PG_DATABASE",
         "PG_POOL_SIZE",
     ]);
-    let pool_size = params.pop().expect("PG_POOL_SIZE must be set");
-    let db = params.pop().expect("PG_DATABASE must be set");
-    let port = params.pop().expect("PG_PORT must be set");
-    let host = params.pop().expect("PG_HOST must be set");
-    let pw = params.pop().expect("PG_PASSWORD must be set");
-    let user = params.pop().expect("PG_USER must be set");
+
+    let pool_size = &params["PG_POOL_SIZE"];
+    let db = &params["PG_DATABASE"];
+    let port = &params["PG_PORT"];
+    let host = &params["PG_HOST"];
+    let pw = &params["PG_PASSWORD"];
+    let user = &params["PG_USER"];
 
     Arc::new(PostgresDiesel::new(
-        &host,
+        host,
         port.parse().expect("Invalid PG_PORT"),
-        &user,
-        &pw,
-        &db,
-        pool_size.parse().expect("Invalid PG_POOL_SIZE"),
+        user,
+        pw,
+        db,
+        Some(pool_size.parse().expect("Invalid PG_POOL_SIZE")),
     ))
 }
 
 fn init_mongo() -> Arc<Mongo> {
-    let mut params = hextacy::env::get_multiple(&[
+    let params = hextacy::env::get_multiple(&[
         "MONGO_USER",
         "MONGO_PASSWORD",
         "MONGO_HOST",
@@ -117,31 +166,30 @@ fn init_mongo() -> Arc<Mongo> {
         "MONGO_DATABASE",
     ]);
 
-    let db = params.pop().expect("MONGO_DATABASE must be set");
-    let port = params.pop().expect("MONGO_PORT must be set");
-    let host = params.pop().expect("MONGO_HOST must be set");
-    let pw = params.pop().expect("MONGO_PASSWORD must be set");
-    let user = params.pop().expect("MONGO_USER must be set");
+    let db = &params["MONGO_DATABASE"];
+    let port = &params["MONGO_PORT"];
+    let host = &params["MONGO_HOST"];
+    let pw = &params["MONGO_PASSWORD"];
+    let user = &params["MONGO_USER"];
 
     Arc::new(Mongo::new(
-        &host,
+        host,
         port.parse().expect("Invalid MONGO_PORT"),
-        &user,
-        &pw,
-        &db,
+        user,
+        pw,
+        db,
     ))
 }
 
 fn init_rd() -> Arc<Redis> {
-    let mut params =
-        hextacy::env::get_multiple(&["RD_HOST", "RD_PORT", "RD_DATABASE", "RD_POOL_SIZE"]);
-    let pool_size = params.pop().expect("RD_POOL_SIZE must be set");
-    let db = params.pop().expect("RD_DATABASE must be set");
-    let port = params.pop().expect("RD_PORT must be set");
-    let host = params.pop().expect("RD_HOST must be set");
+    let params = hextacy::env::get_multiple(&["RD_HOST", "RD_PORT", "RD_DATABASE", "RD_POOL_SIZE"]);
+    let pool_size = &params["RD_POOL_SIZE"];
+    let db = &params["RD_DATABASE"];
+    let port = &params["RD_PORT"];
+    let host = &params["RD_HOST"];
 
     Arc::new(Redis::new(
-        &host,
+        host,
         port.parse().expect("Invalid RD_PORT"),
         None,
         None,

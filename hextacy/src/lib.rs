@@ -32,4 +32,4 @@ pub mod time;
 pub mod web;
 
 /// Derive macro for quick implementation of component traits.
-pub use hextacy_macros::contract;
+pub use hextacy_macros::{contract, Configuration};

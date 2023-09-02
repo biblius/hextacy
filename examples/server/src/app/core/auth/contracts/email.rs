@@ -9,6 +9,12 @@ pub struct Email {
     pub driver: Arc<email::Email>,
 }
 
+impl Email {
+    pub fn new(driver: Arc<email::Email>) -> Self {
+        Self { driver }
+    }
+}
+
 #[contract]
 impl Email {
     fn send_registration_token(
@@ -20,7 +26,7 @@ impl Email {
         debug!("Sending registration token email to {email}");
         let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
-        let mail = email::from_template(
+        let mail = email::load_from_template(
             EMAIL_DIRECTORY,
             "registration_token",
             &[("username", username), ("registration_uri", &uri)],
@@ -32,7 +38,7 @@ impl Email {
 
     fn send_reset_password(&self, username: &str, email: &str, temp_pw: &str) -> Result<(), Error> {
         debug!("Sending reset password email to {email}");
-        let mail = email::from_template(
+        let mail = email::load_from_template(
             EMAIL_DIRECTORY,
             "reset_password",
             &[("username", username), ("temp_password", temp_pw)],
@@ -46,7 +52,7 @@ impl Email {
         debug!("Sending change password email alert to {email}");
         let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
-        let mail = email::from_template(
+        let mail = email::load_from_template(
             EMAIL_DIRECTORY,
             "change_password",
             &[("username", username), ("reset_password_uri", &uri)],
@@ -58,7 +64,7 @@ impl Email {
 
     fn send_forgot_password(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending forgot password email to {email}");
-        let mail = email::from_template(
+        let mail = email::load_from_template(
             EMAIL_DIRECTORY,
             "forgot_password",
             &[("username", username), ("forgot_pw_token", token)],
@@ -72,7 +78,7 @@ impl Email {
         debug!("Sending change password email alert to {email}");
         let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
         let uri = format!("{domain}/auth/reset-password?token={token}");
-        let mail = email::from_template(
+        let mail = email::load_from_template(
             EMAIL_DIRECTORY,
             "account_frozen",
             &[("username", username), ("reset_password_uri", &uri)],

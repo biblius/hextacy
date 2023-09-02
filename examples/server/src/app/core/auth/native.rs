@@ -156,7 +156,7 @@ where
                 return Err(AuthenticationError::AuthBlocked.into());
             }
         }
-        let result = crypto::otp::verify_otp(password, secret)?;
+        let result = crypto::otp::verify_otp(password, secret, BASE32)?;
 
         // If it's wrong increment the throttle and error
         if !result {
@@ -301,7 +301,7 @@ where
     async fn set_otp_secret(&self, session: Session) -> Result<HttpResponse, Error> {
         let Session { ref user_id, .. } = session;
 
-        let secret = crypto::otp::generate_secret();
+        let secret = crypto::otp::generate_secret(160, BASE32);
 
         let user = self
             .repository

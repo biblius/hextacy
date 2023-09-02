@@ -22,14 +22,14 @@ impl PostgresDiesel {
         user: &str,
         password: &str,
         db: &str,
-        pool_size: u32,
+        pool_size: Option<u32>,
     ) -> Self {
         let url = format!("postgresql://{user}:{password}@{host}:{port}/{db}");
 
         let manager = ConnectionManager::<PgConnection>::new(url);
 
         let pool = Pool::builder()
-            .max_size(pool_size)
+            .max_size(pool_size.unwrap_or(8))
             .build(manager)
             .unwrap_or_else(|e| panic!("Failed to create postgres pool: {e}"));
 

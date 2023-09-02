@@ -53,9 +53,7 @@ pub(super) mod auth_service {
             let service = Self {
                 repository: RepoComponent::new(state.pg_sea.clone()),
                 cache: CacheComponent::new(state.redis.clone()),
-                email: EmailComponent {
-                    driver: state.smtp.clone(),
-                },
+                email: EmailComponent::new(state.smtp.clone()),
             };
             cfg.app_data(web::Data::new(service));
         }

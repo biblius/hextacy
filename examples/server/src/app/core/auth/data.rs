@@ -78,7 +78,7 @@ pub struct ForgotPasswordVerify {
 }
 
 #[derive(Debug, Deserialize)]
-/// Received when verifying registration token
+/// Received when the user wants to logout
 pub struct Logout {
     pub purge: bool,
 }

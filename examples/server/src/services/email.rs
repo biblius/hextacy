@@ -17,34 +17,10 @@ impl std::fmt::Debug for Email {
     }
 }
 
-impl Default for Email {
-    fn default() -> Self {
-        Self::build_driver()
-    }
-}
-
 impl Email {
-    pub fn new() -> Self {
-        Self::build_driver()
-    }
-
-    /// Build an email driver from the environment.
-    fn build_driver() -> Self {
-        let mut params =
-            crate::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
-
-        let password = params.pop().expect("SMTP_PASSWORD must be set");
-        let username = params.pop().expect("SMTP_USERNAME must be set");
-        let port = params
-            .pop()
-            .expect("SMTP_PORT must be set")
-            .parse::<u16>()
-            .expect("Invalid SMTP port");
-        let host = params.pop().expect("SMTP host must be set");
-
+    pub fn new(host: &str, port: u16, username: String, password: String) -> Self {
         debug!("Building SMTP driver");
-
-        let driver = SmtpTransport::relay(&host)
+        let driver = SmtpTransport::relay(host)
             .expect("Could not establish SmtpTransport")
             .credentials(Credentials::new(username, password))
             .port(port)
@@ -84,7 +60,7 @@ impl Email {
 
 /// Load a template from an HTML file and replace all the keywords with the targets.
 /// Keywords must be formatted as `{{keyword}}`.
-pub fn from_template(dir: &str, template_name: &str, replacements: &[(&str, &str)]) -> String {
+pub fn load_from_template(dir: &str, template_name: &str, replacements: &[(&str, &str)]) -> String {
     let template = fs::read_to_string(Path::new(&format!("{dir}/{template_name}.html")))
         .expect("Couldn't load template");
 

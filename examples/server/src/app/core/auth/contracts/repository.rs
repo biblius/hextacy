@@ -11,9 +11,6 @@ use hextacy::Driver;
 use hextacy::{contract, drive};
 use tracing::info;
 
-#[allow(unused_imports)]
-use hextacy::adapters::db::postgres::diesel::{DieselConnection, PostgresDiesel};
-
 drive! {
     AuthenticationRepository,
 

@@ -121,7 +121,6 @@ where
 
 impl<M> Handler<Subscribe<M>> for Broker
 where
-    // T: 'static + Unpin + Debug,
     M: Broadcast + Debug,
 {
     type Result = ();

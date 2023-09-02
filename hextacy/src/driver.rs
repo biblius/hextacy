@@ -18,7 +18,8 @@ pub trait Driver {
 /// the connection on which the transaction is started.
 ///
 /// When they are struct based, the adapter must implement a repository trait for both the
-/// connection and transaction.
+/// connection and transaction (usually a trait is provided for both so one can use it to
+/// mitigate 2 different implementations).
 ///
 /// Check out the [driver module][crate::drivers::db] to see concrete implementations.
 #[async_trait]

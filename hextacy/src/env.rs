@@ -1,4 +1,7 @@
-use std::env::{self, VarError};
+use std::{
+    collections::HashMap,
+    env::{self, VarError},
+};
 
 /// Gets an environment variable for the given key
 pub fn get(key: &str) -> Result<String, VarError> {
@@ -15,33 +18,31 @@ pub fn get_or_default(key: &str, default: &str) -> String {
     get(key).unwrap_or_else(|_| String::from(default))
 }
 
-/// Retrieves a vec of values for the given keys set in the env, in the order
-/// of the input vec. Panics if any of the requested variables are not set.
-///
-/// TODO: Make this return a Result
-pub fn get_multiple(keys: &[&str]) -> Vec<String> {
-    let mut results = vec![];
+/// Retrieves a map of values for the given keys set in the env.
+/// If the key is not found in the env, it will not be in the returned map.
+pub fn get_multiple<'a>(keys: &[&'a str]) -> HashMap<&'a str, String> {
+    let mut results = HashMap::new();
     for key in keys {
-        match env::var(key) {
-            Ok(value) => {
-                results.push(value);
-            }
-            Err(e) => panic!("Error at key {key}, {e}"),
-        };
+        let var = env::var(key);
+        if let Ok(var) = var {
+            results.insert(*key, var);
+        }
     }
     results
 }
 
-/// Retrieves a vec of values for the given keys set in the env, in the order
-/// of the input vec, default to the given value if not found.
-pub fn get_or_default_multiple(keys: &[(&str, &str)]) -> Vec<String> {
-    let mut results = vec![];
+/// The same as [get_multiple], but ensures there is a default value in the final map if the
+/// key is not found in the end
+pub fn get_or_default_multiple<'a>(keys: &'a [(&'a str, &str)]) -> HashMap<&'a str, String> {
+    let mut results = HashMap::new();
     for (key, default) in keys {
         match env::var(key) {
             Ok(value) => {
-                results.push(value);
+                results.insert(*key, value);
             }
-            Err(_) => results.push(default.to_string()),
+            Err(_) => {
+                results.insert(key, default.to_string());
+            }
         };
     }
     results

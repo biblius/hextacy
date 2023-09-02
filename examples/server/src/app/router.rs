@@ -25,7 +25,7 @@ fn auth_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
-    use super::handlers::auth::native::*;
+    use super::controllers::auth::native::*;
     use super::setup::auth_service::*;
     AuthenticationService::configure(state, cfg);
     scope!(
@@ -49,7 +49,7 @@ fn oauth_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
-    use super::handlers::auth::o_auth::*;
+    use super::controllers::auth::o_auth::*;
     use super::setup::oauth_service::*;
     OAuthService::configure(state, cfg);
     scope!(

@@ -1,6 +1,6 @@
 use crate::config::constants::FAVICON_PATH;
 use lazy_static::lazy_static;
-use std::{fs, path::Path};
+use std::fs;
 use tracing::debug;
 
 pub fn initialize() {
@@ -12,6 +12,6 @@ pub fn initialize() {
 lazy_static! {
     pub static ref FAVICON: Vec<u8> = {
         debug!("Loading favicon");
-        fs::read(Path::new(FAVICON_PATH)).expect("Couldn't load favicon.ico")
+        fs::read(FAVICON_PATH).expect("Couldn't load favicon.ico")
     };
 }
