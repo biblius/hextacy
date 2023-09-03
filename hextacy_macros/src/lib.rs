@@ -5,10 +5,15 @@ use syn::{spanned::Spanned, DeriveInput, Ident, ItemImpl, TypePath};
 
 mod configuration;
 
-/// Intended to be used on configuration/state structs that need to instantiate themselves using env variables.
+/// Intended to be used on configuration/state structs that need to instantiate themselves using variables obtained
+/// from an external source.
 ///
 /// This macro assumes a constructor (an associated function named `new`) exists for the annotated field's type and
-/// creates a function that initialises said struct using the specified keys and strategy.
+/// creates a function that calls it using the specified keys and strategy. If a constructor does not exit, you can
+/// specify an associated function of the struct to load with with `#[load_with(T::some_constructor)]`.
+///
+/// A struct annotated with this macro will receive an associated function `init()` which can be used to construct
+/// it via the generated functions.
 ///
 /// For each field annotated and for each annotation, the function's signature will be
 /// `fn init_<field_name>_<strategy>() { .. }`.
@@ -18,15 +23,43 @@ mod configuration;
 /// - The wrappers must have an associated `new` function (constructor)
 /// - The wrapper cannot be `Option`
 ///
+/// If a field constructor is async, the field it can be annotated with `#[load_async]` to support it. If any of the
+/// constructors are async, the resulting `init()` function will be async as well.
+///
+/// Given that most adapters are thin wrappers to some kind of connection source (pool, client, etc.), it might be better to
+/// configure them to implement `Clone` and delegate the clone to the arc instead of creating an additional pointer to them.
+///
 /// ## Field annotations
+///
+/// The order of field annotations specifies the priority of loading the variables. Each subsequent annotation will be a fallback
+/// strategy to the previous if it fails. If all the strategies fail for a given field, the `init()` function will panic.
+///
+/// The order of variables specified, as well as the types, must match the order of the constructor's signature.
+///
+/// Examples use the following dummy adapter:
+///
+/// ```ignore
+/// struct DummyAdapter {
+///     // ...
+/// }
+///
+/// // The order of the variables must match the variables in field annotations
+/// impl DummyAdapter {
+///     pub fn new(host: &str, port: u16, pool_size: Option<u16>) -> DummyAdapter {
+///         // ...
+///     }
+///     pub async fn new_async(host: &str, port: u16, pool_size: Option<u16>) -> DummyAdapter {
+///         // ...
+///     }
+/// }
+/// ```
 ///
 /// ### `env`
 ///
-/// - The order of variables specified, as well as the types, must match the order of the constructor's signature.
-/// - All variables are loaded as `String`s by default
+/// - All variables are loaded as `String`s by default and are passed as `&str`s to the constructors
 /// - Variables can be parsed by appending `as T`, e.g. `"MY_VAR" as usize`
 /// - Variables can be optional by appending `as Option`, e.g. `"MY_VAR" as Option`
-/// - Variables can be both parsed and optional by appending `as Option<T>`, e.g. `"MY_VAR" as Option<u16>`
+/// - Both can be applied by appending `as Option<T>`, e.g. `"MY_VAR" as Option<u16>`
 ///  
 /// The function generated calls `hextacy::env::get_multiple`, parses the variables if specified and calls the
 /// struct's constructor.
@@ -47,27 +80,51 @@ mod configuration;
 ///     // Mutex is just for example, don't do this at home
 ///     pub postgres: Arc<Mutex<MyPgAdapter>>
 /// }
-///
-/// struct DummyAdapter {
-///     // ...
-/// }
-///
-/// impl DummyAdapter {
-///     // The order of the variables here determines how the
-///     pub fn new(host: &str, port: u16, pool_size: Option<u16>) -> DummyAdapter {
-///         // ...
-///     }
-/// }
+/// ```
 ///
 /// ### `raw`
 ///
-/// - The order of variables specified, as well as the types, must match the order of the constructor's signature.
+/// - Should only be used when prototyping
+///
+/// #### Example
+///
+/// ```ignore
+/// use hextacy::Configuration;
+///
+/// #[derive(Debug, Configuration)]
+/// struct MyAppState {
+///     #[raw("localhost", 5432, Some(8))]
+///     pub postgres: Arc<MyPgAdapter>
+/// }
 /// ```
-#[proc_macro_derive(Configuration, attributes(env, raw))]
+///
+/// ### `load_async`
+///
+/// - Use this when the constructor is async
+///
+/// ### `load_with`
+///
+/// - Use this to specify an associated function to call instead of `new`
+///
+///
+/// #### Examples
+///
+/// ```ignore
+/// #[derive(Debug, Configuration)]
+/// struct MyAppState {
+///     #[raw("localhost", 5432, Some(8))]
+///     #[load_async]
+///     #[load_with(MyPgAdapter::new_async)]
+///     pub postgres: Arc<MyPgAdapter>
+/// }
+/// ````
+#[proc_macro_derive(Configuration, attributes(env, raw, load_async, load_with))]
 #[proc_macro_error]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input: DeriveInput = syn::parse(input.clone()).unwrap();
-    configuration::impl_configuration(input).into()
+    configuration::impl_configuration(input)
+        .expect("Error while parsing Configuration")
+        .into()
 }
 
 #[proc_macro_attribute]

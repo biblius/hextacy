@@ -1,29 +1,117 @@
+use std::collections::HashMap;
+
 use proc_macro2::{Span, TokenStream};
 use proc_macro_error::abort;
 use quote::{format_ident, quote, ToTokens, TokenStreamExt};
 use syn::{
-    parse::Parse, punctuated::Punctuated, spanned::Spanned, DeriveInput, Ident, LitStr,
-    PathArguments, PathSegment, Token, Type, 
+    parse::Parse, punctuated::Punctuated, spanned::Spanned, DeriveInput, Expr, Field, Ident,
+    LitStr, Meta, PathArguments, PathSegment, Token, Type,
 };
 
-pub fn impl_configuration(input: DeriveInput) -> proc_macro2::TokenStream {
+pub fn impl_configuration(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn::Error> {
     let syn::Data::Struct(strct) = input.data else {
-        unimplemented!("Configuration derive only works for structs");
+        abort!(input.span(), "Configuration derive only works for structs");
     };
 
-    let mut loaders = vec![];
+    let mut field_loaders = vec![];
 
     for field in strct.fields {
-        let field_id = field.ident.clone().unwrap_or_else(|| {
+        let field_info = FieldInfo::from(&field);
+        let field_id = field_info.id.clone();
+
+        let mut field_loader = FieldLoader {
+            field: field_info,
+            loaders: HashMap::new(),
+            is_async: false,
+            load_with: None,
+        };
+
+        // Parse attributes
+        for attr in field.attrs {
+            // Parse env
+            if attr.meta.path().is_ident("env") {
+                let env_loader = EnvLoader::from(&attr.meta);
+                let loader = Box::new(env_loader);
+                field_loader
+                    .loaders
+                    .entry(field_id.clone())
+                    .or_insert(vec![])
+                    .push(loader);
+            }
+
+            // Parse raw
+            if attr.meta.path().is_ident("raw") {
+                let raw_loader = RawLoader::from(&attr.meta);
+                let loader = Box::new(raw_loader);
+                field_loader
+                    .loaders
+                    .entry(field_id.clone())
+                    .or_insert(vec![])
+                    .push(loader);
+            }
+
+            if attr.meta.path().is_ident("load_async") {
+                field_loader.is_async = true;
+            }
+
+            if attr.meta.path().is_ident("load_with") {
+                let list = attr.meta.require_list()?;
+                field_loader.load_with = Some(list.parse_args::<syn::Path>()?);
+            }
+        }
+
+        field_loaders.push(field_loader);
+    }
+
+    field_loaders.retain(|loader| !loader.loaders.is_empty());
+
+    let mut tokens = TokenStream::new();
+
+    tokens.append_all(field_loaders);
+
+    Ok(tokens)
+}
+
+trait Loader: std::fmt::Debug {
+    fn fn_ident(&self, field_id: Ident) -> Ident;
+
+    fn extend_tokens(
+        &self,
+        field: &FieldInfo,
+        is_async: bool,
+        load_with: Option<&syn::Path>,
+        tokens: &mut TokenStream,
+    );
+}
+
+/// Top level loader that collects config loaders on a per field basis.
+#[derive(Debug)]
+struct FieldLoader {
+    field: FieldInfo,
+    loaders: HashMap<Ident, Vec<Box<dyn Loader>>>,
+    is_async: bool,
+    load_with: Option<syn::Path>,
+}
+
+#[derive(Debug)]
+struct FieldInfo {
+    id: Ident,
+    strct: PathSegment,
+    wrappers: Vec<Ident>,
+}
+
+impl From<&Field> for FieldInfo {
+    fn from(field: &Field) -> Self {
+        let field_id = field.ident.as_ref().unwrap_or_else(|| {
             abort!(
-                field.ident.span(),
+                field.span(),
                 "Configuration macro must be used on named structs"
             )
         });
 
         let mut wrappers = vec![];
 
-        let Type::Path(p) = field.ty.clone() else {
+        let Type::Path(ref p) = field.ty else {
             abort!(
                 field.ty.span(),
                 "`env` loader cannot be implemented for type"
@@ -36,76 +124,91 @@ pub fn impl_configuration(input: DeriveInput) -> proc_macro2::TokenStream {
             .last()
             .unwrap_or_else(|| abort!(p.path.segments.span(), "Wrapper not supported"));
 
-        let original = find_original(seg.clone(), &mut wrappers);
+        let original = find_original(seg, &mut wrappers);
 
-        let mut field_loader = FieldLoader {
-            id: field_id,
+        Self {
+            id: field_id.clone(),
             strct: original,
             wrappers,
-            env_keys: vec![],
-            source: None,
-        };
-
-        // Parse attributes
-        for attr in field.attrs {
-            if attr.meta.path().is_ident("env") {
-                field_loader.source = Some(VarSource::Env);
-                let list = attr.meta.require_list().unwrap_or_else(|_| {
-                    abort!(
-                        attr.meta.span(),
-                        "`env` loader must be a list of variables to load from the env"
-                    )
-                });
-
-                field_loader.env_keys.extend(
-                    list.parse_args_with(Punctuated::<EnvVar, Token![,]>::parse_terminated)
-                        .unwrap()
-                        .into_pairs()
-                        .map(|pair| pair.into_value()),
-                );
-            }
         }
-
-        loaders.push(field_loader);
     }
-
-    loaders.retain(|loader| !loader.env_keys.is_empty());
-
-    let mut tokens = TokenStream::new();
-
-    tokens.append_all(loaders);
-
-    tokens
-}
-
-
-#[derive(Debug)]
-struct FieldLoader {
-    id: Ident,
-    strct: PathSegment,
-    wrappers: Vec<Ident>,
-    env_keys: Vec<EnvVar>,
-    source: Option<VarSource>,
 }
 
 impl ToTokens for FieldLoader {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let Self {
+            field,
+            loaders,
+            is_async,
+            load_with,
+        } = &self;
+
+        let loaders = loaders.get(&field.id).unwrap();
+        for loader in loaders {
+            loader.extend_tokens(field, *is_async, load_with.as_ref(), tokens)
+        }
+    }
+}
+
+/// Loading strategy for the `env` attribute.
+#[derive(Debug)]
+struct EnvLoader {
+    keys: Vec<EnvVar>,
+}
+
+impl From<&Meta> for EnvLoader {
+    fn from(meta: &Meta) -> Self {
+        let mut loader = Self { keys: vec![] };
+
+        let list = meta.require_list().unwrap_or_else(|_| {
+            abort!(
+                meta.span(),
+                "`env` loader must be a list of variables to load from the env"
+            )
+        });
+
+        loader.keys.extend(
+            list.parse_args_with(Punctuated::<EnvVar, Token![,]>::parse_terminated)
+                .unwrap()
+                .into_pairs()
+                .map(|pair| pair.into_value()),
+        );
+
+        loader
+    }
+}
+
+impl Loader for EnvLoader {
+    fn fn_ident(&self, field_id: Ident) -> Ident {
+        format_ident!("init_{field_id}_env")
+    }
+
+    fn extend_tokens(
+        &self,
+        field: &FieldInfo,
+        is_async: bool,
+        load_with: Option<&syn::Path>,
+        tokens: &mut TokenStream,
+    ) {
+        let FieldInfo {
             id,
             strct,
             wrappers,
-            env_keys,
-            source,
-        } = &self;
-
-        let source = match source.as_ref().unwrap() {
-            VarSource::Env => "env",
-            VarSource::Raw => "raw",
-        };
-
-        let id = format_ident!("init_{id}_{source}");
+        } = field;
+        let id = self.fn_ident(id.clone());
+        let env_keys = &self.keys;
 
         let to_var_ident = |var: &EnvVar| Ident::new(&var.lit.to_lowercase(), Span::call_site());
+
+        // Account for asyncness
+        let (async_fn, async_constr) = if is_async {
+            (quote!(async), quote!(.await))
+        } else {
+            (quote!(), quote!())
+        };
+
+        // Custom constructor
+        let constructor_fn = load_with.map(|p| quote!(#p)).unwrap_or(quote!(#strct::new));
 
         // For the call to strct::new
         let constructor_vars = env_keys.iter().map(to_var_ident).collect::<Vec<_>>();
@@ -126,8 +229,8 @@ impl ToTokens for FieldLoader {
                     (true, false) => quote!(.map(|x| x.as_str())),
                     (false, true) => quote!(.expect(#convert_err)),
                     (false, false) => quote!(.map(|x| x.as_str()).expect(#convert_err)),
-                }; 
-                
+                };
+
                 let parse = env_key
                     .parse_to
                     .as_ref()
@@ -138,25 +241,22 @@ impl ToTokens for FieldLoader {
             })
             .collect::<Vec<_>>();
 
-        // For indexing to the map and fetching the vars with get_multiple
-        let env_keys = env_keys
-            .iter()
-            .map(|k| k.lit.clone())
-            .collect::<Vec<_>>();
+        // For collecting the vars with get_multiple
+        let env_keys = env_keys.iter().map(|k| k.lit.clone()).collect::<Vec<_>>();
 
         let mut return_ty = quote!(#strct);
         for wrapper in wrappers {
             return_ty = quote!(#wrapper<#return_ty>);
         }
 
-        let mut constructor = quote!(#strct::new( #( #constructor_vars ),* ));
+        let mut constructor = quote!( #constructor_fn ( #( #constructor_vars ),* ) #async_constr);
         for wrapper in wrappers {
             constructor = quote!(#wrapper::new(#constructor));
         }
 
         let quoted = quote!(
-            fn #id () -> #return_ty {
-                let params = ::hextacy::env::get_multiple(&[#( #env_keys ),*]);
+            #async_fn fn #id () -> #return_ty {
+                let params = ::hextacy::config::env::get_multiple(&[#( #env_keys ),*]);
                 #(#variables)*
                 #constructor
             }
@@ -164,17 +264,6 @@ impl ToTokens for FieldLoader {
 
         tokens.extend(quoted)
     }
-}
-
-
-/// The source to which to obtain the env variables from.
-#[non_exhaustive]
-#[derive(Debug)]
-enum VarSource {
-    Env,
-
-    // TODO
-    Raw,
 }
 
 /// Represent a variable key in the `env` attribute.
@@ -254,13 +343,89 @@ impl Parse for EnvVar {
     }
 }
 
+/// Loading strategy for the `raw` attribute. Parses all valid `Expr`s.
+#[derive(Debug)]
+struct RawLoader {
+    values: Vec<Expr>,
+}
+
+impl From<&Meta> for RawLoader {
+    fn from(meta: &Meta) -> Self {
+        let mut loader = Self { values: vec![] };
+
+        let list = meta.require_list().unwrap_or_else(|_| {
+            abort!(
+                meta.span(),
+                "`env` loader must be a list of variables to load from the env"
+            )
+        });
+
+        loader.values.extend(
+            list.parse_args_with(Punctuated::<Expr, Token![,]>::parse_terminated)
+                .unwrap()
+                .into_pairs()
+                .map(|pair| pair.into_value()),
+        );
+
+        loader
+    }
+}
+
+impl Loader for RawLoader {
+    fn fn_ident(&self, field_id: Ident) -> Ident {
+        format_ident!("init_{field_id}_raw")
+    }
+
+    fn extend_tokens(
+        &self,
+        field: &FieldInfo,
+        is_async: bool,
+        load_with: Option<&syn::Path>,
+        tokens: &mut TokenStream,
+    ) {
+        let FieldInfo {
+            id,
+            strct,
+            wrappers,
+        } = field;
+        let id = self.fn_ident(id.clone());
+        let args = &self.values;
+
+        let (async_fn, async_constr) = if is_async {
+            (quote!(async), quote!(.await))
+        } else {
+            (quote!(), quote!())
+        };
+
+        let constructor_fn = load_with.map(|p| quote!(#p)).unwrap_or(quote!(#strct::new));
+
+        let mut return_ty = quote!(#strct);
+        for wrapper in wrappers {
+            return_ty = quote!(#wrapper<#return_ty>);
+        }
+
+        let mut constructor = quote!(#constructor_fn ( #( #args ),* ) #async_constr);
+        for wrapper in wrappers {
+            constructor = quote!(#wrapper::new(#constructor));
+        }
+
+        let quoted = quote!(
+            #async_fn fn #id () -> #return_ty {
+                #constructor
+            }
+        );
+
+        tokens.extend(quoted)
+    }
+}
+
 /// Recursively goes through wrappers until it finds one with no AB args and returns it, this will usually be the
 /// struct in question.
-fn find_original(seg: PathSegment, wrappers: &mut Vec<Ident>) -> PathSegment {
+fn find_original(seg: &PathSegment, wrappers: &mut Vec<Ident>) -> PathSegment {
     match seg.arguments {
-        PathArguments::None => seg,
-        PathArguments::AngleBracketed(ab) => {
-            wrappers.insert(0, seg.ident);
+        PathArguments::None => seg.clone(),
+        PathArguments::AngleBracketed(ref ab) => {
+            wrappers.insert(0, seg.ident.clone());
             let arg = ab
                 .args
                 .last()
@@ -273,12 +438,12 @@ fn find_original(seg: PathSegment, wrappers: &mut Vec<Ident>) -> PathSegment {
                             "`env` loader not supported for type"
                         )
                     });
-                    find_original(s.clone(), wrappers)
+                    find_original(s, wrappers)
                 }
                 _ => abort!(arg.span(), "`env` loader not supported for type"),
             }
         }
-        PathArguments::Parenthesized(p) => {
+        PathArguments::Parenthesized(ref p) => {
             abort!(p.span(), "`env` loader not supported for type")
         }
     }

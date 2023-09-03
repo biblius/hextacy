@@ -8,7 +8,7 @@ use crate::{
 use adapter::*;
 use hextacy::Driver;
 use interceptor::*;
-use std::{rc::Rc, sync::Arc};
+use std::rc::Rc;
 
 impl<RepoDriver, CacheDriver, CacheConn, Cache, RepoConn, Session>
     AuthenticationGuardInner<
@@ -21,7 +21,7 @@ where
     Cache: SimpleCacheAccess<CacheConn> + Send + Sync,
     Session: SessionRepository<RepoConn> + Send + Sync,
 {
-    pub fn new(repository: Arc<RepoDriver>, cache: Arc<CacheDriver>, role: Role) -> Self {
+    pub fn new(repository: RepoDriver, cache: CacheDriver, role: Role) -> Self {
         Self {
             cache: AuthMwCache::new(cache),
             repository: AuthMwRepo::new(repository),
@@ -41,7 +41,7 @@ where
     Cache: SimpleCacheAccess<CacheConn> + Send + Sync,
     Session: SessionRepository<RepoConn> + Send + Sync,
 {
-    pub fn new(repository: Arc<RepoDriver>, cache: Arc<CacheDriver>, role: Role) -> Self {
+    pub fn new(repository: RepoDriver, cache: CacheDriver, role: Role) -> Self {
         Self {
             inner: Rc::new(AuthenticationGuardInner::new(repository, cache, role)),
         }

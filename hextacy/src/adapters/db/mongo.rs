@@ -2,13 +2,15 @@ use crate::driver::{Atomic, Driver, DriverError};
 use async_trait::async_trait;
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
-    Client,
+    Client, ClientSession,
 };
 use tracing::trace;
 
-pub use mongodb::ClientSession;
+pub use mongodb;
 
-#[derive(Debug)]
+/// Thin wrapper around a [mongodb::Client] that implements [Driver] that can be
+/// injected into services.
+#[derive(Debug, Clone)]
 pub struct Mongo {
     pub driver: Client,
 }

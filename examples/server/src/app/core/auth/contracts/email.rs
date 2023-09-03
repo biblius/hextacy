@@ -24,7 +24,7 @@ impl Email {
         email: &str,
     ) -> Result<(), Error> {
         debug!("Sending registration token email to {email}");
-        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = &self.driver.domain;
         let uri = format!("{domain}/auth/verify-registration-token?token={token}");
         let mail = email::load_from_template(
             EMAIL_DIRECTORY,
@@ -50,7 +50,7 @@ impl Email {
 
     fn alert_password_change(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = &self.driver.domain;
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::load_from_template(
             EMAIL_DIRECTORY,
@@ -76,7 +76,7 @@ impl Email {
 
     fn send_freeze_account(&self, username: &str, email: &str, token: &str) -> Result<(), Error> {
         debug!("Sending change password email alert to {email}");
-        let domain = hextacy::env::get("DOMAIN").expect("DOMAIN must be set");
+        let domain = &self.driver.domain;
         let uri = format!("{domain}/auth/reset-password?token={token}");
         let mail = email::load_from_template(
             EMAIL_DIRECTORY,

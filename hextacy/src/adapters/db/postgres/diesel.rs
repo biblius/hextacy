@@ -8,8 +8,7 @@ use diesel::{
 
 pub type DieselConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
-/// Contains a connection pool for postgres with diesel. An instance of this
-/// should be shared through the app with Arcs
+/// Thin wrapper around a diesel postgres connection pool.
 #[derive(Debug, Clone)]
 pub struct PostgresDiesel {
     pool: Pool<ConnectionManager<PgConnection>>,

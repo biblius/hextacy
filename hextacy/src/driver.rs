@@ -122,7 +122,7 @@ macro_rules! drive {
                 $($id: $repository <$connection> + Send + Sync),*
             {
                $(
-                 $( pub (in $field_vis) )? $field: ::std::sync::Arc<$driver>,
+                 $( pub (in $field_vis) )? $field: $driver,
                )+
                 $($id: ::std::marker::PhantomData<$id>),*
             }
@@ -135,7 +135,7 @@ macro_rules! drive {
                )+
                 $($id: $repository <$connection> + Send + Sync),*
             {
-                pub fn new($($driver: ::std::sync::Arc<$driver>),+) -> Self {
+                pub fn new($($driver: $driver),+) -> Self {
                     Self {
                        $(
                            $field: $driver,

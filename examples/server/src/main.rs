@@ -11,7 +11,7 @@ use crate::config::{
     AppState,
 };
 use actix_web::{middleware::Logger, App, HttpServer};
-use hextacy::{env, web::http};
+use hextacy::{config::env, web::http};
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing::info;
 

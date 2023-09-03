@@ -7,6 +7,7 @@ use tracing::debug;
 // This implementation is concrete because I cba to write it via Drivers
 pub struct Email {
     driver: SmtpTransport,
+    pub domain: String,
 }
 
 impl std::fmt::Debug for Email {
@@ -18,15 +19,18 @@ impl std::fmt::Debug for Email {
 }
 
 impl Email {
-    pub fn new(host: &str, port: u16, username: String, password: String) -> Self {
+    pub fn new(host: &str, port: u16, username: &str, password: &str, domain: &str) -> Self {
         debug!("Building SMTP driver");
         let driver = SmtpTransport::relay(host)
             .expect("Could not establish SmtpTransport")
-            .credentials(Credentials::new(username, password))
+            .credentials(Credentials::new(username.to_string(), password.to_string()))
             .port(port)
             .build();
 
-        Self { driver }
+        Self {
+            driver,
+            domain: domain.to_string(),
+        }
     }
 
     /// Send an email with the given params

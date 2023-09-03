@@ -14,7 +14,8 @@ use hextacy::{
     Configuration,
 };
 use std::sync::Arc;
-use tracing::info;
+
+const REDIS_PORT: u16 = 6379;
 
 #[derive(Debug, Clone, Configuration)]
 pub struct AppState {
@@ -26,18 +27,19 @@ pub struct AppState {
         "PG_DATABASE",
         "PG_POOL_SIZE" as Option<u32>
     )]
-    pub pg_diesel: Arc<PostgresDiesel>,
+    pub pg_diesel: PostgresDiesel,
 
-    /*     #[env(
+    #[env(
         "PG_HOST",
-        "PG_PORT",
+        "PG_PORT" as u16,
         "PG_USER",
         "PG_PASSWORD",
         "PG_DATABASE",
-        "PG_POOL_SIZE"
-    )] */
-    pub pg_sea: Arc<PostgresSea>,
-    // #[raw("localhost", 6379, None, None, 0, 8)]
+        "PG_POOL_SIZE" as u32
+    )]
+    #[load_async]
+    pub pg_sea: PostgresSea,
+
     #[env(
         "RD_HOST",
         "RD_PORT" as u16,
@@ -46,28 +48,34 @@ pub struct AppState {
         "RD_DATABASE" as i64,
         "RD_POOL_SIZE" as usize
     )]
-    pub redis: Arc<Redis>,
+    #[raw("localhost", REDIS_PORT, Some("lmao"), None, 0, 8)]
+    pub redis: Redis,
+
+    #[env("SMTP_HOST", "SMTP_PORT" as u16, "SMTP_USERNAME", "SMTP_PASSWORD", "DOMAIN")]
+    #[load_with(Email::new)]
     pub smtp: Arc<Email>,
-    //    #[env("MONGO_HOST", "MONGO_PORT")]
-    pub mongo: std::sync::Arc<Mongo>,
+
+    #[env(
+        "MONGO_HOST",
+        "MONGO_PORT" as u16,
+        "MONGO_USER",
+        "MONGO_PASSWORD",
+        "MONGO_DATABASE"
+    )]
+    pub mongo: Mongo,
 }
 
 impl AppState {
     pub async fn init() -> Self {
-        let pg_diesel = init_diesel_pg();
-        // info!("PostgresDiesel pool initialized");
+        let pg_diesel = init_pg_diesel_env();
 
-        let pg_sea = init_sea_pg().await;
-        // info!("PostgresSea pool initialized");
+        let pg_sea = init_pg_sea_env().await;
 
-        let mongo = init_mongo();
-        // info!("Mongo pool initialized");
+        let mongo = init_mongo_env();
 
-        let redis = init_rd();
-        // info!("Redis pool initialized");
+        let redis = init_redis_raw();
 
-        let smtp = init_email();
-        // info!("Email client initialized");
+        let smtp = init_smtp_env();
 
         Self {
             pg_diesel,
@@ -80,19 +88,26 @@ impl AppState {
 }
 
 fn init_email() -> Arc<Email> {
-    let params =
-        crate::env::get_multiple(&["SMTP_HOST", "SMTP_PORT", "SMTP_USERNAME", "SMTP_PASSWORD"]);
+    let params = crate::env::get_multiple(&[
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "DOMAIN",
+    ]);
 
     let password = &params["SMTP_PASSWORD"];
     let username = &params["SMTP_USERNAME"];
     let port = &params["SMTP_PORT"];
     let host = &params["SMTP_HOST"];
+    let domain = &params["DOMAIN"];
 
     Arc::new(Email::new(
         host,
         port.parse::<u16>().expect("Invalid SMTP port"),
-        username.to_string(),
-        password.to_string(),
+        username,
+        password,
+        domain,
     ))
 }
 
@@ -101,7 +116,7 @@ pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
 }
 
 async fn init_sea_pg() -> Arc<PostgresSea> {
-    let params = hextacy::env::get_multiple(&[
+    let params = hextacy::config::env::get_multiple(&[
         "PG_USER",
         "PG_PASSWORD",
         "PG_HOST",
@@ -131,7 +146,7 @@ async fn init_sea_pg() -> Arc<PostgresSea> {
 }
 
 fn init_diesel_pg() -> Arc<PostgresDiesel> {
-    let params = hextacy::env::get_multiple(&[
+    let params = hextacy::config::env::get_multiple(&[
         "PG_USER",
         "PG_PASSWORD",
         "PG_HOST",
@@ -158,7 +173,7 @@ fn init_diesel_pg() -> Arc<PostgresDiesel> {
 }
 
 fn init_mongo() -> Arc<Mongo> {
-    let params = hextacy::env::get_multiple(&[
+    let params = hextacy::config::env::get_multiple(&[
         "MONGO_USER",
         "MONGO_PASSWORD",
         "MONGO_HOST",
@@ -182,7 +197,8 @@ fn init_mongo() -> Arc<Mongo> {
 }
 
 fn init_rd() -> Arc<Redis> {
-    let params = hextacy::env::get_multiple(&["RD_HOST", "RD_PORT", "RD_DATABASE", "RD_POOL_SIZE"]);
+    let params =
+        hextacy::config::env::get_multiple(&["RD_HOST", "RD_PORT", "RD_DATABASE", "RD_POOL_SIZE"]);
     let pool_size = &params["RD_POOL_SIZE"];
     let db = &params["RD_DATABASE"];
     let port = &params["RD_PORT"];

@@ -17,8 +17,8 @@ pub mod adapters;
 /// Cryptographic utilities
 pub mod crypto;
 
-/// Utilities for getting and setting stuff from the env.
-pub mod env;
+/// Utilities for configuring stuff.
+pub mod config;
 
 /// A logger that can be set up to use stdout or a file.
 pub mod logger;

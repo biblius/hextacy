@@ -205,7 +205,7 @@ where
             .repository
             .create_user(email, username, &hashed)
             .await?;
-        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        let secret = hextacy::config::env::get("REG_TOKEN_SECRET")?;
         let token = generate_hmac(secret.as_bytes(), user.id.as_bytes(), BASE64URL)?;
 
         self.cache.set_registration_token(&token, &user.id).await?;
@@ -234,7 +234,7 @@ where
         info!("Verfiying registration token for {user_id}");
 
         // Verify the token with the hashed user ID, error if they mismatch
-        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
+        let secret = hextacy::config::env::get("REG_TOKEN_SECRET")?;
         if !verify_hmac(
             secret.as_bytes(),
             user_id.as_bytes(),

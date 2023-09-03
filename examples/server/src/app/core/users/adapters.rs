@@ -3,14 +3,13 @@ use crate::db::models::user;
 use crate::db::repository::user::UserRepository;
 use crate::error::Error;
 use hextacy::Driver;
-use std::sync::Arc;
 
 pub struct Repository<A, C, User>
 where
     A: Driver<Connection = C>,
     User: UserRepository<C>,
 {
-    driver: Arc<A>,
+    driver: A,
     _user: std::marker::PhantomData<User>,
 }
 
@@ -19,7 +18,7 @@ where
     A: Driver<Connection = C>,
     User: UserRepository<C>,
 {
-    pub fn new(driver: Arc<A>) -> Self {
+    pub fn new(driver: A) -> Self {
         Self {
             driver,
             _user: std::marker::PhantomData,
