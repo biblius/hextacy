@@ -48,12 +48,12 @@ pub struct AppState {
         "RD_DATABASE" as i64,
         "RD_POOL_SIZE" as usize
     )]
-    #[raw("localhost", REDIS_PORT, Some("lmao"), None, 0, 8)]
+    #[raw("localhost", REDIS_PORT, None, None, 0, 8)]
     pub redis: Redis,
 
     #[env("SMTP_HOST", "SMTP_PORT" as u16, "SMTP_USERNAME", "SMTP_PASSWORD", "DOMAIN")]
     #[load_with(Email::new)]
-    pub smtp: Arc<Email>,
+    pub email: Arc<Email>,
 
     #[env(
         "MONGO_HOST",
@@ -65,151 +65,6 @@ pub struct AppState {
     pub mongo: Mongo,
 }
 
-impl AppState {
-    pub async fn init() -> Self {
-        let pg_diesel = init_pg_diesel_env();
-
-        let pg_sea = init_pg_sea_env().await;
-
-        let mongo = init_mongo_env();
-
-        let redis = init_redis_raw();
-
-        let smtp = init_smtp_env();
-
-        Self {
-            pg_diesel,
-            pg_sea,
-            redis,
-            smtp,
-            mongo,
-        }
-    }
-}
-
-fn init_email() -> Arc<Email> {
-    let params = crate::env::get_multiple(&[
-        "SMTP_HOST",
-        "SMTP_PORT",
-        "SMTP_USERNAME",
-        "SMTP_PASSWORD",
-        "DOMAIN",
-    ]);
-
-    let password = &params["SMTP_PASSWORD"];
-    let username = &params["SMTP_USERNAME"];
-    let port = &params["SMTP_PORT"];
-    let host = &params["SMTP_HOST"];
-    let domain = &params["DOMAIN"];
-
-    Arc::new(Email::new(
-        host,
-        port.parse::<u16>().expect("Invalid SMTP port"),
-        username,
-        password,
-        domain,
-    ))
-}
-
 pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
     router::route(state, cfg);
-}
-
-async fn init_sea_pg() -> Arc<PostgresSea> {
-    let params = hextacy::config::env::get_multiple(&[
-        "PG_USER",
-        "PG_PASSWORD",
-        "PG_HOST",
-        "PG_PORT",
-        "PG_DATABASE",
-        "PG_POOL_SIZE",
-    ]);
-
-    let pool_size = &params["PG_POOL_SIZE"];
-    let db = &params["PG_DATABASE"];
-    let port = &params["PG_PORT"];
-    let host = &params["PG_HOST"];
-    let pw = &params["PG_PASSWORD"];
-    let user = &params["PG_USER"];
-
-    Arc::new(
-        PostgresSea::new(
-            host,
-            port.parse().expect("Invalid PG_PORT"),
-            user,
-            pw,
-            db,
-            pool_size.parse().expect("Invalid PG_POOL_SIZE"),
-        )
-        .await,
-    )
-}
-
-fn init_diesel_pg() -> Arc<PostgresDiesel> {
-    let params = hextacy::config::env::get_multiple(&[
-        "PG_USER",
-        "PG_PASSWORD",
-        "PG_HOST",
-        "PG_PORT",
-        "PG_DATABASE",
-        "PG_POOL_SIZE",
-    ]);
-
-    let pool_size = &params["PG_POOL_SIZE"];
-    let db = &params["PG_DATABASE"];
-    let port = &params["PG_PORT"];
-    let host = &params["PG_HOST"];
-    let pw = &params["PG_PASSWORD"];
-    let user = &params["PG_USER"];
-
-    Arc::new(PostgresDiesel::new(
-        host,
-        port.parse().expect("Invalid PG_PORT"),
-        user,
-        pw,
-        db,
-        Some(pool_size.parse().expect("Invalid PG_POOL_SIZE")),
-    ))
-}
-
-fn init_mongo() -> Arc<Mongo> {
-    let params = hextacy::config::env::get_multiple(&[
-        "MONGO_USER",
-        "MONGO_PASSWORD",
-        "MONGO_HOST",
-        "MONGO_PORT",
-        "MONGO_DATABASE",
-    ]);
-
-    let db = &params["MONGO_DATABASE"];
-    let port = &params["MONGO_PORT"];
-    let host = &params["MONGO_HOST"];
-    let pw = &params["MONGO_PASSWORD"];
-    let user = &params["MONGO_USER"];
-
-    Arc::new(Mongo::new(
-        host,
-        port.parse().expect("Invalid MONGO_PORT"),
-        user,
-        pw,
-        db,
-    ))
-}
-
-fn init_rd() -> Arc<Redis> {
-    let params =
-        hextacy::config::env::get_multiple(&["RD_HOST", "RD_PORT", "RD_DATABASE", "RD_POOL_SIZE"]);
-    let pool_size = &params["RD_POOL_SIZE"];
-    let db = &params["RD_DATABASE"];
-    let port = &params["RD_PORT"];
-    let host = &params["RD_HOST"];
-
-    Arc::new(Redis::new(
-        host,
-        port.parse().expect("Invalid RD_PORT"),
-        None,
-        None,
-        db.parse().expect("Invalid RD_DATABASE"),
-        pool_size.parse().expect("Invalid RD_POOL_SIZE"),
-    ))
 }

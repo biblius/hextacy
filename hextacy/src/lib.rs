@@ -22,6 +22,7 @@ pub mod config;
 
 /// A logger that can be set up to use stdout or a file.
 pub mod logger;
+pub use tracing::{self, debug, error, info, warn};
 
 /// Utilities for time related stuff.
 pub mod time;

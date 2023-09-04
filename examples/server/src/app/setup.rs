@@ -36,7 +36,6 @@ pub(super) mod auth_service {
         native::Authentication,
     };
 
-    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
     type RepoComponent = AuthenticationRepository<
         PostgresSea,
         DatabaseConnection,
@@ -44,6 +43,7 @@ pub(super) mod auth_service {
         PgSessionAdapter,
         PgOAuthAdapter,
     >;
+    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
     type EmailComponent = Email;
 
     pub type AuthenticationService = Authentication<RepoComponent, CacheComponent, Email>;
@@ -53,7 +53,7 @@ pub(super) mod auth_service {
             let service = Self {
                 repository: RepoComponent::new(state.pg_sea.clone()),
                 cache: CacheComponent::new(state.redis.clone()),
-                email: EmailComponent::new(state.smtp.clone()),
+                email: EmailComponent::new(state.email.clone()),
             };
             cfg.app_data(web::Data::new(service));
         }

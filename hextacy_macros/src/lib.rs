@@ -9,30 +9,28 @@ mod configuration;
 /// from an external source.
 ///
 /// This macro assumes a constructor (an associated function named `new`) exists for the annotated field's type and
-/// creates a function that calls it using the specified keys and strategy. If a constructor does not exit, you can
-/// specify an associated function of the struct to load with with `#[load_with(T::some_constructor)]`.
+/// creates a function that calls it using the specified keys and strategy. If a constructor does not exist, you can
+/// specify an associated function of the struct to load with `#[load_with(T::some_constructor)]`.
 ///
-/// A struct annotated with this macro will receive an associated function `init()` which can be used to construct
-/// it via the generated functions.
+/// If loaders are configured on all of the struct's fields, it will receive an associated function `configure()`
+/// which can be used to construct it via the generated functions. If you need fine tuning, you can use the
+/// generated functions in a custom function and create your own loading logic.
 ///
 /// For each field annotated and for each annotation, the function's signature will be
-/// `fn init_<field_name>_<strategy>() { .. }`.
+/// `fn init_<field_name>_<strategy>() { .. }`. See strategies below in field annotations.
 ///
 /// Each field can also be wrapped, e.g. in an `Arc`, but a few rules apply here:
 /// - Wrappers can be nested any amount, but they must solely consist of single argument angle-bracket wrappers
 /// - The wrappers must have an associated `new` function (constructor)
 /// - The wrapper cannot be `Option`
 ///
-/// If a field constructor is async, the field it can be annotated with `#[load_async]` to support it. If any of the
-/// constructors are async, the resulting `init()` function will be async as well.
-///
-/// Given that most adapters are thin wrappers to some kind of connection source (pool, client, etc.), it might be better to
-/// configure them to implement `Clone` and delegate the clone to the arc instead of creating an additional pointer to them.
+/// If a field constructor is async, the field must be annotated with `#[load_async]` to support it. If any of the
+/// constructors are async, the resulting `configure()` function will be async as well.
 ///
 /// ## Field annotations
 ///
 /// The order of field annotations specifies the priority of loading the variables. Each subsequent annotation will be a fallback
-/// strategy to the previous if it fails. If all the strategies fail for a given field, the `init()` function will panic.
+/// strategy to the previous if it fails. If all the strategies fail for a given field, the `configure()` function will return an error.
 ///
 /// The order of variables specified, as well as the types, must match the order of the constructor's signature.
 ///
@@ -57,11 +55,12 @@ mod configuration;
 /// ### `env`
 ///
 /// - All variables are loaded as `String`s by default and are passed as `&str`s to the constructors
-/// - Variables can be parsed by appending `as T`, e.g. `"MY_VAR" as usize`
+/// - Variables are required by default, the function will return an error if it cannot find the variable in the env
 /// - Variables can be optional by appending `as Option`, e.g. `"MY_VAR" as Option`
+/// - Variables can be parsed by appending `as T`, e.g. `"MY_VAR" as usize`
 /// - Both can be applied by appending `as Option<T>`, e.g. `"MY_VAR" as Option<u16>`
 ///  
-/// The function generated calls `hextacy::env::get_multiple`, parses the variables if specified and calls the
+/// The function generated calls `hextacy::config::env::get_multiple`, parses the variables if specified and calls the
 /// struct's constructor.
 ///
 /// #### Example
@@ -77,14 +76,14 @@ mod configuration;
 ///         "PORT" as u16,
 ///         "POOL_SIZE" as Option<u16>
 ///     )]
-///     // Mutex is just for example, don't do this at home
 ///     pub postgres: Arc<Mutex<MyPgAdapter>>
 /// }
 /// ```
 ///
 /// ### `raw`
 ///
-/// - Should only be used when prototyping
+/// - Call constructor with the specified values
+/// - Generated function never errors
 ///
 /// #### Example
 ///
@@ -106,12 +105,17 @@ mod configuration;
 ///
 /// - Use this to specify an associated function to call instead of `new`
 ///
-///
 /// #### Examples
 ///
 /// ```ignore
 /// #[derive(Debug, Configuration)]
 /// struct MyAppState {
+///     #[env(
+///         "HOST",
+///         "PORT" as u16,
+///         "POOL_SIZE" as Option<u16>
+///     )]
+///     // Raw is used as a fallback here
 ///     #[raw("localhost", 5432, Some(8))]
 ///     #[load_async]
 ///     #[load_with(MyPgAdapter::new_async)]
@@ -121,7 +125,7 @@ mod configuration;
 #[proc_macro_derive(Configuration, attributes(env, raw, load_async, load_with))]
 #[proc_macro_error]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input: DeriveInput = syn::parse(input.clone()).unwrap();
+    let input: DeriveInput = syn::parse(input).unwrap();
     configuration::impl_configuration(input)
         .expect("Error while parsing Configuration")
         .into()

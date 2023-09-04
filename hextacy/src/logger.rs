@@ -44,9 +44,6 @@ pub fn init(level: &str) {
 }
 
 /// Initiates a logger that logs to the provided file
-///
-/// Follow [this link](https://docs.rs/log4rs/latest/log4rs/encode/pattern/index.html) to see the
-/// pattern encoder syntax
 pub fn init_file(level: &str, path: &str) {
     let level = match level {
         "info" | "INFO" => LevelFilter::Info,

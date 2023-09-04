@@ -15,40 +15,43 @@ pub fn impl_configuration(input: DeriveInput) -> Result<proc_macro2::TokenStream
 
     let mut field_loaders = vec![];
 
-    for field in strct.fields {
-        let field_info = FieldInfo::from(&field);
-        let field_id = field_info.id.clone();
+    let field_len = strct.fields.len();
 
-        let mut field_loader = FieldLoader {
-            field: field_info,
-            loaders: HashMap::new(),
-            is_async: false,
-            load_with: None,
-        };
+    for field in strct.fields {
+        let field_info = FieldInfo::new(&field, &input.ident);
+        let field_id = field_info.id.clone();
+        let mut field_loader = FieldLoader::new(field_info);
 
         // Parse attributes
+        let mut priority = 0;
         for attr in field.attrs {
             // Parse env
             if attr.meta.path().is_ident("env") {
-                let env_loader = EnvLoader::from(&attr.meta);
+                let mut env_loader = EnvLoader::from(&attr.meta);
+                env_loader.priority = priority;
                 let loader = Box::new(env_loader);
                 field_loader
                     .loaders
                     .entry(field_id.clone())
                     .or_insert(vec![])
                     .push(loader);
+                priority += 1;
             }
 
             // Parse raw
             if attr.meta.path().is_ident("raw") {
-                let raw_loader = RawLoader::from(&attr.meta);
+                let mut raw_loader = RawLoader::from(&attr.meta);
+                raw_loader.priority = priority;
                 let loader = Box::new(raw_loader);
                 field_loader
                     .loaders
                     .entry(field_id.clone())
                     .or_insert(vec![])
                     .push(loader);
+                priority += 1;
             }
+
+            // Parse helpers
 
             if attr.meta.path().is_ident("load_async") {
                 field_loader.is_async = true;
@@ -65,15 +68,139 @@ pub fn impl_configuration(input: DeriveInput) -> Result<proc_macro2::TokenStream
 
     field_loaders.retain(|loader| !loader.loaders.is_empty());
 
+    // Sort each field loader collection by priority
+    for f_loader in field_loaders.iter_mut() {
+        let v = &f_loader.field.id;
+        f_loader
+            .loaders
+            .get_mut(v)
+            .unwrap()
+            .sort_by_key(|a| a.priority())
+    }
+
     let mut tokens = TokenStream::new();
 
-    tokens.append_all(field_loaders);
+    tokens.append_all(&field_loaders);
+
+    let config_struct = &input.ident;
+    let (imp, ty, wher) = input.generics.split_for_impl();
+    let asyncness = field_loaders
+        .iter()
+        .any(|l| l.is_async)
+        .then_some(quote!(async));
+
+    let loader_calls = field_loaders
+        .iter()
+        .map(|l| {
+            let var = &l.field.id;
+            let loaders = l.loaders.get(var).unwrap();
+
+            let mut last_err = quote!();
+            let len = loaders.len();
+
+            if l.is_async {
+                let mut quoted = quote!();
+                for (i, loader) in loaders.iter().enumerate() {
+                    let loader_fn = loader.fn_ident(var);
+                    let log_err = loader.error_log();
+                    if i == len - 1 {
+                        quoted.extend(quote!(
+                            let #var = #loader_fn().await?;
+                        ));
+                        break;
+                    }
+                    quoted.extend(quote!(
+                        let #var = #loader_fn().await;
+                        if let Err(e) = #var {
+                            #log_err;
+                        }
+                    ));
+                }
+
+                return quoted;
+            }
+
+            let mut quoted = quote!( let #var = );
+            for (i, loader) in loaders.iter().enumerate() {
+                let loader_fn = loader.fn_ident(var);
+
+                if i == 0 {
+                    last_err = loader.error_log();
+                    quoted.extend(quote!( #loader_fn() ));
+                    if len == 1 {
+                        quoted.extend(quote!(?;));
+                    }
+                    continue;
+                }
+
+                quoted.extend(quote!(
+                    .or_else(|e| {
+                        #last_err;
+                        #loader_fn()
+                    })
+                ));
+
+                last_err = loader.error_log();
+
+                if i == len - 1 {
+                    quoted.extend(quote!(?;));
+                }
+            }
+
+            quoted
+        })
+        .collect::<Vec<_>>();
+
+    let self_fields = field_loaders
+        .iter()
+        .map(|el| el.field.id.clone())
+        .collect::<Vec<_>>();
+
+    let error_id = format_ident!("{}ConfigurationError", config_struct);
+
+    let error = quote!(
+        /// Autogenerated with `#[derive(Configuration)]`
+        #[derive(Debug)]
+        pub enum #error_id {
+            Env(String),
+            Raw
+        }
+
+        impl std::fmt::Display for #error_id {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    AppStateConfigurationError::Env(s) => write!(f, "{s}"),
+                    AppStateConfigurationError::Raw => unreachable!(),
+                }
+            }
+        }
+    );
+
+    let configure_fn = quote!(
+        impl #imp #config_struct #ty #wher {
+            /// Initialises the struct by calling all functions generated by `Configure`.
+            pub #asyncness fn configure() -> Result<Self, #error_id> {
+                #(#loader_calls ; )*
+                Ok(Self {
+                    #(#self_fields),*
+                })
+            }
+        }
+    );
+
+    tokens.extend(error);
+
+    if field_len == field_loaders.len() {
+        tokens.extend(configure_fn);
+    }
 
     Ok(tokens)
 }
 
 trait Loader: std::fmt::Debug {
-    fn fn_ident(&self, field_id: Ident) -> Ident;
+    fn fn_ident(&self, field_id: &Ident) -> Ident;
+
+    fn priority(&self) -> usize;
 
     fn extend_tokens(
         &self,
@@ -82,6 +209,10 @@ trait Loader: std::fmt::Debug {
         load_with: Option<&syn::Path>,
         tokens: &mut TokenStream,
     );
+
+    fn error_variant(&self, config_id: &Ident) -> TokenStream;
+
+    fn error_log(&self) -> TokenStream;
 }
 
 /// Top level loader that collects config loaders on a per field basis.
@@ -93,15 +224,27 @@ struct FieldLoader {
     load_with: Option<syn::Path>,
 }
 
+impl FieldLoader {
+    fn new(field: FieldInfo) -> Self {
+        Self {
+            field,
+            loaders: HashMap::new(),
+            is_async: false,
+            load_with: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct FieldInfo {
     id: Ident,
     strct: PathSegment,
     wrappers: Vec<Ident>,
+    config_struct: Ident,
 }
 
-impl From<&Field> for FieldInfo {
-    fn from(field: &Field) -> Self {
+impl FieldInfo {
+    fn new(field: &Field, config_struct: &Ident) -> Self {
         let field_id = field.ident.as_ref().unwrap_or_else(|| {
             abort!(
                 field.span(),
@@ -130,6 +273,7 @@ impl From<&Field> for FieldInfo {
             id: field_id.clone(),
             strct: original,
             wrappers,
+            config_struct: config_struct.clone(),
         }
     }
 }
@@ -153,12 +297,16 @@ impl ToTokens for FieldLoader {
 /// Loading strategy for the `env` attribute.
 #[derive(Debug)]
 struct EnvLoader {
+    priority: usize,
     keys: Vec<EnvVar>,
 }
 
 impl From<&Meta> for EnvLoader {
     fn from(meta: &Meta) -> Self {
-        let mut loader = Self { keys: vec![] };
+        let mut loader = Self {
+            keys: vec![],
+            priority: 0,
+        };
 
         let list = meta.require_list().unwrap_or_else(|_| {
             abort!(
@@ -179,8 +327,12 @@ impl From<&Meta> for EnvLoader {
 }
 
 impl Loader for EnvLoader {
-    fn fn_ident(&self, field_id: Ident) -> Ident {
+    fn fn_ident(&self, field_id: &Ident) -> Ident {
         format_ident!("init_{field_id}_env")
+    }
+
+    fn priority(&self) -> usize {
+        self.priority
     }
 
     fn extend_tokens(
@@ -194,8 +346,9 @@ impl Loader for EnvLoader {
             id,
             strct,
             wrappers,
+            config_struct,
         } = field;
-        let id = self.fn_ident(id.clone());
+        let id = self.fn_ident(id);
         let env_keys = &self.keys;
 
         let to_var_ident = |var: &EnvVar| Ident::new(&var.lit.to_lowercase(), Span::call_site());
@@ -220,24 +373,32 @@ impl Loader for EnvLoader {
                 let id = to_var_ident(env_key);
                 let env_var = &env_key.lit;
 
-                let convert_err = format!("Required variable {} not found in env, if it should be optional, denote it with `\"{}\" as Option`", env_key.lit, env_key.lit);
-                let parse_err = format!("Could not parse \"{}\" to specified type", env_key.lit);
+                let err_variant = self.error_variant(config_struct);
 
-                // Handles required fields
-                let convert = match (env_key.optional, env_key.parse_to.is_some()) {
-                    (true, true) => quote!(),
-                    (true, false) => quote!(.map(|x| x.as_str())),
-                    (false, true) => quote!(.expect(#convert_err)),
-                    (false, false) => quote!(.map(|x| x.as_str()).expect(#convert_err)),
+                let required_msg = format!("Required variable {env_var} not found in env");
+                let required_err = quote!(#err_variant(#required_msg.to_string()));
+
+                let parse_msg = format!("Could not parse {env_var} to specified type");
+                let parse_err = quote!(#err_variant(#parse_msg.to_string()));
+
+                let convert = match (env_key.optional, env_key.parse_to.as_ref()) {
+                    (true, Some(to)) => quote!(
+                        // This ensures an error is returned on unparseable values
+                        ; if let Some(val) = #id {
+                             if val.parse::<#to>().is_err() {
+                                 return Err(#parse_err)
+                                }
+                            }
+                        let #id = #id.map(|x|x.parse::<#to>().unwrap());
+                    ),
+                    (true, None) => quote!(.map(|x| x.as_str());),
+                    (false, Some(to)) => {
+                        quote!(.ok_or(#required_err)?.parse::<#to>().map_err(|_|#parse_err)?;)
+                    }
+                    (false, None) => quote!(.map(|x| x.as_str()).ok_or(#required_err)?;),
                 };
 
-                let parse = env_key
-                    .parse_to
-                    .as_ref()
-                    .map(|to| quote!( .map(|var| var.parse::<#to>().expect(#parse_err)) ))
-                    .unwrap_or(quote!());
-
-                quote!(let #id = params.get(#env_var) #parse #convert ;)
+                quote!(let #id = params.get(#env_var) #convert)
             })
             .collect::<Vec<_>>();
 
@@ -254,15 +415,28 @@ impl Loader for EnvLoader {
             constructor = quote!(#wrapper::new(#constructor));
         }
 
+        let config_err = format_ident!("{config_struct}ConfigurationError");
+
         let quoted = quote!(
-            #async_fn fn #id () -> #return_ty {
+            #async_fn fn #id () -> Result<#return_ty, #config_err> {
                 let params = ::hextacy::config::env::get_multiple(&[#( #env_keys ),*]);
                 #(#variables)*
-                #constructor
+                Ok(#constructor)
             }
         );
 
         tokens.extend(quoted)
+    }
+
+    fn error_variant(&self, config_id: &Ident) -> TokenStream {
+        let err = format_ident!("{config_id}ConfigurationError");
+        quote!(#err::Env)
+    }
+
+    fn error_log(&self) -> TokenStream {
+        quote!(hextacy::error!(
+            "Error occurred while loading from env: {e}"
+        ))
     }
 }
 
@@ -346,12 +520,16 @@ impl Parse for EnvVar {
 /// Loading strategy for the `raw` attribute. Parses all valid `Expr`s.
 #[derive(Debug)]
 struct RawLoader {
+    priority: usize,
     values: Vec<Expr>,
 }
 
 impl From<&Meta> for RawLoader {
     fn from(meta: &Meta) -> Self {
-        let mut loader = Self { values: vec![] };
+        let mut loader = Self {
+            values: vec![],
+            priority: 0,
+        };
 
         let list = meta.require_list().unwrap_or_else(|_| {
             abort!(
@@ -372,8 +550,12 @@ impl From<&Meta> for RawLoader {
 }
 
 impl Loader for RawLoader {
-    fn fn_ident(&self, field_id: Ident) -> Ident {
+    fn fn_ident(&self, field_id: &Ident) -> Ident {
         format_ident!("init_{field_id}_raw")
+    }
+
+    fn priority(&self) -> usize {
+        self.priority
     }
 
     fn extend_tokens(
@@ -387,8 +569,9 @@ impl Loader for RawLoader {
             id,
             strct,
             wrappers,
+            config_struct,
         } = field;
-        let id = self.fn_ident(id.clone());
+        let id = self.fn_ident(id);
         let args = &self.values;
 
         let (async_fn, async_constr) = if is_async {
@@ -409,13 +592,26 @@ impl Loader for RawLoader {
             constructor = quote!(#wrapper::new(#constructor));
         }
 
+        let config_err = format_ident!("{config_struct}ConfigurationError");
+
         let quoted = quote!(
-            #async_fn fn #id () -> #return_ty {
-                #constructor
+            /// This function will never error
+            #async_fn fn #id () -> Result<#return_ty, #config_err> {
+                Ok(#constructor)
             }
         );
 
         tokens.extend(quoted)
+    }
+
+    // Raw loaders can never error since an invalid configuration will be stopped at compile time
+    fn error_variant(&self, config_id: &Ident) -> TokenStream {
+        let err = format_ident!("{config_id}ConfigurationError");
+        quote!(#err::Raw)
+    }
+
+    fn error_log(&self) -> TokenStream {
+        quote!(hextacy::error!("Error occurred while loading raw: {e}"))
     }
 }
 
