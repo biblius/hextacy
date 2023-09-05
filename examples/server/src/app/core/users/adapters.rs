@@ -1,8 +1,7 @@
-use super::contract::RepositoryContract;
 use crate::db::models::user;
 use crate::db::repository::user::UserRepository;
 use crate::error::Error;
-use hextacy::Driver;
+use hextacy::{component, contract, Driver};
 
 pub struct Repository<A, C, User>
 where
@@ -26,13 +25,12 @@ where
     }
 }
 
-#[async_trait::async_trait]
-impl<D, Conn, User> RepositoryContract for Repository<D, Conn, User>
-where
-    Conn: Send,
-    User: UserRepository<Conn> + Send + Sync,
-    D: Driver<Connection = Conn> + Send + Sync,
-{
+#[component(
+    use Driver for Connection:Atomic,
+    use UserRepository with Connection as User
+)]
+#[contract]
+impl Repository {
     async fn get_paginated(
         &self,
         page: u16,
@@ -46,3 +44,8 @@ where
             .map_err(Error::new)
     }
 }
+
+/* where
+Conn: Send,
+User: UserRepository<Conn> + Send + Sync,
+D: Driver<Connection = Conn> + Send + Sync, */

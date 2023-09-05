@@ -1,11 +1,11 @@
 use crate::driver::{Driver, DriverError};
 use async_trait::async_trait;
+use deadpool_redis::redis::{
+    AsyncCommands, FromRedisValue, IntoConnectionInfo, RedisError, ToRedisArgs,
+};
 use deadpool_redis::{Config, Connection, Pool, Runtime};
-use redis::{AsyncCommands, FromRedisValue, IntoConnectionInfo, RedisError, ToRedisArgs};
 use serde::{de::DeserializeOwned, Serialize};
 use std::fmt::Debug;
-
-pub use redis;
 
 pub type RedisConnection = Connection;
 

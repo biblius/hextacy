@@ -1,7 +1,7 @@
 pub mod adapters;
 pub mod contracts;
 
-use hextacy::adapters::cache::redis::redis;
+use hextacy::adapters::cache::exports::deadpool_redis::redis;
 use std::fmt::Display;
 use thiserror::Error;
 

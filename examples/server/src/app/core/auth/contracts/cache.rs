@@ -7,8 +7,7 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::Driver;
-use hextacy::{contract, drive};
+use hextacy::{component, contract, drive};
 
 drive! {
     AuthenticationCache,
@@ -16,13 +15,12 @@ drive! {
     Cache: SimpleCacheAccess<Connection>
 }
 
+#[component(
+    use D for C,
+    use SimpleCacheAccess with C as Cache
+)]
 #[contract]
-impl<D, C, Cache> AuthenticationCache<D, C>
-where
-    C: Send,
-    D: Driver<Connection = C> + Send + Sync,
-    Cache: SimpleCacheAccess<C> + Send + Sync,
-{
+impl AuthenticationCache {
     /// Sessions get cached behind the user's csrf token.
     async fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;

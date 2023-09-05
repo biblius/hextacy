@@ -23,11 +23,11 @@ use actix_web::body::to_bytes;
 use data_encoding::{BASE32, BASE64URL};
 use derive_new::new;
 use hextacy::{
+    config::env,
     crypto::{
         hmac::generate_hmac,
         {bcrypt_hash, uuid},
     },
-    env,
     web::http::response::Response,
 };
 use lazy_static::lazy_static;

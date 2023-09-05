@@ -6,8 +6,7 @@ use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
-use hextacy::Atomic;
-use hextacy::Driver;
+use hextacy::{component, Atomic};
 use hextacy::{contract, drive};
 use tracing::info;
 
@@ -21,15 +20,14 @@ drive! {
     O: OAuthRepository<Connection>
 }
 
+#[component(
+    use D for C:Atomic,
+    use UserRepository with C as User,
+    use SessionRepository with C as Session,
+    use OAuthRepository with C as OAuth,
+)]
 #[contract]
-impl<D, C, User, Session, OAuth> AuthenticationRepository<D, C, User, Session, OAuth>
-where
-    C: Atomic + Send,
-    D: Driver<Connection = C> + Send + Sync,
-    Session: SessionRepository<C> + Send + Sync,
-    OAuth: OAuthRepository<C> + OAuthRepository<<C as Atomic>::TransactionResult> + Send + Sync,
-    User: UserRepository<C> + UserRepository<<C as Atomic>::TransactionResult> + Send + Sync,
-{
+impl AuthenticationRepository {
     async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let mut conn = self.driver.connect().await?;
         User::get_by_id(&mut conn, id).await.map_err(Error::new)

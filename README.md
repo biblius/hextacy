@@ -1,12 +1,27 @@
 # **⬡ Hextacy ⬡**
 
-A repository designed to quick start server development by providing an extensible infrastructure, a CLI tool to reduce manually writing boilerplate, and out of the box implementations for a few database and cache drivers.
+A repository designed to bootstrap backend development.
 
-The kind of project structure this repository uses is heavily based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture which is very flexible and easily testable. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
+Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
+
+## **Feature flags**
+
+```bash
+  - full - Enable everything
+
+  - db-full - Enables all database adapters
+  - web - Enable actix, actix-web and actix-web-actors and a broker implementation
+
+  - db-postgres-diesel - Enables the diesel postgres driver adapter
+  - db-postgres-seaorm - Enables the seaorm postgres driver adapter
+  - db-mongo - Enables the mongodb driver adapter
+  - cache-redis - Enables the redis driver and cache access trait
+  - cache-inmem - Enables an in memory cache for quickly prototyping
+```
 
 ## **Architecture**
 
-The following is the server architecture intended to be used with the various hextacy helpers, but in order to understand why it is built the way it is, we first need to understand how all the helpers tie together to provide an efficient and flexible architecture.
+In order to understand why hextacy is built the way it is, we first need to understand how its pieces tie together to provide a flexible architecture.
 
 Backend servers usually, if not always, consists of data stores. _Repositories_ provide methods through which an application's _Adapters_ can interact with to get access to database _Models_.
 
@@ -70,9 +85,9 @@ We create entry points for the service with handlers:
   }
   ```
 
-So far we've been showcasing a simple actix handler, so let's get to the good stuff.
+So far we've been showcasing a simple handler, so let's get to the good stuff.
 
-Notice that we have a `ServiceContract` bound in our handler. Services define their api through contract traits:
+Notice that we have a `ServiceContract` bound in our handler. Services execute business the business:
 
 - **service.rs**
 
@@ -82,9 +97,8 @@ Notice that we have a `ServiceContract` bound in our handler. Services define th
       pub repository: R,
   }
 
-  #[hextacy::contract]
   impl<R> Service<R> where
-      R: RepositoryComponentContract,
+      R: RepositoryContract,
   {
       fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
           let users = self.repository.get_paginated(
@@ -102,11 +116,7 @@ Notice that we have a `ServiceContract` bound in our handler. Services define th
 
 The service has a single field that is completely generic, however in the impl block we bind it to the contract.
 
-The `#[contract]` attribute macro will create a `ServiceContract` trait with signatures from the impl block and will implement the trait for the struct. This is done so that the api remains consistent because some components could potentially be swappable. Therefore, the macro should only be used when creating one-of components and is solely here to prevent writing the same items twice and to make the component easily mockable. When using multiple adapters that can be injected into the service, a proper trait should be written out.
-
-The contract provides an api that serves as a layer of abstraction such that we now do not care what goes in the `repository` field so long as it implements `RepositoryContract`. This helps with the generic bounds in the upcoming component and makes testing the services a breeze!
-
-Now we have to define our component and is when we enter the esoteric realms of rust generics:
+Now we have to define the service component and is when we enter the esoteric realms of rust generics:
 
 - **components.rs**
 
@@ -138,7 +148,15 @@ Now we have to define our component and is when we enter the esoteric realms of 
       }
   }
 
-  #[hextacy::component]
+  pub trait RepositoryContract {
+    fn get_paginated(
+        &self,
+        page: u16,
+        per_page: u16,
+        sort: Option<user::SortOptions>,
+    );
+  }
+
   impl<D, Conn, User> RepositoryContract for Repository<D, Conn, User>
   where
       D: Driver<Connection = Conn>,
@@ -171,6 +189,8 @@ pub trait Driver {
 As you can see, the component's `D` parameter must implement `Driver` with the `Conn` as its connection. Out of the box implementations of drivers exist in the `drivers` module that can satisfy these bounds. This takes care of how we're connecting to the DB.
 
 The `User` bound is simply a bound to a repository the service component will use, which in this case is the `UserRepository`. Since repository methods must take in a connection (in order to preserve transactions) they do not take in `&self`. This is fine, but now the compiler will complain we have unused fields because we are in fact not using them. If we remove the fields, the compiler will complain we have unused trait bounds, so we use phantom data to make the compiler think the struct owns the data.
+
+The `RepositoryContract` serves as a layer of abstraction such that we now do not care what goes in the service's `repository` field so long as it implements `RepositoryContract`. This makes testing the services a breeze since we can now easily mock the contract with `mockall`.
 
 So far we haven't coupled any implementation details to the service, all the service has are calls to some generic drivers, connections and repositories.
 
@@ -302,58 +322,3 @@ pub trait UserRepository<C> {
 ```
 
 The adapter just implements the `UserRepository` trait and returns the model using its specific ORM. This concludes the architectural part (for now... :).
-
-## **hextacy**
-
-Feature flags:
-
-```bash
-  - full - Enables all the feature below
-
-  - db - Enables mongo, diesel, seaorm and redis
-  - ws - Enable the WS session adapter and message broker
-
-  - postgres-diesel - Enables the diesel postgres driver
-  - postgres-seaorm - Enables the seaorm postgres driver
-  - mongo - Enables the mongodb driver
-  - redis - Enables the redis driver and cache access trait
-  - email - Enables the SMTP driver and lettre
-```
-
-- ### **db**
-
-  Contains a collection of traits to implement on structures that access databases and interact with repositories. Provides macros to easily generate repository structs as shown in the example.
-
-- ### **drivers**
-
-  Contains structures implementing driver specific behaviour such as connecting to and establishing connection pools with database, cache, smtp and http servers. All the connections made here are generally shared throughout the app with Arcs. Check out the [drivers readme](./hextacy/src/drivers/README.md)
-
-- ### **logger**
-
-  The `logger` module utilizes the [tracing](https://docs.rs/tracing/latest/tracing/), [env_logger](https://docs.rs/env_logger/latest/env_logger/) and [log4rs](https://docs.rs/log4rs/latest/log4rs/) crates to setup logging either to stdout or a `server.log` file, whichever suits your needs better.
-
-- ### **crypto**
-
-  Contains cryptographic utilities for encrypting and signing data and generating tokens.
-
-- ### **web**
-
-  Contains various helpers and utilities for HTTP and websockets.
-
-  - **http**
-
-    The most notable here are the _Default security headers_ middleware for HTTP (sets all the recommended security headers for each request as described [here](https://www.npmjs.com/package/helmet)) and the _Response_ trait, a utility trait that can be implemented by any struct that needs to be turned in to an HTTP response. Also some cookie helpers.
-
-  - **ws**
-
-    Module containing a Websocket session handler.
-
-    Every message sent to this handler must have a top level `"domain"` field. Domains are completely arbitrary and are used to tell the ws session which datatype to broadcast.
-
-    Domains are internally mapped to data types. Actors can subscribe via the broker to specific data types they are interested in and WS session actors will in turn publish them whenever they receive any from their respective clients.
-
-    Registered data types are usually enums which are then matched in handlers of the receiving actors. Enums should always be untagged, so as to mitigate unnecessary nestings from the client sockets.
-
-    Uses an implementation of a broker utilising the [actix framework](https://actix.rs/book/actix/sec-2-actor.html), a very cool message based communication system based on the [Actor model](https://en.wikipedia.org/wiki/Actor_model).
-
-    Check out the `web::ws` module for more info and an example of how it works.

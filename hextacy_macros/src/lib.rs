@@ -1,8 +1,8 @@
-use proc_macro2::Span;
 use proc_macro_error::{abort, proc_macro_error};
-use quote::quote;
-use syn::{spanned::Spanned, DeriveInput, Ident, ItemImpl, TypePath};
+use quote::{format_ident, quote};
+use syn::{spanned::Spanned, DeriveInput, ItemImpl, TypePath};
 
+mod component;
 mod configuration;
 
 /// Intended to be used on configuration/state structs that need to instantiate themselves using variables obtained
@@ -145,27 +145,24 @@ pub fn contract(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let ast: ItemImpl = syn::parse(input.clone()).unwrap();
+    let item_impl: ItemImpl = syn::parse(input.clone()).unwrap();
 
-    let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
+    let (impl_generics, type_generics, where_clause) = item_impl.generics.split_for_impl();
 
-    let (original_struct, trait_ident) = match ast.self_ty.as_ref() {
+    let (original_struct, trait_ident) = match item_impl.self_ty.as_ref() {
         syn::Type::Path(TypePath { ref path, .. }) => {
             let struct_name = &path.segments[0].ident;
-            (
-                struct_name,
-                Ident::new(&format!("{}Contract", struct_name), Span::call_site()),
-            )
+            (struct_name, format_ident!("{struct_name}Contract"))
         }
         _ => abort!(
-            ast.self_ty.span(),
+            item_impl.self_ty.span(),
             "contract not supported for this type of impl"
         ),
     };
 
     let mut fn_defs = vec![];
 
-    let original_fns = ast
+    let original_fns = item_impl
         .items
         .iter()
         .map(|item| {
@@ -200,10 +197,42 @@ pub fn contract(
     .into()
 }
 
-/*             if let Ok(mut file) = std::fs::read_to_string("./fn") {
-    file.push_str("\n\n\n");
-    file.push_str(tokens.to_string().as_str());
-    std::fs::write("./fn", file).unwrap();
-} else {
-    std::fs::write("./fn", tokens.to_string()).unwrap();
-} */
+#[proc_macro_attribute]
+/// Used to inject bounds on components and their contract implementations.
+/// Can be applied to either a struct declaration or a struct impl block.
+///
+/// ## Syntax
+///
+/// ```ignore
+/// // Bracketed tokens are optional.
+/// #[component(
+///     use Driver for Connection [:Atomic] [as field],
+///     use Contract with Connection as SR,
+/// )]
+/// ```
+/// The macro works by binding the generics to the necessary hextacy traits.
+/// In the example above, `Driver` will use `Connection` as its associated type
+/// and `Contract` will use the same connection (assuming `Contract` is a trait that accepts
+/// a single generic parameter).
+///
+/// Multiple drivers can be applied to a single call. Drivers and contracts are made distinct
+/// with `for` and `with`, respectively, and are parsed in the order provided. If called on an impl block,
+/// the order of the declarations must match the order of the implementing struct's generics
+/// (or the order of its component attribute if it has one).
+pub fn component(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    component::impl_component(attr, input)
+}
+
+#[allow(dead_code)] // Helper for debugging
+pub(crate) fn print_tokens(tokens: proc_macro2::TokenStream) {
+    if let Ok(mut file) = std::fs::read_to_string("./fn") {
+        file.push_str("\n\n\n");
+        file.push_str(tokens.to_string().as_str());
+        std::fs::write("./fn", file).unwrap();
+    } else {
+        std::fs::write("./fn", tokens.to_string()).unwrap();
+    }
+}

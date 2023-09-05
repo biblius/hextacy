@@ -67,7 +67,6 @@ diesel = { version = "2.0.1", features = [
   "r2d2",
   "serde_json",
 ], optional = true }
-r2d2 = { version = "0.8.10", optional = true }
 
 # db-mongo
 mongodb = { version = "2.3.1", features = ["tokio-runtime"], optional = true }
@@ -84,7 +83,7 @@ cache-redis = ["dep:deadpool-redis", "dep:redis"]
 db-full = ["db-mongo", "db-postgres-diesel", "db-postgres-seaorm"]
 
 db-mongo = ["dep:mongodb"]
-db-postgres-diesel = ["dep:diesel", "dep:r2d2"]
+db-postgres-diesel = ["dep:diesel"]
 db-postgres-seaorm = ["dep:sea-orm"]
 
 web = ["dep:actix", "dep:actix-web", "dep:actix-web-actors"]

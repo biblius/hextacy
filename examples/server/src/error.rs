@@ -1,5 +1,5 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use hextacy::adapters::cache::redis::redis;
+use hextacy::adapters::cache::exports::deadpool_redis::redis;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Display;

@@ -12,6 +12,8 @@ pub use driver::{Atomic, Driver, DriverError};
     feature = "cache-redis",
     feature = "cache-inmem",
 ))]
+/// Provides out of the box implementations for the [Driver][driver::Driver] trait.
+/// Re-exports the underlying libraries used for the implementation.
 pub mod adapters;
 
 /// Cryptographic utilities
@@ -21,6 +23,7 @@ pub mod crypto;
 pub mod config;
 
 /// A logger that can be set up to use stdout or a file.
+// TODO: Feature flag
 pub mod logger;
 pub use tracing::{self, debug, error, info, warn};
 
@@ -32,5 +35,5 @@ pub mod time;
 #[cfg(any(feature = "full", feature = "web"))]
 pub mod web;
 
-/// Derive macro for quick implementation of component traits.
-pub use hextacy_macros::{contract, Configuration};
+/// Quality of life macros.
+pub use hextacy_macros::{component, contract, Configuration};

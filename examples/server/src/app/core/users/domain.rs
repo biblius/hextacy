@@ -1,5 +1,6 @@
 use super::{
-    contract::{RepositoryContract, ServiceContract},
+    adapters::RepositoryContract,
+    contract::ServiceContract,
     data::{GetUsersPaginated, UserResponse},
 };
 use crate::error::Error;

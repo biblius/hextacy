@@ -4,6 +4,11 @@ use thiserror::Error;
 #[async_trait]
 /// Trait used by data sources for establishing connections. Service components can bind their driver fields to this trait
 /// in order for them obtain access to a generic connection.
+///
+/// A concrete implementation of a driver is usually a thin wrapper around a connection pool or a client.
+/// Drivers provide us the means to define business logic without coupling it to any specific implementation.
+///
+/// Check out the [adapters module][crate::adapters] to see concrete implementations.
 pub trait Driver {
     type Connection;
     async fn connect(&self) -> Result<Self::Connection, DriverError>;
@@ -20,8 +25,6 @@ pub trait Driver {
 /// When they are struct based, the adapter must implement a repository trait for both the
 /// connection and transaction (usually a trait is provided for both so one can use it to
 /// mitigate 2 different implementations).
-///
-/// Check out the [driver module][crate::drivers::db] to see concrete implementations.
 #[async_trait]
 pub trait Atomic: Sized {
     type TransactionResult: Send;
@@ -31,6 +34,8 @@ pub trait Atomic: Sized {
     async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DriverError>;
 }
 
+/// The error returned by driver implementations. Use [DriverError::Custom] if you are implementing
+/// the [Driver] trait on your own types.
 #[derive(Debug, Error)]
 pub enum DriverError {
     #[cfg(any(feature = "full", feature = "db-full", feature = "db-mongo"))]
@@ -39,7 +44,7 @@ pub enum DriverError {
 
     #[cfg(any(feature = "full", feature = "db-full", feature = "db-postgres-diesel"))]
     #[error("Postgres pool error: {0}")]
-    DieselConnection(#[from] r2d2::Error),
+    DieselConnection(#[from] diesel::r2d2::PoolError),
 
     #[cfg(any(feature = "full", feature = "db-full", feature = "db-postgres-diesel"))]
     #[error("Diesel error: {0}")]
@@ -52,6 +57,9 @@ pub enum DriverError {
     #[cfg(any(feature = "full", feature = "cache-full", feature = "cache-redis"))]
     #[error("Redis pool error: {0}")]
     RedisConnection(#[from] deadpool_redis::PoolError),
+
+    #[error("Custom driver error: {0}")]
+    Custom(Box<dyn std::error::Error + Send>),
 }
 
 #[macro_export]
