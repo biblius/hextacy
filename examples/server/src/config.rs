@@ -1,8 +1,7 @@
 pub mod constants;
 pub mod cors;
 
-use crate::{app::router, services::email::Email};
-use actix_web::web::ServiceConfig;
+use crate::services::email::Email;
 use hextacy::{
     adapters::{
         cache::redis::Redis,
@@ -11,13 +10,13 @@ use hextacy::{
             postgres::{diesel::PostgresDiesel, seaorm::PostgresSea},
         },
     },
-    Configuration,
+    State,
 };
 use std::sync::Arc;
 
 const REDIS_PORT: u16 = 6379;
 
-#[derive(Debug, Clone, Configuration)]
+#[derive(Debug, Clone, State)]
 pub struct AppState {
     #[env(
         "PG_HOST",
@@ -63,8 +62,4 @@ pub struct AppState {
         "MONGO_DATABASE"
     )]
     pub mongo: Mongo,
-}
-
-pub(super) fn init(cfg: &mut ServiceConfig, state: &AppState) {
-    router::route(state, cfg);
 }

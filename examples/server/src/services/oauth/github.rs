@@ -1,31 +1,21 @@
 use super::{
-    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, ProviderKeys, ProviderParams,
-    RefreshTokenBody, TokenResponse,
+    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, RefreshTokenBody, TokenResponse,
 };
 use async_trait::async_trait;
+use hextacy::Constructor;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info};
 
-pub struct GithubOAuth;
-
-impl ProviderParams for GithubOAuth {}
-
-impl ProviderKeys for GithubOAuth {
-    fn token_url_key(&self) -> &'static str {
-        "GITHUB_TOKEN_URI"
-    }
-
-    fn client_id_key(&self) -> &'static str {
-        "GITHUB_CLIENT_ID"
-    }
-
-    fn client_secret_key(&self) -> &'static str {
-        "GITHUB_CLIENT_SECRET"
-    }
-
-    fn redirect_uri_key(&self) -> &'static str {
-        "GITHUB_REDIRECT_URI"
-    }
+#[derive(Debug, Constructor)]
+pub struct GithubOAuth {
+    #[env("GITHUB_TOKEN_URI")]
+    token_uri: String,
+    #[env("GITHUB_CLIENT_ID")]
+    client_id: String,
+    #[env("GITHUB_CLIENT_SECRET")]
+    client_secret: String,
+    #[env("GITHUB_REDIRECT_URI")]
+    redirect_uri: String,
 }
 
 #[async_trait]
@@ -38,14 +28,15 @@ impl OAuth for GithubOAuth {
         code: &str,
     ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
-
-        let token_url = self.token_url()?;
-        let client_id = self.client_id()?;
-        let client_secret = self.client_secret()?;
-        let redirect_uri = self.redirect_uri()?;
+        let GithubOAuth {
+            token_uri,
+            client_id,
+            client_secret,
+            redirect_uri,
+        } = self;
 
         let res = client
-            .post(token_url)
+            .post(token_uri)
             .header("accept", "application/json")
             .header("content-type", "application/x-www-form-urlencoded")
             .header("content-length", 0)
@@ -53,7 +44,7 @@ impl OAuth for GithubOAuth {
             .query(&[
                 ("code", code),
                 ("grant_type", "authorization_code"),
-                ("redirect_uri", &redirect_uri),
+                ("redirect_uri", redirect_uri),
             ])
             .send()
             .await;
@@ -93,14 +84,17 @@ impl OAuth for GithubOAuth {
         let client = reqwest::Client::new();
 
         let url = "oauth2.googleapis.com/token";
-        let client_id = self.client_id()?;
-        let client_secret = self.client_secret()?;
+        let GithubOAuth {
+            client_id,
+            client_secret,
+            ..
+        } = self;
 
         let res = client
             .post(url)
             .form(&RefreshTokenBody {
-                client_id: &client_id,
-                client_secret: &client_secret,
+                client_id,
+                client_secret,
                 refresh_token,
                 grant_type: "refresh_token",
             })
@@ -117,7 +111,7 @@ impl OAuth for GithubOAuth {
     async fn revoke_token(&self, token: &str) -> Result<reqwest::Response, OAuthProviderError> {
         let client = reqwest::Client::new();
 
-        let client_id = self.client_id()?;
+        let client_id = &self.client_id;
 
         let url = format!("api.github.com/applications/{client_id}/grant");
 

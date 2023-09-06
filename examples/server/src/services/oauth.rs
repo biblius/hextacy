@@ -1,7 +1,9 @@
 pub mod github;
 pub mod google;
 
-use crate::env;
+use crate::config::AppState;
+
+use self::{github::GithubOAuth, google::GoogleOAuth};
 use async_trait::async_trait;
 use diesel::{
     deserialize::{self, FromSql},
@@ -10,14 +12,30 @@ use diesel::{
     sql_types::Text,
     AsExpression, FromSqlRow,
 };
+use hextacy::Constructor;
 use reqwest::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{env::VarError, fmt::Display, io::Write};
+use std::{fmt::Display, io::Write, sync::Arc};
 use thiserror::Error;
 use tracing::error;
 
+#[derive(Debug, Constructor)]
+pub struct OAuthProviders {
+    pub github: Arc<GithubOAuth>,
+    pub google: Arc<GoogleOAuth>,
+}
+
+impl hextacy::web::Configure<AppState> for OAuthProviders {
+    fn configure(_: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
+        let github = GithubOAuth::new_from_env().unwrap();
+        let google = GoogleOAuth::new_from_env().unwrap();
+        let this = Self::new(Arc::new(github), Arc::new(google));
+        cfg.app_data(actix_web::web::Data::new(this));
+    }
+}
+
 #[async_trait]
-pub trait OAuth: ProviderParams {
+pub trait OAuth {
     type Account: OAuthAccount + DeserializeOwned + 'static;
     type CodeExchangeResponse: TokenResponse + DeserializeOwned + 'static;
 
@@ -41,32 +59,42 @@ pub trait OAuth: ProviderParams {
     fn provider_id(&self) -> OAuthProvider;
 }
 
-pub trait ProviderParams: ProviderKeys {
-    fn token_url(&self) -> Result<String, VarError> {
-        env::get(self.token_url_key())
+#[async_trait]
+impl<T> OAuth for Arc<T>
+where
+    T: OAuth + Send + Sync,
+{
+    type Account = T::Account;
+    type CodeExchangeResponse = T::CodeExchangeResponse;
+
+    async fn exchange_code(
+        &self,
+        code: &str,
+    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+        T::exchange_code(self, code).await
     }
 
-    fn client_id(&self) -> Result<String, VarError> {
-        env::get(self.client_id_key())
+    async fn refresh_access_token(
+        &self,
+        refresh_token: &str,
+    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+        T::refresh_access_token(self, refresh_token).await
     }
 
-    fn client_secret(&self) -> Result<String, VarError> {
-        env::get(self.client_secret_key())
+    async fn revoke_token(&self, token: &str) -> Result<reqwest::Response, OAuthProviderError> {
+        T::revoke_token(self, token).await
     }
 
-    fn redirect_uri(&self) -> Result<String, VarError> {
-        env::get(self.redirect_uri_key())
+    async fn get_account(
+        &self,
+        token_res: &Self::CodeExchangeResponse,
+    ) -> Result<Self::Account, OAuthProviderError> {
+        T::get_account(self, token_res).await
     }
-}
 
-pub trait ProviderKeys {
-    fn token_url_key(&self) -> &'static str;
-
-    fn client_id_key(&self) -> &'static str;
-
-    fn client_secret_key(&self) -> &'static str;
-
-    fn redirect_uri_key(&self) -> &'static str;
+    fn provider_id(&self) -> OAuthProvider {
+        T::provider_id(self)
+    }
 }
 
 pub trait TokenResponse: Send + Sync {

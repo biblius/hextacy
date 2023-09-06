@@ -6,9 +6,7 @@ use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
-use hextacy::{component, Atomic};
-use hextacy::{contract, drive};
-use tracing::info;
+use hextacy::{component, contract, drive, info};
 
 drive! {
     AuthenticationRepository,
@@ -118,39 +116,40 @@ impl AuthenticationRepository {
     ) -> Result<(user::User, OAuthMeta), Error> {
         let conn = self.driver.connect().await?;
         let mut conn = conn.start_transaction().await?;
-        let user = match self.get_user_by_email(email).await {
+
+        let user = match User::get_by_email(&mut conn, email).await {
             Ok(user) => User::update_oauth_id(&mut conn, &user.id, account_id, provider)
                 .await
                 .map_err(Error::new)?,
-            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => {
+            Err(RepoAdapterError::DoesNotExist) => {
                 User::create_from_oauth(&mut conn, account_id, email, username, provider)
                     .await
                     .map_err(Error::new)?
             }
             Err(e) => {
-                <C as Atomic>::abort_transaction(conn).await?;
-                return Err(e);
+                C::abort_transaction(conn).await?;
+                return Err(Error::new(e));
             }
         };
 
-        let existing_oauth = match self.get_oauth_by_account_id(account_id).await {
+        let existing_oauth = match OAuth::get_by_account_id(&mut conn, account_id).await {
             Ok(oauth) => oauth,
             Err(e) => match e {
                 // If the entry does not exist, we must create one for the user
-                Error::Adapter(RepoAdapterError::DoesNotExist) => {
+                RepoAdapterError::DoesNotExist => {
                     info!("OAuth entry does not exist, creating");
                     OAuth::create(&mut conn, &user.id, account_id, tokens, provider)
                         .await
                         .map_err(Error::new)?
                 }
                 e => {
-                    <C as Atomic>::abort_transaction(conn).await?;
-                    return Err(e);
+                    C::abort_transaction(conn).await?;
+                    return Err(Error::new(e));
                 }
             },
         };
 
-        <C as Atomic>::commit_transaction(conn).await?;
+        C::commit_transaction(conn).await?;
 
         Ok((user, existing_oauth))
     }

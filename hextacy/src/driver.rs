@@ -27,6 +27,7 @@ pub trait Driver {
 /// mitigate 2 different implementations).
 #[async_trait]
 pub trait Atomic: Sized {
+    // Atomic bound here is so we can call commit and abort directly on the result
     type TransactionResult: Send;
 
     async fn start_transaction(self) -> Result<Self::TransactionResult, DriverError>;

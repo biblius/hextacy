@@ -1,6 +1,4 @@
 use proc_macro_error::{abort, proc_macro_error};
-use quote::{format_ident, quote};
-use syn::{spanned::Spanned, DeriveInput, ItemImpl, TypePath};
 
 mod component;
 mod configuration;
@@ -66,9 +64,9 @@ mod configuration;
 /// #### Example
 ///
 /// ```ignore
-/// use hextacy::Configuration;
+/// use hextacy::State;
 ///
-/// #[derive(Debug, Configuration)]
+/// #[derive(Debug, State)]
 /// struct MyAppState {
 ///     // Must follow the order of the variables in the constructor of MyPgAdapter
 ///     #[env(
@@ -88,9 +86,9 @@ mod configuration;
 /// #### Example
 ///
 /// ```ignore
-/// use hextacy::Configuration;
+/// use hextacy::State;
 ///
-/// #[derive(Debug, Configuration)]
+/// #[derive(Debug, State)]
 /// struct MyAppState {
 ///     #[raw("localhost", 5432, Some(8))]
 ///     pub postgres: Arc<MyPgAdapter>
@@ -108,7 +106,7 @@ mod configuration;
 /// #### Examples
 ///
 /// ```ignore
-/// #[derive(Debug, Configuration)]
+/// #[derive(Debug, State)]
 /// struct MyAppState {
 ///     #[env(
 ///         "HOST",
@@ -122,13 +120,59 @@ mod configuration;
 ///     pub postgres: Arc<MyPgAdapter>
 /// }
 /// ````
-#[proc_macro_derive(Configuration, attributes(env, raw, load_async, load_with))]
+#[proc_macro_derive(State, attributes(env, raw, load_async, load_with))]
+#[proc_macro_error]
+pub fn derive_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input: syn::DeriveInput = syn::parse(input).unwrap();
+    configuration::state::impl_state(input)
+        .expect("Error while parsing State")
+        .into()
+}
+
+/// Creates an associated `new` function with the struct's types as the args. Mainly useful
+/// for DTOs and structs that need to get stuff from the env.
+///
+/// Integers, strings, and their respective options can be annotated with `#[env("SOME_KEY")`
+/// to get associated functions for fetching the variables from the current process env.
+/// The functions have the signature `fn load_<field>_env`.
+/// If every field is annotated with `env`, it will receive a `load_from_env` constructor
+/// which returns `None` if any of the variables are missing or cannot be parsed.
+#[proc_macro_derive(Constructor, attributes(env))]
 #[proc_macro_error]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input: DeriveInput = syn::parse(input).unwrap();
-    configuration::impl_configuration(input)
-        .expect("Error while parsing Configuration")
+    let input: syn::DeriveInput = syn::parse(input).unwrap();
+    configuration::config::impl_constructor(input)
+        .expect("Error while parsing Constructor")
         .into()
+}
+
+#[proc_macro_attribute]
+/// Used to inject bounds on components and their contract implementations.
+/// Can be applied to either a struct declaration or a struct impl block.
+///
+/// ## Syntax
+///
+/// ```ignore
+/// // Bracketed tokens are optional.
+/// #[component(
+///     use Driver for Connection [:Atomic] [as field],
+///     use Contract with Connection as SR,
+/// )]
+/// ```
+/// The macro works by binding the generics to the necessary hextacy traits.
+/// In the example above, `Driver` will use `Connection` as its associated type
+/// and `Contract` will use the same connection (assuming `Contract` is a trait that accepts
+/// a single generic parameter).
+///
+/// Multiple drivers can be applied to a single call. Drivers and contracts are made distinct
+/// with `for` and `with`, respectively, and are parsed in the order provided. If called on an impl block,
+/// the order of the declarations must match the order of the implementing struct's generics
+/// (or the order of its component attribute if it has one).
+pub fn component(
+    attr: proc_macro::TokenStream,
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    component::impl_component(attr, input)
 }
 
 #[proc_macro_attribute]
@@ -145,12 +189,15 @@ pub fn contract(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
-    let item_impl: ItemImpl = syn::parse(input.clone()).unwrap();
+    use quote::{format_ident, quote};
+    use syn::spanned::Spanned;
+
+    let item_impl: syn::ItemImpl = syn::parse(input.clone()).unwrap();
 
     let (impl_generics, type_generics, where_clause) = item_impl.generics.split_for_impl();
 
     let (original_struct, trait_ident) = match item_impl.self_ty.as_ref() {
-        syn::Type::Path(TypePath { ref path, .. }) => {
+        syn::Type::Path(syn::TypePath { ref path, .. }) => {
             let struct_name = &path.segments[0].ident;
             (struct_name, format_ident!("{struct_name}Contract"))
         }
@@ -195,35 +242,6 @@ pub fn contract(
         }
     )
     .into()
-}
-
-#[proc_macro_attribute]
-/// Used to inject bounds on components and their contract implementations.
-/// Can be applied to either a struct declaration or a struct impl block.
-///
-/// ## Syntax
-///
-/// ```ignore
-/// // Bracketed tokens are optional.
-/// #[component(
-///     use Driver for Connection [:Atomic] [as field],
-///     use Contract with Connection as SR,
-/// )]
-/// ```
-/// The macro works by binding the generics to the necessary hextacy traits.
-/// In the example above, `Driver` will use `Connection` as its associated type
-/// and `Contract` will use the same connection (assuming `Contract` is a trait that accepts
-/// a single generic parameter).
-///
-/// Multiple drivers can be applied to a single call. Drivers and contracts are made distinct
-/// with `for` and `with`, respectively, and are parsed in the order provided. If called on an impl block,
-/// the order of the declarations must match the order of the implementing struct's generics
-/// (or the order of its component attribute if it has one).
-pub fn component(
-    attr: proc_macro::TokenStream,
-    input: proc_macro::TokenStream,
-) -> proc_macro::TokenStream {
-    component::impl_component(attr, input)
 }
 
 #[allow(dead_code)] // Helper for debugging

@@ -2,9 +2,9 @@ use crate::cache::contracts::SimpleCacheAccess;
 use crate::cache::AuthID;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
-use hextacy::contract;
 use hextacy::drive;
 use hextacy::Driver;
+use hextacy::{component, contract};
 
 drive! {
     AuthMwRepo,
@@ -12,13 +12,12 @@ drive! {
     S: SessionRepository<Connection>,
 }
 
+#[component(
+    use D for Connection,
+    use SessionRepository with Connection as Session
+)]
 #[contract]
-impl<D, Connection, Session> AuthMwRepo<D, Connection, Session>
-where
-    Connection: Send,
-    D: Driver<Connection = Connection> + Send + Sync,
-    Session: SessionRepository<Connection> + Send + Sync,
-{
+impl AuthMwRepo {
     async fn refresh_session(&self, id: &str, csrf: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
         Session::refresh(&mut conn, id, csrf)
@@ -40,13 +39,12 @@ drive! {
     Cache: SimpleCacheAccess<Connection>
 }
 
+#[component(
+    use D for Connection,
+    use SimpleCacheAccess with Connection as Cache
+)]
 #[contract]
-impl<D, Conn, Cache> AuthMwCache<D, Conn, Cache>
-where
-    Conn: Send,
-    Cache: SimpleCacheAccess<Conn> + Send + Sync,
-    D: Driver<Connection = Conn> + Send + Sync,
-{
+impl AuthMwCache {
     async fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
         Cache::get_json(&mut conn, AuthID::Session, id)

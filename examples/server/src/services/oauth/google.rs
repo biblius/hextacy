@@ -1,32 +1,22 @@
 use super::{
-    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, ProviderKeys, ProviderParams,
-    RefreshTokenBody, TokenResponse,
+    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, RefreshTokenBody, TokenResponse,
 };
 use async_trait::async_trait;
 use data_encoding::BASE64URL_NOPAD;
+use hextacy::Constructor;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-pub struct GoogleOAuth;
-
-impl ProviderParams for GoogleOAuth {}
-
-impl ProviderKeys for GoogleOAuth {
-    fn token_url_key(&self) -> &'static str {
-        "GOOGLE_TOKEN_URI"
-    }
-
-    fn client_id_key(&self) -> &'static str {
-        "GOOGLE_CLIENT_ID"
-    }
-
-    fn client_secret_key(&self) -> &'static str {
-        "GOOGLE_CLIENT_SECRET"
-    }
-
-    fn redirect_uri_key(&self) -> &'static str {
-        "GOOGLE_REDIRECT_URI"
-    }
+#[derive(Debug, Constructor)]
+pub struct GoogleOAuth {
+    #[env("GOOGLE_TOKEN_URI")]
+    token_uri: String,
+    #[env("GOOGLE_CLIENT_ID")]
+    client_id: String,
+    #[env("GOOGLE_CLIENT_SECRET")]
+    client_secret: String,
+    #[env("GOOGLE_REDIRECT_URI")]
+    redirect_uri: String,
 }
 
 #[async_trait]
@@ -40,13 +30,15 @@ impl OAuth for GoogleOAuth {
     ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
 
-        let token_url = self.token_url()?;
-        let client_id = self.client_id()?;
-        let client_secret = self.client_secret()?;
-        let redirect_uri = self.redirect_uri()?;
+        let GoogleOAuth {
+            token_uri,
+            client_id,
+            client_secret,
+            redirect_uri,
+        } = self;
 
         let res = client
-            .post(token_url)
+            .post(token_uri)
             .header("accept", "application/json")
             .header("content-type", "application/x-www-form-urlencoded")
             .header("content-length", 0)
@@ -54,7 +46,7 @@ impl OAuth for GoogleOAuth {
             .query(&[
                 ("code", code),
                 ("grant_type", "authorization_code"),
-                ("redirect_uri", &redirect_uri),
+                ("redirect_uri", redirect_uri),
             ])
             .send()
             .await;
@@ -94,14 +86,14 @@ impl OAuth for GoogleOAuth {
         let client = reqwest::Client::new();
 
         let url = "oauth2.googleapis.com/token";
-        let client_id = self.client_id()?;
-        let client_secret = self.client_secret()?;
+        let client_id = &self.client_id;
+        let client_secret = &self.client_secret;
 
         client
             .post(url)
             .form(&RefreshTokenBody {
-                client_id: &client_id,
-                client_secret: &client_secret,
+                client_id,
+                client_secret,
                 refresh_token,
                 grant_type: "refresh_token",
             })
@@ -109,7 +101,7 @@ impl OAuth for GoogleOAuth {
             .await?
             .json::<Self::CodeExchangeResponse>()
             .await
-            .map_err(|e| e.into())
+            .map_err(OAuthProviderError::Reqwest)
     }
 
     async fn revoke_token(&self, token: &str) -> Result<reqwest::Response, OAuthProviderError> {

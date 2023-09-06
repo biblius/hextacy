@@ -53,7 +53,7 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(move || {
         App::new()
-            .configure(|cfg| config::init(cfg, &state))
+            .configure(|cfg| app::router::route(&state, cfg))
             .service(actix_web::web::resource("/hello").to(|| async { "OK" }))
             .wrap(config::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
             .wrap(http::security_headers::default())
