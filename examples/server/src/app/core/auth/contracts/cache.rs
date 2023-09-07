@@ -7,16 +7,16 @@ use crate::config::constants::{
 use crate::db::models::session;
 use crate::error::Error;
 use chrono::Utc;
-use hextacy::{component, contract, drive};
-
-drive! {
-    AuthenticationCache,
-    use Driver for Connection as driver;
-    Cache: SimpleCacheAccess<Connection>
-}
+use hextacy::{component, contract};
 
 #[component(
-    use D for C,
+    use Driver for Connection as driver,
+    use SimpleCacheAccess with Connection as C
+)]
+pub struct AuthenticationCache {}
+
+#[component(
+    use Driver for C,
     use SimpleCacheAccess with C as Cache
 )]
 #[contract]

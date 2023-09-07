@@ -2,6 +2,7 @@ use proc_macro_error::{abort, proc_macro_error};
 
 mod component;
 mod configuration;
+mod response;
 
 /// Intended to be used on configuration/state structs that need to instantiate themselves using variables obtained
 /// from an external source.
@@ -135,6 +136,7 @@ pub fn derive_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Integers, strings, and their respective options can be annotated with `#[env("SOME_KEY")`
 /// to get associated functions for fetching the variables from the current process env.
 /// The functions have the signature `fn load_<field>_env`.
+///
 /// If every field is annotated with `env`, it will receive a `load_from_env` constructor
 /// which returns `None` if any of the variables are missing or cannot be parsed.
 #[proc_macro_derive(Constructor, attributes(env))]
@@ -146,28 +148,52 @@ pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         .into()
 }
 
+#[proc_macro_derive(HttpResponse, attributes(code))]
+#[proc_macro_error]
+pub fn derive_response(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    let input: syn::DeriveInput = syn::parse(input).unwrap();
+    response::impl_response(input)
+        .expect("Error while parsing HttpResponse")
+        .into()
+}
+
 #[proc_macro_attribute]
-/// Used to inject bounds on components and their contract implementations.
+#[proc_macro_error]
+/// Used to inject driver generics on components and their contract implementations.
 /// Can be applied to either a struct declaration or a struct impl block.
 ///
-/// ## Syntax
+/// ## Example
 ///
 /// ```ignore
-/// // Bracketed tokens are optional.
 /// #[component(
-///     use Driver for Connection [:Atomic] [as field],
+///     use Driver for Connection as field,
 ///     use Contract with Connection as SR,
 /// )]
+/// struct MyServiceComponent {}
+///
+/// #[component(
+///     use Driver for Connection,
+///     use Contract with Connection as SR,
+/// )]
+/// #[contract] // Can be combined with contract for that sweet boilerplate reduction
+/// impl MyServiceComponent {
+///     /* ... */
+/// }
 /// ```
 /// The macro works by binding the generics to the necessary hextacy traits.
 /// In the example above, `Driver` will use `Connection` as its associated type
 /// and `Contract` will use the same connection (assuming `Contract` is a trait that accepts
-/// a single generic parameter).
+/// a single generic parameter). All contracts will be bound to phantom data.
 ///
 /// Multiple drivers can be applied to a single call. Drivers and contracts are made distinct
 /// with `for` and `with`, respectively, and are parsed in the order provided. If called on an impl block,
 /// the order of the declarations must match the order of the implementing struct's generics
 /// (or the order of its component attribute if it has one).
+///
+/// If there are any existing generics, they will always be at the end of the struct's and impl block's generic lists
+/// and must be accounted for in the impl block.
+///
+/// Struct annotations also receive a `new` function to easily instantiate themselves with generic drivers.
 pub fn component(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
@@ -181,10 +207,12 @@ pub fn component(
 /// is the original struct name suffixed with `Contract` and implement it on the struct. The trait
 /// has the same signatures as the functions in the impl block.
 ///
-/// This allows for easy mocking of component contracts for unit testing, as well as for DI through bounds
-/// on services.
-///
 /// Visibility can be provided for the generated trait, e.g. `#[contract(crate)]`
+///
+/// A contract defines a set of interactions with an underlying data source or client and
+/// clearly defines how the service interacts with it. Contracts are also an important part
+/// of unit testing since they can easily be mocked and verified for correctness. Additionally,
+/// they make the service look nicer since they encapsulate driver generics.
 pub fn contract(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
@@ -230,7 +258,8 @@ pub fn contract(
     });
 
     quote!(
-        #[cfg_attr(test, mockall::automock)]
+        //#[cfg_attr(test, mockall::automock)]
+        #[mockall::automock]
         #[async_trait::async_trait]
         pub #visibility trait #trait_ident {
             #(#fn_defs)*

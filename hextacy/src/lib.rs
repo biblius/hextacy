@@ -36,4 +36,4 @@ pub mod time;
 pub mod web;
 
 /// Quality of life macros.
-pub use hextacy_macros::{component, contract, Constructor, State};
+pub use hextacy_macros::{component, contract, Constructor, HttpResponse, State};

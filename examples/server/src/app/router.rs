@@ -3,6 +3,7 @@ pub mod resources;
 
 use crate::config::AppState;
 use crate::db::models::role::Role;
+use crate::services::oauth::OAuthProviders;
 use actix_web::web;
 use hextacy::web::Configure;
 use hextacy::{route, scope};
@@ -51,6 +52,7 @@ fn oauth_service(
 ) {
     use super::controllers::auth::o_auth::*;
     use super::setup::oauth_service::*;
+    OAuthProviders::configure(state, cfg);
     OAuthService::configure(state, cfg);
     scope!(
         OAuthService, cfg, "/oauth/{provider}",

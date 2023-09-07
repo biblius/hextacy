@@ -2,15 +2,14 @@ use crate::cache::contracts::SimpleCacheAccess;
 use crate::cache::AuthID;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
-use hextacy::drive;
 use hextacy::Driver;
 use hextacy::{component, contract};
 
-drive! {
-    AuthMwRepo,
-    use D for Connection as driver;
-    S: SessionRepository<Connection>,
-}
+#[component(
+    use Driver for Connection as driver,
+    use SessionRepository with Connection as S
+)]
+pub struct AuthMwRepo {}
 
 #[component(
     use D for Connection,
@@ -33,14 +32,14 @@ impl AuthMwRepo {
     }
 }
 
-drive! {
-    AuthMwCache,
-    use Driver for Connection as driver;
-    Cache: SimpleCacheAccess<Connection>
-}
+#[component(
+    use Driver for Connection as driver,
+    use SimpleCacheAccess with Connection as SCA
+)]
+pub struct AuthMwCache {}
 
 #[component(
-    use D for Connection,
+    use Driver for Connection,
     use SimpleCacheAccess with Connection as Cache
 )]
 #[contract]

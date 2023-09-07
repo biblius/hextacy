@@ -6,26 +6,28 @@ use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, TokenResponse};
-use hextacy::{component, contract, drive, info};
-
-drive! {
-    AuthenticationRepository,
-
-    use Driver for Connection as driver;
-
-    U: UserRepository<Connection>,
-    S: SessionRepository<Connection>,
-    O: OAuthRepository<Connection>
-}
+use hextacy::{component, contract, info};
 
 #[component(
-    use D for C:Atomic,
-    use UserRepository with C as User,
-    use SessionRepository with C as Session,
-    use OAuthRepository with C as OAuth,
+    use Driver for Connection as driver,
+    use UserRepository with Connection as U,
+    use SessionRepository with Connection as S,
+    use OAuthRepository with Connection as O,
+)]
+pub struct AuthenticationRepository {}
+
+#[component(
+    use Driver for Connection:Atomic,
+    use UserRepository with Connection as User,
+    use SessionRepository with Connection as Session,
 )]
 #[contract]
-impl AuthenticationRepository {
+impl<OAuth> AuthenticationRepository<OAuth>
+where
+    // Just to try out component with existing generics
+    OAuth:
+        OAuthRepository<Connection> + OAuthRepository<Connection::TransactionResult> + Send + Sync,
+{
     async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let mut conn = self.driver.connect().await?;
         User::get_by_id(&mut conn, id).await.map_err(Error::new)
@@ -127,7 +129,7 @@ impl AuthenticationRepository {
                     .map_err(Error::new)?
             }
             Err(e) => {
-                C::abort_transaction(conn).await?;
+                Connection::abort_transaction(conn).await?;
                 return Err(Error::new(e));
             }
         };
@@ -143,13 +145,13 @@ impl AuthenticationRepository {
                         .map_err(Error::new)?
                 }
                 e => {
-                    C::abort_transaction(conn).await?;
+                    Connection::abort_transaction(conn).await?;
                     return Err(Error::new(e));
                 }
             },
         };
 
-        C::commit_transaction(conn).await?;
+        Connection::commit_transaction(conn).await?;
 
         Ok((user, existing_oauth))
     }

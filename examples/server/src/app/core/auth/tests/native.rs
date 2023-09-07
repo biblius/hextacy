@@ -21,7 +21,6 @@ use crate::{
 };
 use actix_web::body::to_bytes;
 use data_encoding::{BASE32, BASE64URL};
-use derive_new::new;
 use hextacy::{
     config::env,
     crypto::{
@@ -35,7 +34,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 
 /// Mock this one here so we don't clog the code with unnecessary implementations
-#[derive(Debug, Serialize, Deserialize, new)]
+#[derive(Debug, Serialize, Deserialize, hextacy::Constructor)]
 struct TwoFactorAuthResponse {
     pub username: String,
     pub token: String,

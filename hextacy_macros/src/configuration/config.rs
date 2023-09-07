@@ -42,11 +42,11 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
         }
 
         match field.ty {
-            syn::Type::Path(_) => field_types.push(field.ty.clone()),
-            syn::Type::Array(_) => field_types.push(field.ty.clone()),
-            syn::Type::Reference(_) => field_types.push(field.ty.clone()),
-            syn::Type::Slice(_) => field_types.push(field.ty.clone()),
-            syn::Type::Tuple(_) => field_types.push(field.ty.clone()),
+            syn::Type::Path(_)
+            | syn::Type::Array(_)
+            | syn::Type::Reference(_)
+            | syn::Type::Slice(_)
+            | syn::Type::Tuple(_) => field_types.push(field.ty.clone()),
             _ => abort!(
                 field.ty.span(),
                 "Cannot derive Constructor on provided type"

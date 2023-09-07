@@ -52,7 +52,7 @@ macro_rules! call {
         {
             type Response = actix_web::dev::ServiceResponse;
             type Error = actix_web::Error;
-            type Future = futures_util::future::LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+            type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
 
             #[inline]
             fn poll_ready(
