@@ -3,7 +3,7 @@ use crate::db::repository::user::UserRepository;
 use crate::error::Error;
 use hextacy::{component, contract, Driver};
 
-pub struct Repository<A, C, User>
+pub struct UsersRepository<A, C, User>
 where
     A: Driver<Connection = C>,
     User: UserRepository<C>,
@@ -12,7 +12,7 @@ where
     _user: std::marker::PhantomData<User>,
 }
 
-impl<A, C, User> Repository<A, C, User>
+impl<A, C, User> UsersRepository<A, C, User>
 where
     A: Driver<Connection = C>,
     User: UserRepository<C>,
@@ -30,7 +30,7 @@ where
     use UserRepository with Connection as User
 )]
 #[contract]
-impl Repository {
+impl UsersRepository {
     async fn get_paginated(
         &self,
         page: u16,

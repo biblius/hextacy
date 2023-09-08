@@ -1,4 +1,4 @@
-use crate::cache::{contracts::SimpleCacheAccess, AuthID as CacheKey};
+use crate::cache::{contracts::BasicCacheAccess, AuthID as CacheKey};
 use crate::config::constants::{
     EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, OTP_TOKEN_DURATION,
     REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_CACHE_DURATION,
@@ -11,16 +11,16 @@ use hextacy::{component, contract};
 
 #[component(
     use Driver for Connection as driver,
-    use SimpleCacheAccess with Connection as C
+    use BasicCacheAccess with Connection as C
 )]
-pub struct AuthenticationCache {}
+pub struct AuthenticationCacheAccess {}
 
 #[component(
     use Driver for C,
-    use SimpleCacheAccess with C as Cache
+    use BasicCacheAccess with C as Cache
 )]
 #[contract]
-impl AuthenticationCache {
+impl AuthenticationCacheAccess {
     /// Sessions get cached behind the user's csrf token.
     async fn set_session(&self, session_id: &str, session: &session::Session) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;

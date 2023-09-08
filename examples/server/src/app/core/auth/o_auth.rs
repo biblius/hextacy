@@ -1,5 +1,5 @@
 use super::contracts::{
-    cache::AuthenticationCacheContract, repository::AuthenticationRepositoryContract,
+    cache::AuthenticationCacheAccessContract, repository::AuthenticationRepositoryAccessContract,
 };
 use super::data::OAuthCodeExchange;
 use crate::{
@@ -26,8 +26,8 @@ use tracing::info;
 
 pub struct OAuthService<R, C>
 where
-    R: AuthenticationRepositoryContract,
-    C: AuthenticationCacheContract,
+    R: AuthenticationRepositoryAccessContract,
+    C: AuthenticationCacheAccessContract,
 {
     pub repository: R,
     pub cache: C,
@@ -36,8 +36,8 @@ where
 #[contract]
 impl<R, C> OAuthService<R, C>
 where
-    R: AuthenticationRepositoryContract + Send + Sync,
-    C: AuthenticationCacheContract + Send + Sync,
+    R: AuthenticationRepositoryAccessContract + Send + Sync,
+    C: AuthenticationCacheAccessContract + Send + Sync,
 {
     /// Process the code received in the authorization step and log the user in or auto
     /// register them, based on whether they already exist. Establishes a session.
@@ -181,8 +181,8 @@ where
 #[async_trait]
 impl<R, C> ServiceApi for OAuthService<R, C>
 where
-    R: AuthenticationRepositoryContract + Send + Sync,
-    C: AuthenticationCacheContract + Send + Sync,
+    R: AuthenticationRepositoryAccessContract + Send + Sync,
+    C: AuthenticationCacheAccessContract + Send + Sync,
 {
     async fn login<T: OAuth + Send + Sync>(
         &self,

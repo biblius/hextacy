@@ -143,7 +143,7 @@ pub fn derive_state(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 #[proc_macro_error]
 pub fn derive_config(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input: syn::DeriveInput = syn::parse(input).unwrap();
-    configuration::config::impl_constructor(input)
+    configuration::constructor::impl_constructor(input)
         .expect("Error while parsing Constructor")
         .into()
 }
@@ -211,8 +211,8 @@ pub fn component(
 ///
 /// A contract defines a set of interactions with an underlying data source or client and
 /// clearly defines how the service interacts with it. Contracts are also an important part
-/// of unit testing since they can easily be mocked and verified for correctness. Additionally,
-/// they make the service look nicer since they encapsulate driver generics.
+/// of unit testing since they can easily be mocked and the service verified for correctness. They also
+/// make the service look nicer since they encapsulate driver generics.
 pub fn contract(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,

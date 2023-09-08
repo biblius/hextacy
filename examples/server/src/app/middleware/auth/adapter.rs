@@ -1,4 +1,4 @@
-use crate::cache::contracts::SimpleCacheAccess;
+use crate::cache::contracts::BasicCacheAccess;
 use crate::cache::AuthID;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
@@ -34,13 +34,13 @@ impl AuthMwRepo {
 
 #[component(
     use Driver for Connection as driver,
-    use SimpleCacheAccess with Connection as SCA
+    use BasicCacheAccess with Connection as SCA
 )]
 pub struct AuthMwCache {}
 
 #[component(
     use Driver for Connection,
-    use SimpleCacheAccess with Connection as Cache
+    use BasicCacheAccess with Connection as Cache
 )]
 #[contract]
 impl AuthMwCache {
@@ -93,7 +93,7 @@ where
 impl<D, C, Cache> Clone for AuthMwCache<D, C, Cache>
 where
     D: Driver<Connection = C> + Send + Sync + Clone,
-    Cache: SimpleCacheAccess<C> + Send + Sync,
+    Cache: BasicCacheAccess<C> + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self {

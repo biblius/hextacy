@@ -22,38 +22,40 @@ pub(super) mod auth_middleware {
         interceptor::AuthenticationGuard,
     };
 
-    type AuthMWCache = AuthMwCache<Redis, RedisConnection, RedisAdapter>;
-    type AuthMWRepo = AuthMwRepo<PostgresSea, DatabaseConnection, PgSessionAdapter>;
-    pub type AuthenticationMiddleware = AuthenticationGuard<AuthMWRepo, AuthMWCache>;
+    pub type AuthenticationMiddleware = AuthenticationGuard<
+        AuthMwRepo<PostgresSea, DatabaseConnection, PgSessionAdapter>,
+        AuthMwCache<Redis, RedisConnection, RedisAdapter>,
+    >;
 }
 
 pub(super) mod auth_service {
     use super::*;
     use crate::app::core::auth::{
         contracts::{
-            cache::AuthenticationCache, email::Email, repository::AuthenticationRepository,
+            cache::AuthenticationCacheAccess, email::Email,
+            repository::AuthenticationRepositoryAccess,
         },
         native::Authentication,
     };
 
-    type RepoComponent = AuthenticationRepository<
-        PostgresSea,
-        DatabaseConnection,
-        PgUserAdapter,
-        PgSessionAdapter,
-        PgOAuthAdapter,
+    pub type AuthenticationService = Authentication<
+        AuthenticationRepositoryAccess<
+            PostgresSea,
+            DatabaseConnection,
+            PgUserAdapter,
+            PgSessionAdapter,
+            PgOAuthAdapter,
+        >,
+        AuthenticationCacheAccess<Redis, RedisConnection, RedisAdapter>,
+        Email,
     >;
-    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
-    type EmailComponent = Email;
-
-    pub type AuthenticationService = Authentication<RepoComponent, CacheComponent, Email>;
 
     impl Configure<AppState> for AuthenticationService {
         fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
             let service = Self {
-                repository: RepoComponent::new(state.pg_sea.clone()),
-                cache: CacheComponent::new(state.redis.clone()),
-                email: EmailComponent::new(state.email.clone()),
+                repository: AuthenticationRepositoryAccess::new(state.pg_sea.clone()),
+                cache: AuthenticationCacheAccess::new(state.redis.clone()),
+                email: Email::new(state.email.clone()),
             };
             cfg.app_data(web::Data::new(service));
         }
@@ -63,26 +65,26 @@ pub(super) mod auth_service {
 pub(super) mod oauth_service {
     use super::*;
     use crate::app::core::auth::{
-        contracts::{cache::AuthenticationCache, repository::AuthenticationRepository},
+        contracts::{cache::AuthenticationCacheAccess, repository::AuthenticationRepositoryAccess},
         o_auth::OAuthService as Service,
     };
 
-    type CacheComponent = AuthenticationCache<Redis, RedisConnection, RedisAdapter>;
-    type RepoComponent = AuthenticationRepository<
-        PostgresSea,
-        DatabaseConnection,
-        PgUserAdapter,
-        PgSessionAdapter,
-        PgOAuthAdapter,
+    pub type OAuthService = Service<
+        AuthenticationRepositoryAccess<
+            PostgresSea,
+            DatabaseConnection,
+            PgUserAdapter,
+            PgSessionAdapter,
+            PgOAuthAdapter,
+        >,
+        AuthenticationCacheAccess<Redis, RedisConnection, RedisAdapter>,
     >;
-
-    pub type OAuthService = Service<RepoComponent, CacheComponent>;
 
     impl Configure<AppState> for OAuthService {
         fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
             let service = Self {
-                repository: RepoComponent::new(state.pg_sea.clone()),
-                cache: CacheComponent::new(state.redis.clone()),
+                repository: AuthenticationRepositoryAccess::new(state.pg_sea.clone()),
+                cache: AuthenticationCacheAccess::new(state.redis.clone()),
             };
             cfg.app_data(web::Data::new(service));
         }
@@ -91,16 +93,15 @@ pub(super) mod oauth_service {
 
 pub(super) mod user_service {
     use super::*;
-    use crate::app::core::users::{adapters::Repository, domain::UserService as Service};
+    use crate::app::core::users::{adapters::UsersRepository, domain::Users};
 
-    type RepoComponent = Repository<PostgresDiesel, DieselConnection, DieselUserAdapter>;
-
-    pub type UserService = Service<RepoComponent>;
+    pub type UserService =
+        Users<UsersRepository<PostgresDiesel, DieselConnection, DieselUserAdapter>>;
 
     impl Configure<AppState> for UserService {
         fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
             let service = Self {
-                repository: RepoComponent::new(state.pg_diesel.clone()),
+                repository: UsersRepository::new(state.pg_diesel.clone()),
             };
             cfg.app_data(web::Data::new(service));
         }

@@ -1,14 +1,12 @@
 pub mod health;
 pub mod resources;
 
+use super::setup::auth_middleware::AuthenticationMiddleware;
 use crate::config::AppState;
 use crate::db::models::role::Role;
 use crate::services::oauth::OAuthProviders;
 use actix_web::web;
-use hextacy::web::Configure;
-use hextacy::{route, scope};
-
-use super::setup::auth_middleware::AuthenticationMiddleware;
+use hextacy::{route, scope, web::Configure};
 
 pub fn route(state: &AppState, cfg: &mut web::ServiceConfig) {
     let auth_guard =

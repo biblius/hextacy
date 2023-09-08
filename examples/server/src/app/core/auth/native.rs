@@ -1,6 +1,6 @@
 use super::contracts::{
-    cache::AuthenticationCacheContract, email::EmailContract,
-    repository::AuthenticationRepositoryContract,
+    cache::AuthenticationCacheAccessContract, email::EmailContract,
+    repository::AuthenticationRepositoryAccessContract,
 };
 use super::data::{
     ChangePassword, Credentials, EmailToken, ForgotPassword, ForgotPasswordVerify,
@@ -50,8 +50,8 @@ pub struct Authentication<R, C, E> {
 #[contract]
 impl<R, C, E> Authentication<R, C, E>
 where
-    R: AuthenticationRepositoryContract + Send + Sync,
-    C: AuthenticationCacheContract + Send + Sync,
+    R: AuthenticationRepositoryAccessContract + Send + Sync,
+    C: AuthenticationCacheAccessContract + Send + Sync,
     E: EmailContract + Send + Sync,
 {
     /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`

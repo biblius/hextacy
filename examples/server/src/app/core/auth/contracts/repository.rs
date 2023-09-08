@@ -14,7 +14,7 @@ use hextacy::{component, contract, info};
     use SessionRepository with Connection as S,
     use OAuthRepository with Connection as O,
 )]
-pub struct AuthenticationRepository {}
+pub struct AuthenticationRepositoryAccess {}
 
 #[component(
     use Driver for Connection:Atomic,
@@ -22,7 +22,7 @@ pub struct AuthenticationRepository {}
     use SessionRepository with Connection as Session,
 )]
 #[contract]
-impl<OAuth> AuthenticationRepository<OAuth>
+impl<OAuth> AuthenticationRepositoryAccess<OAuth>
 where
     // Just to try out component with existing generics
     OAuth:
@@ -200,7 +200,7 @@ where
     }
 }
 /* implement! {
-    AuthenticationRepository : RepositoryApi,
+    AuthenticationRepositoryAccess : RepositoryApi,
 
     use Postgres for Connection : Atomic;
 
@@ -213,7 +213,7 @@ where
 
 /* #[async_trait]
 impl<Pg, Mg, Connection, MgConn, User, Session, OAuth> RepositoryApi
-    for AuthenticationRepository<Pg, Mg, Connection, MgConn, User, Session, OAuth>
+    for AuthenticationRepositoryAccess<Pg, Mg, Connection, MgConn, User, Session, OAuth>
 where
     Self: RepositoryAccess<Connection> + RepositoryAccess<MgConn>,
     Pg: Driver<Connection = Connection>,
@@ -248,7 +248,7 @@ where
 */
 
 /* #[derive(Debug, hextacy::derive::Repository)]
-pub struct AuthenticationRepository<Pg, Connection, User, Session, OAuth>
+pub struct AuthenticationRepositoryAccess<Pg, Connection, User, Session, OAuth>
 where
     Pg: Driver<Connection = Connection>,
 {

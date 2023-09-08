@@ -6,8 +6,8 @@ use super::super::data::{
 };
 use super::super::native::Authentication;
 use crate::app::core::auth::contracts::{
-    cache::MockAuthenticationCacheContract as MockCache, email::MockEmailContract,
-    repository::MockAuthenticationRepositoryContract as MockRepository,
+    cache::MockAuthenticationCacheAccessContract as MockCache, email::MockEmailContract,
+    repository::MockAuthenticationRepositoryAccessContract as MockRepository,
 };
 use crate::app::core::auth::native::AuthenticationContract as ServiceContract;
 use crate::app::core::auth::native::MockAuthenticationContract;

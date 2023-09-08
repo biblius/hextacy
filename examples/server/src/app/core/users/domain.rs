@@ -1,5 +1,5 @@
 use super::{
-    adapters::RepositoryContract,
+    adapters::UsersRepositoryContract,
     contract::ServiceContract,
     data::{GetUsersPaginated, UserResponse},
 };
@@ -9,17 +9,17 @@ use async_trait::async_trait;
 use hextacy::web::http::response::Response;
 use reqwest::StatusCode;
 
-pub struct UserService<R>
+pub struct Users<R>
 where
-    R: RepositoryContract,
+    R: UsersRepositoryContract,
 {
     pub repository: R,
 }
 
 #[async_trait]
-impl<R> ServiceContract for UserService<R>
+impl<R> ServiceContract for Users<R>
 where
-    R: RepositoryContract + Send + Sync,
+    R: UsersRepositoryContract + Send + Sync,
 {
     async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
         let users = self
