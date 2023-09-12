@@ -1,10 +1,12 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use hextacy::adapters::cache::exports::deadpool_redis::redis;
+use hextacy::{adapters::email::TemplateMailerError, exports::deadpool_redis::redis};
 use reqwest::StatusCode;
 use serde::Serialize;
-use std::fmt::Display;
+use std::fmt::Debug;
 use thiserror::{self, Error};
 use validify::{ValidationError, ValidationErrors};
+
+use crate::{cache::TokenType, services::oauth::OAuthProviderError};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -36,8 +38,8 @@ pub enum Error {
     Http(#[from] hextacy::web::http::HttpError),
     #[error("OAuth Provider Error: {0}")]
     OAuthProvider(#[from] crate::services::oauth::OAuthProviderError),
-    #[error("Lettre Error: {0}")]
-    Lettre(#[from] lettre::transport::smtp::Error),
+    #[error("Smtp Mailer: {0}")]
+    TemplateMailer(#[from] TemplateMailerError),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]
@@ -55,23 +57,16 @@ impl Error {
         e.into()
     }
 
-    /// Returns error message and description
-    pub fn message_and_description(&self) -> (&'static str, String) {
+    /// Returns error error and description
+    pub fn error_and_description(&self) -> (&'static str, &'static str) {
         match self {
             Self::Authentication(e) => e.describe(),
             Self::Adapter(crate::db::RepoAdapterError::DoesNotExist) => {
-                ("NOT_FOUND", "Resource does not exist".to_string())
+                ("NOT_FOUND", "Resource does not exist")
             }
-            Self::Validation(_) => ("VALIDATION", "Invalid input".to_string()),
-            _ => ("INTERNAL_SERVER_ERROR", "Internal server error".to_string()),
-        }
-    }
-
-    /// Check whether the error is a validation error
-    fn check_validation_errors(&self) -> Option<Vec<ValidationError>> {
-        match self {
-            Error::Validation(errors) => Some(errors.clone()),
-            _ => None,
+            Self::Validation(_) => ("VALIDATION", "Invalid request parameters"),
+            Self::OAuthProvider(_) => ("OAUTH", "Something went wrong"),
+            _ => ("INTERNAL", "Something went wrong"),
         }
     }
 }
@@ -79,7 +74,9 @@ impl Error {
 impl ResponseError for Error {
     fn status_code(&self) -> reqwest::StatusCode {
         match self {
-            Error::Authentication(e) => e.status_code(),
+            Self::Authentication(e) => e.status_code(),
+            Self::Validation(_) => StatusCode::BAD_REQUEST,
+            Self::Adapter(crate::db::RepoAdapterError::DoesNotExist) => StatusCode::NOT_FOUND,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
@@ -88,45 +85,57 @@ impl ResponseError for Error {
     /// Flattens all validation errors to a vec, if any
     fn error_response(&self) -> HttpResponse<BoxBody> {
         let status = self.status_code();
-        let (message, description) = self.message_and_description();
-        let validation_errors = self.check_validation_errors();
-        let error_response =
-            ErrorResponse::new(status.as_u16(), message, &description, validation_errors);
-        Response::new(status).json(error_response)
-    }
-}
-
-#[derive(Serialize, Debug)]
-pub struct ErrorResponse<'a> {
-    code: u16,
-    message: &'a str,
-    description: &'a str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    validation_errors: Option<Vec<ValidationError>>,
-}
-
-impl<'a> ErrorResponse<'a> {
-    pub fn new(
-        code: u16,
-        message: &'a str,
-        description: &'a str,
-        validation_errors: Option<Vec<ValidationError>>,
-    ) -> Self {
-        Self {
-            code,
-            message,
-            description,
-            validation_errors,
+        let (error, description) = self.error_and_description();
+        match self {
+            Self::Adapter(crate::db::RepoAdapterError::DoesNotExist) => todo!(),
+            Self::Validation(errs) => {
+                let error_response = ErrorResponse::new_with_details(error, description, errs);
+                Response::new(status).json(error_response)
+            }
+            Self::OAuthProvider(OAuthProviderError::GithubOAuth(err)) => {
+                let error_response = ErrorResponse::new_with_details(error, description, err);
+                Response::new(status).json(error_response)
+            }
+            _ => Response::new(status).json(ErrorResponse::<()>::new(error, description)),
         }
     }
 }
 
-impl Display for ErrorResponse<'_> {
+#[derive(Serialize, Debug)]
+pub struct ErrorResponse<'a, T> {
+    error: &'a str,
+    description: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<T>,
+}
+
+impl<'a, T> ErrorResponse<'a, T>
+where
+    T: Serialize,
+{
+    pub fn new(error: &'a str, description: &'a str) -> Self {
+        Self {
+            error,
+            description,
+            details: None,
+        }
+    }
+
+    pub fn new_with_details(error: &'a str, description: &'a str, details: T) -> Self {
+        Self {
+            error,
+            description,
+            details: Some(details),
+        }
+    }
+}
+
+impl<T: Debug> std::fmt::Display for ErrorResponse<'_, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Message: {}, Description: {}",
-            self.message, self.description
+            "Message: {}, Description: {}, Details: {:?}",
+            self.error, self.description, self.details
         )
     }
 }
@@ -138,7 +147,7 @@ pub enum AuthenticationError {
     #[error("Invalid credentials")]
     InvalidCredentials,
     #[error("Invalid token")]
-    InvalidToken(&'static str),
+    InvalidToken(TokenType),
     #[error("Invalid OTP")]
     InvalidOTP,
     #[error("Invalid CSRF header")]
@@ -169,32 +178,22 @@ impl AuthenticationError {
         }
     }
 
-    pub fn describe(&self) -> (&'static str, String) {
+    pub fn describe(&self) -> (&'static str, &'static str) {
         match self {
-            AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session".to_string()),
-            AuthenticationError::InvalidCsrfHeader => {
-                ("UNAUTHORIZED", "Invalid CSRF header".to_string())
-            }
-            AuthenticationError::InvalidCredentials => {
-                ("UNAUTHORIZED", "Invalid credentials".to_string())
-            }
-            AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided".to_string()),
-            AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended".to_string()),
-            AuthenticationError::EmailUnverified => {
-                ("UNVERIFIED", "Email not verified".to_string())
-            }
-            AuthenticationError::AuthBlocked => {
-                ("BLOCKED", "Authentication currently blocked".to_string())
-            }
-            AuthenticationError::InsufficientRights => {
-                ("FORBIDDEN", "Insufficient rights".to_string())
-            }
+            AuthenticationError::Unauthenticated => ("UNAUTHORIZED", "No session"),
+            AuthenticationError::InvalidCsrfHeader => ("UNAUTHORIZED", "Invalid CSRF header"),
+            AuthenticationError::InvalidCredentials => ("UNAUTHORIZED", "Invalid credentials"),
+            AuthenticationError::InvalidOTP => ("UNAUTHORIZED", "Invalid OTP provided"),
+            AuthenticationError::AccountFrozen => ("SUSPENDED", "Account suspended"),
+            AuthenticationError::EmailUnverified => ("UNVERIFIED", "Email not verified"),
+            AuthenticationError::AuthBlocked => ("BLOCKED", "Authentication currently blocked"),
+            AuthenticationError::InsufficientRights => ("FORBIDDEN", "Insufficient rights"),
             AuthenticationError::InvalidToken(id) => match *id {
-                "OTP" => ("INVALID_TOKEN", "Invalid OTP token".to_string()),
-                "Registration" => ("INVALID_TOKEN", "Invalid registration token".to_string()),
-                "Password" => ("INVALID_TOKEN", "Invalid password change token".to_string()),
-                "OAuth" => ("INVALID_TOKEN", "Invalid OAuth access token".to_string()),
-                _ => ("INVALID_TOKEN", "Token not found".to_string()),
+                TokenType::OTPToken => ("INVALID_TOKEN", "Invalid OTP token"),
+                TokenType::RegToken => ("INVALID_TOKEN", "Invalid registration token"),
+                TokenType::PWToken => ("INVALID_TOKEN", "Invalid password change token"),
+                // Token => ("INVALID_TOKEN", "Invalid OAuth access token"),
+                _ => ("INVALID_TOKEN", "Token not found"),
             },
         }
     }

@@ -1,21 +1,16 @@
 use crate::{
-    db::{models::oauth::OAuthMeta, RepoAdapterError},
-    services::oauth::{OAuthProvider, TokenResponse},
+    db::{dto::oauth::OAuthMetaData, models::oauth::OAuthMeta, RepoAdapterError},
+    services::oauth::OAuthProvider,
 };
 use async_trait::async_trait;
 
 #[async_trait]
 pub trait OAuthRepository<C> {
     /// Create user OAuth metadata
-    async fn create<T>(
+    async fn create<'a>(
         conn: &mut C,
-        user_id: &str,
-        account_id: &str,
-        tokens: &T,
-        provider: OAuthProvider,
-    ) -> Result<OAuthMeta, RepoAdapterError>
-    where
-        T: TokenResponse + Send + Sync;
+        data: OAuthMetaData<'a>,
+    ) -> Result<OAuthMeta, RepoAdapterError>;
 
     /// Get an entry by it's DB ID
     async fn get_by_id(conn: &mut C, id: &str) -> Result<OAuthMeta, RepoAdapterError>;
@@ -47,12 +42,8 @@ pub trait OAuthRepository<C> {
 
     /// Update a token's scopes, i.e. replace the found entry's tokens with the newly
     /// obtained ones. Matches against the user ID and the provider.
-    async fn update<T>(
+    async fn update<'a>(
         conn: &mut C,
-        user_id: &str,
-        tokens: &T,
-        provider: OAuthProvider,
-    ) -> Result<OAuthMeta, RepoAdapterError>
-    where
-        T: TokenResponse;
+        data: OAuthMetaData<'a>,
+    ) -> Result<OAuthMeta, RepoAdapterError>;
 }

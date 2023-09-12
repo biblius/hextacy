@@ -41,7 +41,8 @@ fn impl_impl_block(component: ComponentImpl, item_impl: ItemImpl) -> proc_macro:
         ),
     };
 
-    let generics = component.generics();
+    let impl_generics = component.impl_generics();
+    let ty_generics = component.ty_generics();
 
     let mut where_clause = quote!(where);
 
@@ -56,7 +57,7 @@ fn impl_impl_block(component: ComponentImpl, item_impl: ItemImpl) -> proc_macro:
 
     quote!(
         #(#attrs)*
-        impl<#(#generics),*, #existing_impl> #original_struct <#(#generics),*, #(#existing_ty),*> #where_clause
+        impl<#(#impl_generics),*, #existing_impl> #original_struct <#(#ty_generics),*, #(#existing_ty),*> #where_clause
         {
             #(#original_fns)*
         }
@@ -65,7 +66,7 @@ fn impl_impl_block(component: ComponentImpl, item_impl: ItemImpl) -> proc_macro:
 }
 
 fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macro::TokenStream {
-    let visibility = &item_struct.vis;
+    let new_struct = quote_struct(&component, &item_struct);
 
     let id = &item_struct.ident;
 
@@ -75,36 +76,16 @@ fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macr
 
     let mut where_clause = quote!(where);
 
-    component.extend_where_clause(&mut where_clause);
-
     if let Some(ref wher) = item_struct.generics.where_clause {
         let wher = &wher.predicates;
         where_clause.extend(quote!( #wher ))
     }
 
     let existing_fields = item_struct.fields.iter().collect::<Vec<_>>();
-    let fields = component.driver_contract_fields();
-
-    // This always gets quoted
-    let new_struct = quote!(
-        #visibility struct #id <#( #generics ),*, #existing_generics> #where_clause {
-            #( #existing_fields, ),*
-            #fields
-        }
-    );
-
-    // Zip these since drivers will always be the first in the generics
-    let new_fields = component.driver_fields();
-    let new_fields = new_fields
-        .iter()
-        .zip(generics.iter())
-        .map(|(arg, ty)| quote!(#arg: #ty));
-
-    let struct_fields = component.driver_contract_fields_new();
 
     // Disgusting stuff for the new implementation because we are being
     // ass blasted by commas
-    let existing_fields_for_impl = existing_fields
+    let existing_fields_for_new = existing_fields
         .iter()
         .map(|f| {
             f.ident
@@ -113,22 +94,25 @@ fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macr
         })
         .collect::<Vec<_>>();
 
-    let existing_tys_for_impl = existing_fields
+    let existing_tys_for_new = existing_fields
         .iter()
         .map(|f| f.ty.clone())
         .collect::<Vec<_>>();
 
-    let args = (!existing_fields.is_empty()).then(|| {
+    let existing_args = (!existing_fields.is_empty()).then(|| {
         quote!(
-            #( #existing_fields_for_impl : #existing_tys_for_impl ),*
+            #( #existing_fields_for_new : #existing_tys_for_new ),*
         )
     });
 
-    let s_fields = (!existing_fields.is_empty()).then(|| {
+    let existing_struct_fields = (!existing_fields.is_empty()).then(|| {
         quote!(
-            #( #existing_fields_for_impl ),*,
+            #( #existing_fields_for_new ),*,
         )
     });
+
+    let args_new = component.driver_and_contract_fields();
+    let struct_fields_new = component.driver_contract_fields_new();
 
     let new = quote!(
         impl
@@ -137,20 +121,54 @@ fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macr
         <#( #generics ),*, #existing_generics>
         #where_clause
         {
-                pub fn new( #( #new_fields ),*, #args ) -> Self {
+                pub fn new(#args_new #existing_args ) -> Self {
                     Self {
-                        #s_fields
-                        #struct_fields
+                        #existing_struct_fields
+                        #(#struct_fields_new),*
                     }
                 }
         }
     );
+
+    let mut existing_generics_impl = existing_generics.clone();
+    existing_generics_impl.iter_mut().for_each(|g| match g {
+        syn::GenericParam::Lifetime(_) => todo!(),
+        syn::GenericParam::Type(ty) => ty.bounds.push(syn::TypeParamBound::Trait(
+            syn::parse(quote!(Clone).into()).unwrap(),
+        )),
+        syn::GenericParam::Const(_) => todo!(),
+    });
 
     quote!(
         #new_struct
         #new
     )
     .into()
+}
+
+fn quote_struct(component: &ComponentStruct, item_struct: &ItemStruct) -> proc_macro2::TokenStream {
+    let attrs = &item_struct.attrs;
+    let visibility = &item_struct.vis;
+    let id = &item_struct.ident;
+    let existing_generics = &item_struct.generics.params;
+    let generics = &component.generics();
+
+    let mut where_clause = quote!(where);
+    if let Some(ref wher) = item_struct.generics.where_clause {
+        let wher = &wher.predicates;
+        where_clause.extend(quote!( #wher ))
+    }
+
+    let existing_fields = item_struct.fields.iter().collect::<Vec<_>>();
+    let fields = component.driver_and_contract_fields();
+
+    quote!(
+        #(#attrs),*
+        #visibility struct #id <#( #generics ),*, #existing_generics> #where_clause {
+            #fields
+            #( #existing_fields ),*
+        }
+    )
 }
 
 #[derive(Debug, Default)]
@@ -160,12 +178,21 @@ struct ComponentImpl {
 }
 
 impl ComponentImpl {
-    fn generics(&self) -> Vec<Ident> {
+    fn impl_generics(&self) -> Vec<Ident> {
         let mut generics: Vec<_> = self.drivers.iter().map(|d| d.driver_id.clone()).collect();
         let conns = self.drivers.iter().map(|d| d.conn_id.clone());
         let contracts = self.contracts.iter().map(|d| d.name.clone());
 
         generics.extend(conns);
+        generics.extend(contracts);
+
+        generics
+    }
+
+    fn ty_generics(&self) -> Vec<Ident> {
+        let mut generics: Vec<_> = self.drivers.iter().map(|d| d.driver_id.clone()).collect();
+        let contracts = self.contracts.iter().map(|d| d.name.clone());
+
         generics.extend(contracts);
 
         generics
@@ -301,55 +328,35 @@ impl Parse for ContractImpl {
 #[derive(Debug, Default)]
 struct ComponentStruct {
     drivers: Vec<DriverStruct>,
-    contracts: Vec<ContractImpl>,
+    generics: Vec<Ident>,
 }
 
 impl ComponentStruct {
     fn generics(&self) -> Vec<Ident> {
         let mut generics: Vec<_> = self.drivers.iter().map(|d| d.driver_id.clone()).collect();
-        let conns = self.drivers.iter().map(|d| d.conn_id.clone());
-        let contracts = self.contracts.iter().map(|d| d.name.clone());
-        generics.extend(conns);
-        generics.extend(contracts);
+        let gens = self.generics.iter().cloned();
+        generics.extend(gens);
 
         generics
     }
 
-    fn extend_where_clause(&self, where_clause: &mut proc_macro2::TokenStream) {
-        for driver in self.drivers.iter() {
-            let id = &driver.driver_id;
-            let conn = &driver.conn_id;
-
-            where_clause.extend(quote!(
-                #id: hextacy::Driver<Connection = #conn>,
-            ));
-        }
-
-        for contract in self.contracts.iter() {
-            let name = &contract.name;
-            let trait_id = &contract.trait_id;
-            let conn = &contract.conn_id;
-            where_clause.extend(quote!(
-                #name: #trait_id<#conn>,
-            ));
-        }
-    }
-
-    fn driver_contract_fields(&self) -> proc_macro2::TokenStream {
+    fn driver_and_contract_fields(&self) -> proc_macro2::TokenStream {
         let mut tokens = quote!();
         for driver in self.drivers.iter() {
-            let field = Ident::new(&driver.name.to_string().to_lowercase(), Span::call_site());
+            let field = Ident::new(
+                &pascal_to_snake(&driver.name.to_string()),
+                Span::call_site(),
+            );
             let name = &driver.driver_id;
             tokens.extend(quote!(
                 #field: #name,
             ));
         }
 
-        for contract in self.contracts.iter() {
-            let field = Ident::new(&contract.name.to_string().to_lowercase(), Span::call_site());
-            let name = &contract.name;
+        for generic in self.generics.iter() {
+            let field = Ident::new(&pascal_to_snake(&generic.to_string()), Span::call_site());
             tokens.extend(quote!(
-                #field: std::marker::PhantomData<#name>,
+                #field: #generic,
             ));
         }
 
@@ -357,30 +364,20 @@ impl ComponentStruct {
     }
 
     /// Get the necessary struct fields for implementing new
-    fn driver_contract_fields_new(&self) -> proc_macro2::TokenStream {
-        let mut tokens = quote!();
-        for driver in self.drivers.iter() {
-            let field = Ident::new(&driver.name.to_string().to_lowercase(), Span::call_site());
-            tokens.extend(quote!(
-                #field,
-            ));
-        }
-
-        for contract in self.contracts.iter() {
-            let field = Ident::new(&contract.name.to_string().to_lowercase(), Span::call_site());
-            tokens.extend(quote!(
-                #field: std::marker::PhantomData,
-            ));
-        }
+    fn driver_contract_fields_new(&self) -> Vec<Ident> {
+        let mut tokens = vec![];
+        tokens.extend(
+            self.drivers
+                .iter()
+                .map(|f| Ident::new(&pascal_to_snake(&f.name.to_string()), Span::call_site())),
+        );
+        tokens.extend(
+            self.generics
+                .iter()
+                .map(|f| Ident::new(&pascal_to_snake(&f.to_string()), Span::call_site())),
+        );
 
         tokens
-    }
-
-    fn driver_fields(&self) -> Vec<Ident> {
-        self.drivers
-            .iter()
-            .map(|d| Ident::new(&d.driver_id.to_string().to_lowercase(), Span::call_site()))
-            .collect()
     }
 }
 
@@ -389,15 +386,16 @@ impl Parse for ComponentStruct {
         let mut this = Self::default();
 
         while input.parse::<Token!(use)>().is_ok() {
-            // Checks for 'with' or a fully qualified path
-            if input.peek2(Ident) || input.peek2(Token!(::)) {
-                let contract = input.parse()?;
-                this.contracts.push(contract);
-            }
-
-            if input.peek2(Token!(for)) {
+            if input.peek2(Token!(as)) {
                 let driver = input.parse()?;
                 this.drivers.push(driver);
+            } else {
+                while let Ok(generic) = input.parse::<Ident>() {
+                    this.generics.push(generic);
+                    if input.parse::<Token!(,)>().is_ok() && input.cursor().eof() {
+                        return Ok(this);
+                    }
+                }
             }
         }
         Ok(this)
@@ -407,27 +405,33 @@ impl Parse for ComponentStruct {
 #[derive(Debug)]
 struct DriverStruct {
     driver_id: Ident,
-    conn_id: Ident,
     name: Ident,
 }
 
 impl Parse for DriverStruct {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let driver_id: Ident = input.parse()?;
-        input.parse::<Token!(for)>()?;
-        let conn_id: Ident = input.parse()?;
         input.parse::<Token!(as)>()?;
         let name = input.parse()?;
 
-        let this = DriverStruct {
-            driver_id,
-            conn_id: conn_id.clone(),
-            name,
-        };
+        let this = DriverStruct { driver_id, name };
 
         match input.parse::<Token!(,)>() {
             Ok(_) => Ok(this),
             Err(_) => Ok(this),
         }
     }
+}
+
+fn pascal_to_snake(pascal_string: &str) -> String {
+    pascal_string
+        .chars()
+        .enumerate()
+        .fold(String::new(), |mut acc, (i, c)| {
+            if i > 0 && c.is_uppercase() {
+                acc.push('_');
+            }
+            acc.push(c.to_lowercase().next().unwrap());
+            acc
+        })
 }

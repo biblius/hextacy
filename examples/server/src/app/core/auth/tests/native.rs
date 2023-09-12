@@ -11,6 +11,7 @@ use crate::app::core::auth::contracts::{
 };
 use crate::app::core::auth::native::AuthenticationContract as ServiceContract;
 use crate::app::core::auth::native::MockAuthenticationContract;
+use crate::cache::TokenType;
 use crate::db::{
     models::{session::Session, user::User},
     RepoAdapterError,
@@ -181,7 +182,7 @@ async fn verify_registration_token() {
         Ok(_) => panic!("Not good"),
         Err(e) => assert!(matches!(
             e,
-            Error::Authentication(AuthenticationError::InvalidToken("Registration"))
+            Error::Authentication(AuthenticationError::InvalidToken(TokenType::RegToken))
         )),
     };
 }
@@ -507,7 +508,7 @@ async fn reset_password() {
         Ok(_) => panic!("Not good"),
         Err(e) => assert!(matches!(
             e,
-            Error::Authentication(AuthenticationError::InvalidToken("Password"))
+            Error::Authentication(AuthenticationError::InvalidToken(TokenType::PWToken))
         )),
     };
 }
@@ -623,7 +624,7 @@ async fn verify_forgot_password() {
         Ok(_) => panic!("Not good"),
         Err(e) => assert!(matches!(
             e,
-            Error::Authentication(AuthenticationError::InvalidToken("Password"))
+            Error::Authentication(AuthenticationError::InvalidToken(TokenType::PWToken))
         )),
     }
 }

@@ -1,7 +1,7 @@
 pub mod adapters;
 pub mod contracts;
 
-use hextacy::adapters::cache::exports::deadpool_redis::redis;
+use hextacy::exports::deadpool_redis::redis;
 use std::fmt::Display;
 use thiserror::Error;
 
@@ -27,7 +27,7 @@ pub trait KeyPrefix {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum AuthID {
+pub enum TokenType {
     /// Keeps track of login attempts
     LoginAttempts,
     /// Session caching
@@ -44,20 +44,22 @@ pub enum AuthID {
     OTPAttempts,
     /// Stopping email craziness
     EmailThrottle,
+    /// Token obtained from a provider
+    OAuth,
 }
 
-impl KeyPrefix for AuthID {
+impl KeyPrefix for TokenType {
     fn id(self) -> &'static str {
-        use AuthID::*;
         match self {
-            LoginAttempts => "auth:login_attempts",
-            Session => "auth:session",
-            RegToken => "auth:registration_token",
-            PWToken => "auth:set_pw",
-            OTPToken => "auth:otp",
-            OTPThrottle => "auth:otp_throttle",
-            OTPAttempts => "auth:otp_attempts",
-            EmailThrottle => "auth:emal_throttle",
+            Self::LoginAttempts => "auth:login_attempts",
+            Self::Session => "auth:session",
+            Self::RegToken => "auth:registration_token",
+            Self::PWToken => "auth:set_pw",
+            Self::OTPToken => "auth:otp",
+            Self::OTPThrottle => "auth:otp_throttle",
+            Self::OTPAttempts => "auth:otp_attempts",
+            Self::EmailThrottle => "auth:emal_throttle",
+            Self::OAuth => "auth:oauth",
         }
     }
 }

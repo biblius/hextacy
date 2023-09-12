@@ -7,6 +7,7 @@ use super::data::{
     FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
     ResendRegToken, ResetPassword, TwoFactorAuthResponse,
 };
+use crate::cache::TokenType;
 use crate::config::constants::{
     COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, SESSION_DURATION,
 };
@@ -132,9 +133,8 @@ where
             remember,
         } = otp;
 
-        let user_id = match self.cache.get_otp_token(token).await {
-            Ok(id) => id,
-            Err(_) => return Err(AuthenticationError::InvalidToken("OTP").into()),
+        let Ok(user_id) = self.cache.get_otp_token(token).await else {
+            return Err(AuthenticationError::InvalidToken(TokenType::OTPToken).into());
         };
 
         info!("Verifying OTP for {user_id}");
@@ -228,7 +228,7 @@ where
 
         let user_id = match self.cache.get_registration_token(token).await {
             Ok(id) => id,
-            Err(_) => return Err(AuthenticationError::InvalidToken("Registration").into()),
+            Err(_) => return Err(AuthenticationError::InvalidToken(TokenType::RegToken).into()),
         };
 
         info!("Verfiying registration token for {user_id}");
@@ -241,7 +241,7 @@ where
             token.as_bytes(),
             BASE64URL,
         )? {
-            return Err(AuthenticationError::InvalidToken("Registration").into());
+            return Err(AuthenticationError::InvalidToken(TokenType::RegToken).into());
         }
 
         self.repository
@@ -366,7 +366,7 @@ where
 
         let user_id = match self.cache.get_pw_token(token).await {
             Ok(id) => id,
-            Err(_) => return Err(AuthenticationError::InvalidToken("Password").into()),
+            Err(_) => return Err(AuthenticationError::InvalidToken(TokenType::PWToken).into()),
         };
 
         self.cache.delete_pw_token(token).await?;
@@ -390,7 +390,11 @@ where
         // Check if there's a reset PW token in the cache
         let user_id = match self.cache.get_pw_token(pw_token).await {
             Ok(id) => id,
-            Err(_) => return Err(Error::new(AuthenticationError::InvalidToken("Password"))),
+            Err(_) => {
+                return Err(Error::new(AuthenticationError::InvalidToken(
+                    TokenType::PWToken,
+                )))
+            }
         };
 
         info!("Resetting password for {user_id}");

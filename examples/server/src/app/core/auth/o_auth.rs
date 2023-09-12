@@ -2,11 +2,13 @@ use super::contracts::{
     cache::AuthenticationCacheAccessContract, repository::AuthenticationRepositoryAccessContract,
 };
 use super::data::OAuthCodeExchange;
+use crate::cache::TokenType;
+use crate::services::oauth::OAuthTokenResponse;
 use crate::{
     app::core::auth::data::AuthenticationSuccessResponse,
     config::constants::COOKIE_S_ID,
     error::{AuthenticationError, Error},
-    services::oauth::{OAuthAccount, OAuthProvider, TokenResponse},
+    services::oauth::OAuthProvider,
 };
 use crate::{
     db::models::{session::Session, user::User},
@@ -54,25 +56,24 @@ where
         code: OAuthCodeExchange,
     ) -> Result<HttpResponse, Error> {
         let OAuthCodeExchange { ref code } = code;
-
-        // Get the tokens and obtain the account
-        let mut tokens = provider.exchange_code(code).await?;
-        let account = provider.get_account(&tokens).await?;
+        // Get the token_res and obtain the account
+        let mut token_res = provider.exchange_code(code).await?;
+        let account = provider.get_account(&token_res).await?;
         let provider_id = provider.provider_id();
-        let email = match account.email() {
+        let email = match account.email {
             Some(email) => email,
             None => return Err(AuthenticationError::EmailUnverified.into()),
         };
 
-        let account_id = account.id();
+        let account_id = account.id;
 
         let (user, oauth) = self
             .repository
             .get_or_create_user_oauth(
-                account_id.as_str(),
-                email,
-                account.username(),
-                &tokens,
+                &account_id,
+                &email,
+                &account.username,
+                &token_res,
                 provider_id,
             )
             .await?;
@@ -80,18 +81,18 @@ where
         if oauth.expired() {
             if let Some(ref refresh_token) = oauth.refresh_token {
                 info!("OAuth access token expired, refreshing");
-                tokens = provider.refresh_access_token(refresh_token).await?;
+                token_res = provider.refresh_access_token(refresh_token).await?;
                 self.repository
-                    .refresh_oauth_and_session(&user.id, &tokens, provider_id)
+                    .refresh_oauth_and_session(&user.id, &token_res, provider_id)
                     .await?;
             } else {
                 self.repository
-                    .update_oauth(&user.id, &tokens, provider_id)
+                    .update_oauth(&user.id, &token_res, provider_id)
                     .await?;
             }
         }
 
-        self.establish_session(provider_id, tokens, user).await
+        self.establish_session(provider_id, &token_res, user).await
     }
 
     /// Mainly used for incremental authorization. When the user wants to perform an action
@@ -107,15 +108,15 @@ where
     ) -> Result<HttpResponse, Error> {
         let _ = session
             .oauth_token
-            .ok_or(AuthenticationError::InvalidToken("OAuth"))?;
+            .ok_or(AuthenticationError::InvalidToken(TokenType::OAuth))?;
 
-        // Obtain the new tokens with more scopes
+        // Obtain the new token_res with more scopes
         let OAuthCodeExchange { ref code } = code;
-        let tokens = provider.exchange_code(code).await?;
+        let token_res = provider.exchange_code(code).await?;
 
         let user_id = &session.user_id;
         let provider_id = provider.provider_id();
-        let access_token = tokens.access_token();
+        let access_token = &token_res.access_token;
 
         // Update existing sessions tied to the user and their auth provider
         // as well as the related oauth metadata
@@ -123,7 +124,7 @@ where
             .update_session_access_tokens(access_token, user_id, provider_id)
             .await?;
         self.repository
-            .update_oauth(user_id, &tokens, provider_id)
+            .update_oauth(user_id, &token_res, provider_id)
             .await?;
 
         // Update the existing session, sessions updated in the previous step will not update
@@ -137,16 +138,16 @@ where
             .finish())
     }
 
-    async fn establish_session<TR: TokenResponse + 'static>(
+    async fn establish_session(
         &self,
         provider_id: OAuthProvider,
-        tokens: TR,
+        token_res: &OAuthTokenResponse,
         user: User,
     ) -> Result<HttpResponse, Error> {
         let csrf_token = uuid().to_string();
 
-        let expiration = tokens.expires_in();
-        let access_token = tokens.access_token();
+        let expiration = token_res.expires_in;
+        let access_token = &token_res.access_token;
 
         let session = self
             .repository
@@ -191,9 +192,9 @@ where
     ) -> Result<HttpResponse, Error> {
         let OAuthCodeExchange { ref code } = code;
 
-        // Get the tokens and obtain the account
-        let mut tokens = provider.exchange_code(code).await?;
-        let account = provider.get_account(&tokens).await?;
+        // Get the token_res and obtain the account
+        let mut token_res = provider.exchange_code(code).await?;
+        let account = provider.get_account(&token_res).await?;
         let provider_id = provider.provider_id();
         let email = match account.email() {
             Some(email) => email,
@@ -208,7 +209,7 @@ where
                 account_id.as_str(),
                 email,
                 account.username(),
-                &tokens,
+                &token_res,
                 provider_id,
             )
             .await?;
@@ -216,18 +217,18 @@ where
         if oauth.expired() {
             if let Some(ref refresh_token) = oauth.refresh_token {
                 info!("OAuth access token expired, refreshing");
-                tokens = provider.refresh_access_token(refresh_token).await?;
+                token_res = provider.refresh_access_token(refresh_token).await?;
                 self.repository
-                    .refresh_oauth_and_session(&user.id, &tokens, provider_id)
+                    .refresh_oauth_and_session(&user.id, &token_res, provider_id)
                     .await?;
             } else {
                 self.repository
-                    .update_oauth(&user.id, &tokens, provider_id)
+                    .update_oauth(&user.id, &token_res, provider_id)
                     .await?;
             }
         }
 
-        self.establish_session(provider_id, tokens, user).await
+        self.establish_session(provider_id, token_res, user).await
     }
 
     async fn request_additional_scopes<T: OAuth + Send + Sync>(
@@ -240,13 +241,13 @@ where
             .oauth_token
             .ok_or(AuthenticationError::InvalidToken("OAuth"))?;
 
-        // Obtain the new tokens with more scopes
+        // Obtain the new token_res with more scopes
         let OAuthCodeExchange { ref code } = code;
-        let tokens = provider.exchange_code(code).await?;
+        let token_res = provider.exchange_code(code).await?;
 
         let user_id = &session.user_id;
         let provider_id = provider.provider_id();
-        let access_token = tokens.access_token();
+        let access_token = token_res.access_token();
 
         // Update existing sessions tied to the user and their auth provider
         // as well as the related oauth metadata
@@ -254,7 +255,7 @@ where
             .update_session_access_tokens(access_token, user_id, provider_id)
             .await?;
         self.repository
-            .update_oauth(user_id, &tokens, provider_id)
+            .update_oauth(user_id, &token_res, provider_id)
             .await?;
 
         // Update the existing session, sessions updated in the previous step will not update
@@ -271,13 +272,13 @@ where
     async fn establish_session<TR: TokenResponse>(
         &self,
         provider_id: OAuthProvider,
-        tokens: TR,
+        token_res: TR,
         user: User,
     ) -> Result<HttpResponse, Error> {
         let csrf_token = uuid();
 
-        let expiration = tokens.expires_in();
-        let access_token = tokens.access_token();
+        let expiration = token_res.expires_in();
+        let access_token = token_res.access_token();
 
         let session = self
             .repository

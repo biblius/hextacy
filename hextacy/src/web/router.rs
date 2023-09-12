@@ -14,9 +14,9 @@
 ///
 /// ```ignore
 /// route!(
-///    Service<Bound1, ..., BoundN>, // 1
+///    Service, // 1
 ///    cfg, // 2
-///    post => "/route" => handler_function | optional_middleware, // 3
+///    post => "/route" => handler_function | optional_middleware => fn_ident // 3
 /// )
 /// ```
 #[macro_export]

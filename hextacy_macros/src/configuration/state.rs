@@ -83,10 +83,11 @@ pub fn impl_state(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn::E
 
     let mut tokens = TokenStream::new();
 
-    tokens.append_all(&field_loaders);
-
     let config_struct = &input.ident;
     let (imp, ty, wher) = input.generics.split_for_impl();
+
+    tokens.append_all(quote!(impl #imp #config_struct #ty #wher  { #(#field_loaders)* }));
+
     let asyncness = field_loaders
         .iter()
         .any(|l| l.is_async)
@@ -97,7 +98,19 @@ pub fn impl_state(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn::E
     // Self fields will be the same as the variables returned from the loaders
     let self_fields = field_loaders
         .iter()
-        .map(|el| el.field.id.clone())
+        .map(|el| {
+            let field = &el.field.id;
+            let wrappers = &el.field.wrappers;
+            if wrappers.is_empty() {
+                return quote!(#field);
+            }
+            let mut tokens = quote!( #field );
+            for wrapper in wrappers {
+                tokens = quote!(#wrapper::new(#tokens))
+            }
+            tokens = quote!(#field: #tokens);
+            tokens
+        })
         .collect::<Vec<_>>();
 
     let error_id = format_ident!("{config_struct}ConfigurationError");
@@ -161,12 +174,12 @@ fn quote_loader_calls(field_loaders: &[FieldLoader]) -> Vec<TokenStream> {
                     let log_err = loader.error_log();
                     if i == len - 1 {
                         quoted.extend(quote!(
-                            let #var = #loader_fn().await?;
+                            let #var = Self::#loader_fn().await?;
                         ));
                         break;
                     }
                     quoted.extend(quote!(
-                        let #var = #loader_fn().await;
+                        let #var = Self::#loader_fn().await;
                         if let Err(e) = #var {
                             #log_err;
                         }
@@ -182,7 +195,7 @@ fn quote_loader_calls(field_loaders: &[FieldLoader]) -> Vec<TokenStream> {
 
                 if i == 0 {
                     last_err = loader.error_log();
-                    quoted.extend(quote!( #loader_fn() ));
+                    quoted.extend(quote!( Self::#loader_fn() ));
                     if len == 1 {
                         quoted.extend(quote!(?;));
                     }
@@ -192,7 +205,7 @@ fn quote_loader_calls(field_loaders: &[FieldLoader]) -> Vec<TokenStream> {
                 quoted.extend(quote!(
                     .or_else(|e| {
                         #last_err;
-                        #loader_fn()
+                        Self::#loader_fn()
                     })
                 ));
 
@@ -337,7 +350,7 @@ impl From<&Meta> for EnvLoader {
 
 impl Loader for EnvLoader {
     fn fn_ident(&self, field_id: &Ident) -> Ident {
-        format_ident!("init_{field_id}_env")
+        format_ident!("load_{field_id}_env")
     }
 
     fn priority(&self) -> usize {
@@ -354,8 +367,8 @@ impl Loader for EnvLoader {
         let FieldInfo {
             id,
             strct,
-            wrappers,
             config_struct,
+            ..
         } = field;
         let id = self.fn_ident(id);
         let env_keys = &self.keys;
@@ -414,20 +427,12 @@ impl Loader for EnvLoader {
         // For collecting the vars with get_multiple
         let env_keys = env_keys.iter().map(|k| k.lit.clone()).collect::<Vec<_>>();
 
-        let mut return_ty = quote!(#strct);
-        for wrapper in wrappers {
-            return_ty = quote!(#wrapper<#return_ty>);
-        }
-
-        let mut constructor = quote!( #constructor_fn ( #( #constructor_vars ),* ) #async_constr);
-        for wrapper in wrappers {
-            constructor = quote!(#wrapper::new(#constructor));
-        }
+        let constructor = quote!( #constructor_fn ( #( #constructor_vars ),* ) #async_constr);
 
         let config_err = format_ident!("{config_struct}ConfigurationError");
 
         let quoted = quote!(
-            #async_fn fn #id () -> Result<#return_ty, #config_err> {
+            #async_fn fn #id () -> Result<#strct, #config_err> {
                 let params = ::hextacy::config::env::get_multiple(&[#( #env_keys ),*]);
                 #(#variables)*
                 Ok(#constructor)
@@ -560,7 +565,7 @@ impl From<&Meta> for RawLoader {
 
 impl Loader for RawLoader {
     fn fn_ident(&self, field_id: &Ident) -> Ident {
-        format_ident!("init_{field_id}_raw")
+        format_ident!("load_{field_id}_raw")
     }
 
     fn priority(&self) -> usize {
@@ -577,8 +582,8 @@ impl Loader for RawLoader {
         let FieldInfo {
             id,
             strct,
-            wrappers,
             config_struct,
+            ..
         } = field;
         let id = self.fn_ident(id);
         let args = &self.values;
@@ -591,15 +596,8 @@ impl Loader for RawLoader {
 
         let constructor_fn = load_with.map(|p| quote!(#p)).unwrap_or(quote!(#strct::new));
 
-        let mut return_ty = quote!(#strct);
-        for wrapper in wrappers {
-            return_ty = quote!(#wrapper<#return_ty>);
-        }
-
-        let mut constructor = quote!(#constructor_fn ( #( #args ),* ) #async_constr);
-        for wrapper in wrappers {
-            constructor = quote!(#wrapper::new(#constructor));
-        }
+        let return_ty = quote!(#strct);
+        let constructor = quote!(#constructor_fn ( #( #args ),* ) #async_constr);
 
         let config_err = format_ident!("{config_struct}ConfigurationError");
 

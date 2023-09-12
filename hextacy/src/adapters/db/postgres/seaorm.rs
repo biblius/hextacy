@@ -3,29 +3,30 @@ use async_trait::async_trait;
 use sea_orm::TransactionTrait;
 use sea_orm::{ConnectOptions, Database, DatabaseTransaction};
 
+/// Driver connectin used by sea_orm
 pub use sea_orm::DatabaseConnection;
 
 /// Contains a connection pool for postgres with sea-orm. An instance of this
 /// should be shared through the app with Arcs
 #[derive(Debug, Clone)]
-pub struct PostgresSea {
+pub struct SeaPgDriver {
     pool: DatabaseConnection,
 }
 
-impl PostgresSea {
+impl SeaPgDriver {
     pub async fn new(
         host: &str,
         port: u16,
         user: &str,
         password: &str,
         db: &str,
-        pool_size: u32,
+        pool_size: Option<u32>,
     ) -> Self {
         let url = format!("postgresql://{user}:{password}@{host}:{port}/{db}");
 
         let mut options = ConnectOptions::new(url);
 
-        options.max_connections(pool_size);
+        options.max_connections(pool_size.unwrap_or(8));
 
         let pool = Database::connect(options)
             .await
@@ -41,7 +42,7 @@ impl PostgresSea {
 }
 
 #[async_trait]
-impl Driver for PostgresSea {
+impl Driver for SeaPgDriver {
     type Connection = DatabaseConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

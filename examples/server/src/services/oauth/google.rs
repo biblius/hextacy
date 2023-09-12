@@ -1,5 +1,5 @@
 use super::{
-    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, RefreshTokenBody, TokenResponse,
+    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, OAuthTokenResponse, RefreshTokenBody,
 };
 use async_trait::async_trait;
 use data_encoding::BASE64URL_NOPAD;
@@ -21,13 +21,7 @@ pub struct GoogleOAuth {
 
 #[async_trait]
 impl OAuth for GoogleOAuth {
-    type Account = GoogleAccount;
-    type CodeExchangeResponse = GoogleTokenResponse;
-
-    async fn exchange_code(
-        &self,
-        code: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
 
         let GoogleOAuth {
@@ -63,9 +57,7 @@ impl OAuth for GoogleOAuth {
                 }
 
                 if res.status().is_success() {
-                    res.json::<Self::CodeExchangeResponse>()
-                        .await
-                        .map_err(|e| e.into())
+                    res.json::<OAuthTokenResponse>().await.map_err(|e| e.into())
                 } else {
                     Err(OAuthProviderError::Response(
                         res.json::<serde_json::Value>().await?.to_string(),
@@ -82,7 +74,7 @@ impl OAuth for GoogleOAuth {
     async fn refresh_access_token(
         &self,
         refresh_token: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    ) -> Result<OAuthTokenResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
 
         let url = "oauth2.googleapis.com/token";
@@ -99,7 +91,7 @@ impl OAuth for GoogleOAuth {
             })
             .send()
             .await?
-            .json::<Self::CodeExchangeResponse>()
+            .json::<OAuthTokenResponse>()
             .await
             .map_err(OAuthProviderError::Reqwest)
     }
@@ -117,26 +109,26 @@ impl OAuth for GoogleOAuth {
 
     async fn get_account(
         &self,
-        exchange_res: &Self::CodeExchangeResponse,
-    ) -> Result<Self::Account, OAuthProviderError> {
+        exchange_res: &OAuthTokenResponse,
+    ) -> Result<OAuthAccount, OAuthProviderError> {
         let client = reqwest::Client::new();
 
-        match exchange_res.id_token() {
-            Some(token) => {
+        match exchange_res.id_token {
+            Some(ref token) => {
                 let jwt_body = match token.split('.').nth(1) {
                     Some(body) => body,
                     None => return Err(OAuthProviderError::InvalidJwt),
                 };
                 let decoded = BASE64URL_NOPAD.decode(jwt_body.as_bytes())?;
-                let jwt = serde_json::from_slice::<GoogleOpenID>(&decoded)?.into();
-                Ok(jwt)
+                let acc = serde_json::from_slice::<GoogleOpenID>(&decoded)?.into();
+                Ok(acc)
             }
             None => {
                 let url = "www.googleapis.com/userinfo/v2/me";
                 let res = client
                     .get(url)
                     .header("Accept", "application/json")
-                    .bearer_auth(exchange_res.access_token())
+                    .bearer_auth(&exchange_res.access_token)
                     .send()
                     .await?;
 
@@ -151,7 +143,8 @@ impl OAuth for GoogleOAuth {
                 }
 
                 if res.status().is_success() {
-                    res.json::<Self::Account>().await.map_err(|e| e.into())
+                    // TODO: Should be google account then map
+                    res.json::<OAuthAccount>().await.map_err(|e| e.into())
                 } else {
                     Err(OAuthProviderError::Response(
                         res.json::<serde_json::Value>().await?.to_string(),
@@ -179,24 +172,6 @@ pub struct GoogleAccount {
     locale: Option<String>,
 }
 
-impl OAuthAccount for GoogleAccount {
-    fn id(&self) -> String {
-        self.id.clone()
-    }
-
-    fn email(&self) -> Option<&str> {
-        Some(&self.email)
-    }
-
-    fn username(&self) -> &str {
-        &self.name
-    }
-
-    fn name(&self) -> Option<&str> {
-        Some(&self.name)
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GoogleOpenID {
     azp: String,
@@ -212,6 +187,20 @@ pub struct GoogleOpenID {
     locale: Option<String>,
     iat: u64,
     exp: u64,
+}
+
+impl From<GoogleOpenID> for OAuthAccount {
+    fn from(
+        GoogleOpenID {
+            sub, email, name, ..
+        }: GoogleOpenID,
+    ) -> Self {
+        Self {
+            id: sub,
+            username: name,
+            email: Some(email),
+        }
+    }
 }
 
 impl From<GoogleOpenID> for GoogleAccount {
@@ -249,30 +238,4 @@ pub struct GoogleTokenResponse {
     scope: String,
     token_type: String,
     id_token: Option<String>,
-}
-
-impl TokenResponse for GoogleTokenResponse {
-    fn access_token(&self) -> &str {
-        &self.access_token
-    }
-
-    fn scope(&self) -> &str {
-        &self.scope
-    }
-
-    fn token_type(&self) -> &str {
-        &self.token_type
-    }
-
-    fn refresh_token(&self) -> Option<&str> {
-        self.refresh_token.as_deref()
-    }
-
-    fn expires_in(&self) -> Option<i64> {
-        Some(self.expires_in)
-    }
-
-    fn id_token(&self) -> Option<&str> {
-        self.id_token.as_deref()
-    }
 }

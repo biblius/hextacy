@@ -13,6 +13,10 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
     let struct_id = &input.ident;
     let (im, ty, whe) = input.generics.split_for_impl();
     let mut env_vars = vec![];
+
+    let mut env_field_ids = vec![];
+    let mut env_field_types = vec![];
+
     let mut field_ids = vec![];
     let mut field_types = vec![];
 
@@ -37,7 +41,8 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
                 env_found = true;
                 let list = attr.meta.require_list()?;
                 let var = list.parse_args::<LitStr>()?;
-                env_vars.push(var)
+                env_vars.push(var);
+                env_field_ids.push(field_id);
             }
         }
 
@@ -46,7 +51,12 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
             | syn::Type::Array(_)
             | syn::Type::Reference(_)
             | syn::Type::Slice(_)
-            | syn::Type::Tuple(_) => field_types.push(field.ty.clone()),
+            | syn::Type::Tuple(_) => {
+                field_types.push(field.ty.clone());
+                if env_found {
+                    env_field_types.push(field.ty.clone())
+                }
+            }
             _ => abort!(
                 field.ty.span(),
                 "Cannot derive Constructor on provided type"
@@ -85,16 +95,16 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
         )
     });
 
-    let fn_ids = field_ids
+    let fn_ids = env_field_ids
         .iter()
         .map(|id| format_ident!("load_{id}_env"))
         .collect::<Vec<_>>();
 
-    let (conversions, types) = quote_fn_conversions(&field_types);
+    let (conversions, types) = quote_fn_conversions(&env_field_types);
     let loaders = quote!(
         impl #im #struct_id #ty #whe {
             #(
-                fn #fn_ids() -> Option<#types> {
+                pub fn #fn_ids() -> Option<#types> {
                     hextacy::config::env::get(#env_vars).ok() #conversions
                 }
             )*

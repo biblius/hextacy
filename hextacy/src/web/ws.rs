@@ -178,8 +178,7 @@ mod tests {
         }
     }
 
-    #[actix_web::main]
-    #[test]
+    #[actix_web::test]
     async fn enums() -> Result<(), WsError> {
         let a1 = ActorA { count: 0 };
         let actor1 = a1.start();
@@ -217,7 +216,7 @@ mod tests {
         assert!(matches!(res1, Ok(())));
         assert!(matches!(res2, Ok(())));
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Actor 1 is subscribed to both, actor 3 to none
         actor1.send(Assert(30)).await.unwrap();
@@ -226,8 +225,7 @@ mod tests {
         Ok(())
     }
 
-    #[actix_web::main]
-    #[test]
+    #[actix_web::test]
     async fn simulate_ws() -> Result<(), WsError> {
         // Init the actors and broker
         let a1 = ActorA { count: 0 };
@@ -269,7 +267,7 @@ mod tests {
         assert!(matches!(res, Ok(())));
 
         // Sleep so actors have time to receive messages
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        tokio::time::sleep(Duration::from_millis(20)).await;
 
         // Actor 1 and 2 increment their count via broker, Actor 2 sends
         // message to Actor 3 on receiving it so all counters should be 1
@@ -296,7 +294,7 @@ mod tests {
 
         assert!(matches!(res, Ok(())));
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        //        tokio::time::sleep(Duration::from_millis(50)).await;
 
         // Actor 2 is the only one subscribed to TestData2
         actor1.send(Assert(1)).await.unwrap();

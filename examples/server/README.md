@@ -1,5 +1,11 @@
+# Server example with contracts
 
-# **Get started**
+This example is set up with services that use contracts. In this example, the repository traits do not
+take in self. Services specify contracts to use for grouping together actions on data sources.
+Contracts are created via component impl blocks, they are traits which have the same signatures as the
+functions of an impl block and are used to hide away the implementation details of the component.
+
+## **Setup**
 
 Read more about the openssl setup in `openssl/README.md`.
 
@@ -7,39 +13,13 @@ Read more about the openssl setup in `openssl/README.md`.
 
     - For the Email part, to use an existing gmail, use [this spec](https://support.google.com/mail/answer/7126229?hl=en#zippy=%2Cstep-change-smtp-other-settings-in-your-email-client) to set up the SMTP host(smtp.gmail.com) and port(465) and [follow these instructions](https://support.google.com/accounts/answer/185833?hl=en#zippy=%2Cwhy-you-may-need-an-app-password) to generate an app password. The password can then be used for the `SMTP_PASSWORD` variable. For the sender and username enter your email address.
 
-2. Install the CLI tool via
+2. `cd` into the openssl directory and run `./openssl.sh`, follow the instructions from that directory to set up the certificates.
 
-    ```bash
-    cargo install --path xtc
-    ```
+3. Import the postman collection from the `resources` to postman and run with
 
-3. For the secrets, (namely REG_TOKEN_SECRET and COOKIE_SECRET) run
-
-    ```bash
-    xtc c secret <SECRET_NAME> [-n <NAME>] [-l <LENGTH>]
-    ```
-
-    and replace the example ones with them.
-
-    Run migrations via
-
-    ```bash
-    xtc m run
-    ```
-
-    Give yourself a pat on the back since you've made it this far and optionally check out all the commands with `xtc -h`.
-
-    Run the server with
-
-    ```bash
-    cargo run -p server
-    ```
-
-    and load the postman collection located in `misc` to interact with it.
-
-4. `cd` into the openssl directory and run `./openssl.sh`, follow the instructions from that directory to set up the certificates.
-
-You now have a ready to go infrastructure, now go make that billion $$$ app!
+```bash
+cargo run --example server
+```
 
 ## **Authentication flow**
 

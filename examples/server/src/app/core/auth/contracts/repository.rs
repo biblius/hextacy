@@ -1,3 +1,4 @@
+use crate::db::dto::oauth::OAuthMetaData;
 use crate::db::models::oauth::OAuthMeta;
 use crate::db::models::{session, user};
 use crate::db::repository::oauth::OAuthRepository;
@@ -5,14 +6,15 @@ use crate::db::repository::session::SessionRepository;
 use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
-use crate::services::oauth::{OAuthProvider, TokenResponse};
+use crate::services::oauth::{OAuthProvider, OAuthTokenResponse};
 use hextacy::{component, contract, info};
 
 #[component(
-    use Driver for Connection as driver,
-    use UserRepository with Connection as U,
-    use SessionRepository with Connection as S,
-    use OAuthRepository with Connection as O,
+    use Driver as driver,
+    use
+      UserRepository,
+      SessionRepository,
+      OAuthRepository,
 )]
 pub struct AuthenticationRepositoryAccess {}
 
@@ -108,12 +110,12 @@ where
             .map_err(Error::new)
     }
 
-    async fn get_or_create_user_oauth<T: TokenResponse + 'static>(
+    async fn get_or_create_user_oauth(
         &self,
         account_id: &str,
         email: &str,
         username: &str,
-        tokens: &T,
+        tokens: &OAuthTokenResponse,
         provider: OAuthProvider,
     ) -> Result<(user::User, OAuthMeta), Error> {
         let conn = self.driver.connect().await?;
@@ -140,9 +142,15 @@ where
                 // If the entry does not exist, we must create one for the user
                 RepoAdapterError::DoesNotExist => {
                     info!("OAuth entry does not exist, creating");
-                    OAuth::create(&mut conn, &user.id, account_id, tokens, provider)
-                        .await
-                        .map_err(Error::new)?
+                    let data = OAuthMetaData {
+                        user_id: &user.id,
+                        access_token: &tokens.access_token,
+                        refresh_token: tokens.refresh_token.as_deref(),
+                        provider,
+                        scope: &tokens.scope,
+                        account_id: Some(account_id),
+                    };
+                    OAuth::create(&mut conn, data).await.map_err(Error::new)?
                 }
                 e => {
                     Connection::abort_transaction(conn).await?;
@@ -163,28 +171,34 @@ where
             .map_err(Error::new)
     }
 
-    async fn refresh_oauth_and_session<T: TokenResponse + 'static>(
+    async fn refresh_oauth_and_session(
         &self,
         user_id: &str,
-        tokens: &T,
+        tokens: &OAuthTokenResponse,
         provider: OAuthProvider,
     ) -> Result<(), Error> {
         self.update_oauth(user_id, tokens, provider).await?;
-        self.update_session_access_tokens(tokens.access_token(), user_id, provider)
+        self.update_session_access_tokens(&tokens.access_token, user_id, provider)
             .await?;
         Ok(())
     }
 
-    async fn update_oauth<T: TokenResponse + 'static>(
+    async fn update_oauth(
         &self,
         user_id: &str,
-        tokens: &T,
+        tokens: &OAuthTokenResponse,
         provider: OAuthProvider,
     ) -> Result<OAuthMeta, Error> {
         let mut conn = self.driver.connect().await?;
-        OAuth::update(&mut conn, user_id, tokens, provider)
-            .await
-            .map_err(Error::new)
+        let data = OAuthMetaData {
+            user_id,
+            access_token: &tokens.access_token,
+            refresh_token: tokens.refresh_token.as_deref(),
+            provider,
+            scope: &tokens.scope,
+            account_id: None,
+        };
+        OAuth::update(&mut conn, data).await.map_err(Error::new)
     }
 
     async fn update_session_access_tokens(

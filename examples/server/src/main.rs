@@ -49,7 +49,7 @@ async fn main() -> std::io::Result<()> {
         .set_certificate_chain_file(OPEN_SSL_CERT_PATH)
         .unwrap();
 
-    let state = AppState::configure().await.unwrap();
+    let state = AppState::init().await.unwrap();
 
     HttpServer::new(move || {
         App::new()

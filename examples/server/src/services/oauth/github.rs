@@ -1,9 +1,10 @@
 use super::{
-    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, RefreshTokenBody, TokenResponse,
+    OAuth, OAuthAccount, OAuthProvider, OAuthProviderError, OAuthTokenResponse, RefreshTokenBody,
 };
 use async_trait::async_trait;
 use hextacy::Constructor;
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 use tracing::{error, info};
 
 #[derive(Debug, Constructor)]
@@ -18,15 +19,64 @@ pub struct GithubOAuth {
     redirect_uri: String,
 }
 
+/// Struct representing errors sent back by github
+#[derive(Debug, Deserialize, Serialize, Error)]
+pub struct GithubOAuthError {
+    pub error: String,
+    pub error_description: String,
+    pub error_uri: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct GithubTokenResponse {
+    access_token: String,
+    scope: String,
+    token_type: String,
+}
+
+impl From<GithubTokenResponse> for OAuthTokenResponse {
+    fn from(
+        GithubTokenResponse {
+            access_token,
+            scope,
+            token_type,
+        }: GithubTokenResponse,
+    ) -> Self {
+        Self {
+            access_token,
+            scope,
+            token_type,
+            refresh_token: None,
+            expires_in: None,
+            id_token: None,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GithubResponse {
+    Success(GithubTokenResponse),
+    Failure(GithubOAuthError),
+}
+
+impl std::fmt::Display for GithubOAuthError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let GithubOAuthError {
+            error,
+            error_description,
+            error_uri,
+        } = self;
+        write!(
+            f,
+            "error: {error}, description: {error_description}, uri: {error_uri}"
+        )
+    }
+}
+
 #[async_trait]
 impl OAuth for GithubOAuth {
-    type Account = GithubAccount;
-    type CodeExchangeResponse = GithubTokenResponse;
-
-    async fn exchange_code(
-        &self,
-        code: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
         let GithubOAuth {
             token_uri,
@@ -34,6 +84,8 @@ impl OAuth for GithubOAuth {
             client_secret,
             redirect_uri,
         } = self;
+
+        dbg!(self);
 
         let res = client
             .post(token_uri)
@@ -61,9 +113,11 @@ impl OAuth for GithubOAuth {
                 }
 
                 if res.status().is_success() {
-                    res.json::<Self::CodeExchangeResponse>()
-                        .await
-                        .map_err(|e| e.into())
+                    let res = res.json::<GithubResponse>().await?;
+                    match res {
+                        GithubResponse::Success(res) => Ok(res.into()),
+                        GithubResponse::Failure(err) => Err(err.into()),
+                    }
                 } else {
                     Err(OAuthProviderError::Response(
                         res.json::<serde_json::Value>().await?.to_string(),
@@ -80,7 +134,7 @@ impl OAuth for GithubOAuth {
     async fn refresh_access_token(
         &self,
         refresh_token: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    ) -> Result<OAuthTokenResponse, OAuthProviderError> {
         let client = reqwest::Client::new();
 
         let url = "oauth2.googleapis.com/token";
@@ -103,9 +157,7 @@ impl OAuth for GithubOAuth {
 
         info!("Refreshing {} access token", self.provider_id());
 
-        res.json::<Self::CodeExchangeResponse>()
-            .await
-            .map_err(|e| e.into())
+        res.json::<OAuthTokenResponse>().await.map_err(|e| e.into())
     }
 
     async fn revoke_token(&self, token: &str) -> Result<reqwest::Response, OAuthProviderError> {
@@ -127,8 +179,8 @@ impl OAuth for GithubOAuth {
 
     async fn get_account(
         &self,
-        exchange_res: &Self::CodeExchangeResponse,
-    ) -> Result<Self::Account, OAuthProviderError> {
+        exchange_res: &OAuthTokenResponse,
+    ) -> Result<OAuthAccount, OAuthProviderError> {
         let client = reqwest::Client::new();
 
         let url = "https://api.github.com/user";
@@ -139,7 +191,7 @@ impl OAuth for GithubOAuth {
             .get(url)
             .header("accept", "application/vnd.github+json")
             .header("user-agent", "XTC")
-            .bearer_auth(exchange_res.access_token())
+            .bearer_auth(&exchange_res.access_token)
             .send()
             .await?;
 
@@ -154,7 +206,8 @@ impl OAuth for GithubOAuth {
         }
 
         if res.status().is_success() {
-            res.json::<Self::Account>().await.map_err(|e| e.into())
+            // TODO: Incorrect, deser to github acc
+            res.json::<OAuthAccount>().await.map_err(|e| e.into())
         } else {
             Err(OAuthProviderError::Response(
                 res.json::<serde_json::Value>().await?.to_string(),
@@ -181,43 +234,4 @@ pub struct GithubAccount {
     name: Option<String>,
     company: Option<String>,
     location: Option<String>,
-}
-
-impl OAuthAccount for GithubAccount {
-    fn id(&self) -> String {
-        self.id.to_string()
-    }
-
-    fn username(&self) -> &str {
-        &self.username
-    }
-
-    fn email(&self) -> Option<&str> {
-        self.email.as_deref()
-    }
-
-    fn name(&self) -> Option<&str> {
-        self.name.as_deref()
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct GithubTokenResponse {
-    access_token: String,
-    scope: String,
-    token_type: String,
-}
-
-impl TokenResponse for GithubTokenResponse {
-    fn access_token(&self) -> &str {
-        &self.access_token
-    }
-
-    fn scope(&self) -> &str {
-        &self.scope
-    }
-
-    fn token_type(&self) -> &str {
-        &self.token_type
-    }
 }

@@ -4,42 +4,69 @@ use crate::db::models::role::Role;
 use crate::db::models::session::Session;
 use crate::error::{AuthenticationError, Error};
 use actix_web::cookie::Cookie;
-use actix_web::dev::ServiceRequest;
+use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
 use futures_util::FutureExt;
-use hextacy::{call, transform};
 use std::rc::Rc;
 use tracing::{debug, info};
 use tracing::{trace, warn};
 
 #[derive(Debug, Clone)]
-pub(super) struct AuthenticationGuardInner<R, C> {
-    pub repository: R,
+pub struct AuthenticationGuard<R, C> {
+    pub repo: R,
     pub cache: C,
-    pub auth_level: Role,
+    pub min_role: Role,
 }
 
 #[derive(Debug, Clone)]
-pub struct AuthenticationGuard<Repo, Cache> {
-    pub(super) inner: Rc<AuthenticationGuardInner<Repo, Cache>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct AuthMiddleware<S, Repo, Cache> {
-    inner: Rc<AuthenticationGuardInner<Repo, Cache>>,
+pub struct AuthMiddleware<S, R, C> {
+    inner: Rc<AuthenticationGuard<R, C>>,
     service: Rc<S>,
 }
 
-transform! {
-    AuthenticationGuard => AuthMiddleware,
-    R: AuthMwRepoContract,
-    C: AuthMwCacheContract
+impl<S, R, C> Transform<S, ServiceRequest> for AuthenticationGuard<R, C>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
+    S::Future: 'static,
+    Self: Clone,
+    R: AuthMwRepoContract + Send + Sync + 'static,
+    C: AuthMwCacheContract + Send + Sync + 'static,
+{
+    type Response = ServiceResponse;
+    type Error = actix_web::Error;
+    type InitError = ();
+    type Transform = AuthMiddleware<S, R, C>;
+    type Future = std::future::Ready<Result<Self::Transform, Self::InitError>>;
+
+    fn new_transform(&self, service: S) -> Self::Future {
+        std::future::ready(Ok(AuthMiddleware {
+            inner: Rc::new(self.clone()),
+            service: Rc::new(service),
+        }))
+    }
 }
 
-call! {
-    AuthMiddleware,
-    R: AuthMwRepoContract,
-    C: AuthMwCacheContract;
+impl<S, R, C> Service<ServiceRequest> for AuthMiddleware<S, R, C>
+where
+    S: Service<ServiceRequest, Response = ServiceResponse, Error = actix_web::Error> + 'static,
+    S::Future: 'static,
+    R: AuthMwRepoContract + Send + Sync + 'static,
+    C: AuthMwCacheContract + Send + Sync + 'static,
+{
+    type Response = actix_web::dev::ServiceResponse;
+    type Error = actix_web::Error;
+    type Future =
+        std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    #[inline]
+    fn poll_ready(
+        &self,
+        cx: &mut ::core::task::Context<'_>,
+    ) -> ::core::task::Poll<Result<(), Self::Error>> {
+        self.service
+            .poll_ready(cx)
+            .map_err(::core::convert::Into::into)
+    }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
         info!("Auth guard: Validating session");
@@ -81,7 +108,7 @@ call! {
     }
 }
 
-impl<R, C> AuthenticationGuardInner<R, C>
+impl<R, C> AuthenticationGuard<R, C>
 where
     R: AuthMwRepoContract + Send + Sync,
     C: AuthMwCacheContract + Send + Sync,
@@ -106,13 +133,13 @@ where
             Err(e) => {
                 trace!("{e}");
                 // Check DB
-                if let Ok(session) = self.repository.get_valid_session(session_id, csrf).await {
+                if let Ok(session) = self.repo.get_valid_session(session_id, csrf).await {
                     debug!("Found valid session with id {session_id}");
                     // Cache
                     self.cache.cache_session(session_id, &session).await?;
                     debug!("Refreshing session {}", session.id);
                     if !session.is_permanent() {
-                        self.repository.refresh_session(&session.id, csrf).await?;
+                        self.repo.refresh_session(&session.id, csrf).await?;
                     }
                     Ok(session)
                 } else {
@@ -139,6 +166,6 @@ where
 
     /// Returns true if the role is equal to or greater than the auth_level of this guard instance
     fn check_valid_role(&self, role: &Role) -> bool {
-        role >= &self.auth_level
+        role >= &self.min_role
     }
 }

@@ -6,16 +6,14 @@ use mongodb::{
 };
 use tracing::trace;
 
-pub use mongodb;
-
 /// Thin wrapper around a [mongodb::Client] that implements [Driver] that can be
 /// injected into services.
 #[derive(Debug, Clone)]
-pub struct Mongo {
+pub struct MongoDriver {
     pub driver: Client,
 }
 
-impl Mongo {
+impl MongoDriver {
     pub fn new(host: &str, port: u16, user: &str, password: &str, db: &str) -> Self {
         let address = ServerAddress::Tcp {
             host: host.to_string(),
@@ -51,7 +49,7 @@ impl Mongo {
 }
 
 #[async_trait]
-impl Driver for Mongo {
+impl Driver for MongoDriver {
     type Connection = ClientSession;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

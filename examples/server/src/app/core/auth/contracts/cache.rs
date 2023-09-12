@@ -1,4 +1,4 @@
-use crate::cache::{contracts::BasicCacheAccess, AuthID as CacheKey};
+use crate::cache::{contracts::BasicCacheAccess, TokenType};
 use crate::config::constants::{
     EMAIL_THROTTLE_DURATION, OTP_THROTTLE_DURATION, OTP_TOKEN_DURATION,
     REGISTRATION_TOKEN_DURATION, RESET_PW_TOKEN_DURATION, SESSION_CACHE_DURATION,
@@ -10,8 +10,8 @@ use chrono::Utc;
 use hextacy::{component, contract};
 
 #[component(
-    use Driver for Connection as driver,
-    use BasicCacheAccess with Connection as C
+    use Driver as driver,
+    use CacheAccess
 )]
 pub struct AuthenticationCacheAccess {}
 
@@ -26,7 +26,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_json(
             &mut conn,
-            CacheKey::Session,
+            TokenType::Session,
             session_id,
             session,
             Some(SESSION_CACHE_DURATION),
@@ -37,7 +37,7 @@ impl AuthenticationCacheAccess {
 
     async fn delete_session(&self, session_id: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::Session, session_id)
+        Cache::delete(&mut conn, TokenType::Session, session_id)
             .await
             .map_err(Error::new)
     }
@@ -46,35 +46,35 @@ impl AuthenticationCacheAccess {
 
     async fn get_registration_token(&self, token: &str) -> Result<String, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_string(&mut conn, CacheKey::RegToken, token)
+        Cache::get_string(&mut conn, TokenType::RegToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn get_pw_token(&self, token: &str) -> Result<String, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_string(&mut conn, CacheKey::PWToken, token)
+        Cache::get_string(&mut conn, TokenType::PWToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn get_otp_token(&self, token: &str) -> Result<String, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_string(&mut conn, CacheKey::OTPToken, token)
+        Cache::get_string(&mut conn, TokenType::OTPToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn get_otp_throttle(&self, token: &str) -> Result<i64, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_i64(&mut conn, CacheKey::OTPThrottle, token)
+        Cache::get_i64(&mut conn, TokenType::OTPThrottle, token)
             .await
             .map_err(Error::new)
     }
 
     async fn get_otp_attempts(&self, token: &str) -> Result<i64, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_i64(&mut conn, CacheKey::OTPAttempts, token)
+        Cache::get_i64(&mut conn, TokenType::OTPAttempts, token)
             .await
             .map_err(Error::new)
     }
@@ -83,28 +83,28 @@ impl AuthenticationCacheAccess {
 
     async fn delete_registration_token(&self, token: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::RegToken, token)
+        Cache::delete(&mut conn, TokenType::RegToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn delete_pw_token(&self, token: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::PWToken, token)
+        Cache::delete(&mut conn, TokenType::PWToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn delete_otp_token(&self, token: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::OTPToken, token)
+        Cache::delete(&mut conn, TokenType::OTPToken, token)
             .await
             .map_err(Error::new)
     }
 
     async fn delete_otp_attempts(&self, token: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::OTPAttempts, token)
+        Cache::delete(&mut conn, TokenType::OTPAttempts, token)
             .await
             .map_err(Error::new)
     }
@@ -115,7 +115,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_str(
             &mut conn,
-            CacheKey::RegToken,
+            TokenType::RegToken,
             token,
             value,
             Some(REGISTRATION_TOKEN_DURATION),
@@ -128,7 +128,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_str(
             &mut conn,
-            CacheKey::PWToken,
+            TokenType::PWToken,
             token,
             value,
             Some(RESET_PW_TOKEN_DURATION),
@@ -141,7 +141,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_str(
             &mut conn,
-            CacheKey::OTPToken,
+            TokenType::OTPToken,
             token,
             value,
             Some(OTP_TOKEN_DURATION),
@@ -156,7 +156,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_or_increment(
             &mut conn,
-            CacheKey::LoginAttempts,
+            TokenType::LoginAttempts,
             user_id,
             1,
             Some(WRONG_PASSWORD_CACHE_DURATION),
@@ -168,7 +168,7 @@ impl AuthenticationCacheAccess {
     /// Removes the user's login attempts from the cache
     async fn delete_login_attempts(&self, user_id: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::delete(&mut conn, CacheKey::LoginAttempts, user_id)
+        Cache::delete(&mut conn, TokenType::LoginAttempts, user_id)
             .await
             .map_err(Error::new)
     }
@@ -178,13 +178,13 @@ impl AuthenticationCacheAccess {
     async fn cache_otp_throttle(&self, user_id: &str) -> Result<(), Error> {
         let mut conn = self.driver.connect().await?;
 
-        let attempts = Cache::get_i64(&mut conn, CacheKey::OTPAttempts, user_id).await;
+        let attempts = Cache::get_i64(&mut conn, TokenType::OTPAttempts, user_id).await;
 
         match attempts {
             Ok(attempts) => {
                 Cache::set_i64(
                     &mut conn,
-                    CacheKey::OTPThrottle,
+                    TokenType::OTPThrottle,
                     user_id,
                     Utc::now().timestamp(),
                     Some(OTP_THROTTLE_DURATION),
@@ -193,7 +193,7 @@ impl AuthenticationCacheAccess {
 
                 Cache::set_i64(
                     &mut conn,
-                    CacheKey::OTPAttempts,
+                    TokenType::OTPAttempts,
                     user_id,
                     attempts + 1,
                     Some(OTP_THROTTLE_DURATION),
@@ -203,7 +203,7 @@ impl AuthenticationCacheAccess {
             Err(_) => {
                 Cache::set_i64(
                     &mut conn,
-                    CacheKey::OTPThrottle,
+                    TokenType::OTPThrottle,
                     user_id,
                     Utc::now().timestamp(),
                     Some(OTP_THROTTLE_DURATION),
@@ -212,7 +212,7 @@ impl AuthenticationCacheAccess {
 
                 Cache::set_i64(
                     &mut conn,
-                    CacheKey::OTPAttempts,
+                    TokenType::OTPAttempts,
                     user_id,
                     1,
                     Some(OTP_THROTTLE_DURATION),
@@ -227,7 +227,7 @@ impl AuthenticationCacheAccess {
         let mut conn = self.driver.connect().await?;
         Cache::set_i64(
             &mut conn,
-            CacheKey::EmailThrottle,
+            TokenType::EmailThrottle,
             user_id,
             1,
             Some(EMAIL_THROTTLE_DURATION),
@@ -238,7 +238,7 @@ impl AuthenticationCacheAccess {
 
     async fn get_email_throttle(&self, user_id: &str) -> Result<i64, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_i64(&mut conn, CacheKey::EmailThrottle, user_id)
+        Cache::get_i64(&mut conn, TokenType::EmailThrottle, user_id)
             .await
             .map_err(Error::new)
     }

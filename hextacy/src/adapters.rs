@@ -12,3 +12,6 @@ pub mod cache;
     feature = "db-postgres-seaorm"
 ))]
 pub mod db;
+
+#[cfg(feature = "email")]
+pub mod email;

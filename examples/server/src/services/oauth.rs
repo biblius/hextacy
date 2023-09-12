@@ -3,7 +3,10 @@ pub mod google;
 
 use crate::config::AppState;
 
-use self::{github::GithubOAuth, google::GoogleOAuth};
+use self::{
+    github::{GithubOAuth, GithubOAuthError},
+    google::GoogleOAuth,
+};
 use async_trait::async_trait;
 use diesel::{
     deserialize::{self, FromSql},
@@ -14,7 +17,7 @@ use diesel::{
 };
 use hextacy::Constructor;
 use reqwest::header::{InvalidHeaderName, InvalidHeaderValue, ToStrError};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{fmt::Display, io::Write, sync::Arc};
 use thiserror::Error;
 use tracing::error;
@@ -34,27 +37,38 @@ impl hextacy::web::Configure<AppState> for OAuthProviders {
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct OAuthTokenResponse {
+    pub access_token: String,
+    pub scope: String,
+    pub token_type: String,
+    pub refresh_token: Option<String>,
+    pub expires_in: Option<i64>,
+    pub id_token: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OAuthAccount {
+    pub id: String,
+    pub username: String,
+    pub email: Option<String>,
+}
+
 #[async_trait]
 pub trait OAuth {
-    type Account: OAuthAccount + DeserializeOwned + 'static;
-    type CodeExchangeResponse: TokenResponse + DeserializeOwned + 'static;
-
-    async fn exchange_code(
-        &self,
-        code: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError>;
+    async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse, OAuthProviderError>;
 
     async fn refresh_access_token(
         &self,
         refresh_token: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError>;
+    ) -> Result<OAuthTokenResponse, OAuthProviderError>;
 
     async fn revoke_token(&self, token: &str) -> Result<reqwest::Response, OAuthProviderError>;
 
     async fn get_account(
         &self,
-        token_res: &Self::CodeExchangeResponse,
-    ) -> Result<Self::Account, OAuthProviderError>;
+        token_res: &OAuthTokenResponse,
+    ) -> Result<OAuthAccount, OAuthProviderError>;
 
     fn provider_id(&self) -> OAuthProvider;
 }
@@ -64,20 +78,14 @@ impl<T> OAuth for Arc<T>
 where
     T: OAuth + Send + Sync,
 {
-    type Account = T::Account;
-    type CodeExchangeResponse = T::CodeExchangeResponse;
-
-    async fn exchange_code(
-        &self,
-        code: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    async fn exchange_code(&self, code: &str) -> Result<OAuthTokenResponse, OAuthProviderError> {
         T::exchange_code(self, code).await
     }
 
     async fn refresh_access_token(
         &self,
         refresh_token: &str,
-    ) -> Result<Self::CodeExchangeResponse, OAuthProviderError> {
+    ) -> Result<OAuthTokenResponse, OAuthProviderError> {
         T::refresh_access_token(self, refresh_token).await
     }
 
@@ -87,47 +95,13 @@ where
 
     async fn get_account(
         &self,
-        token_res: &Self::CodeExchangeResponse,
-    ) -> Result<Self::Account, OAuthProviderError> {
+        token_res: &OAuthTokenResponse,
+    ) -> Result<OAuthAccount, OAuthProviderError> {
         T::get_account(self, token_res).await
     }
 
     fn provider_id(&self) -> OAuthProvider {
         T::provider_id(self)
-    }
-}
-
-pub trait TokenResponse: Send + Sync {
-    fn access_token(&self) -> &str;
-
-    fn scope(&self) -> &str;
-
-    fn token_type(&self) -> &str;
-
-    fn refresh_token(&self) -> Option<&str> {
-        None
-    }
-
-    fn expires_in(&self) -> Option<i64> {
-        None
-    }
-
-    fn id_token(&self) -> Option<&str> {
-        None
-    }
-}
-
-pub trait OAuthAccount: Send + Sync {
-    fn id(&self) -> String;
-
-    fn username(&self) -> &str;
-
-    fn email(&self) -> Option<&str> {
-        None
-    }
-
-    fn name(&self) -> Option<&str> {
-        None
     }
 }
 
@@ -149,10 +123,12 @@ pub enum OAuthProviderError {
     Encoding(#[from] data_encoding::DecodeError),
     #[error("Malformed JWT")]
     InvalidJwt,
-    #[error("Reqwest Header")]
+    #[error("Reqwest Header: {0}")]
     ToStr(#[from] ToStrError),
     #[error("Invalid Provider")]
     InvalidProvider,
+    #[error("Github response: {0}")]
+    GithubOAuth(#[from] GithubOAuthError),
 }
 
 #[derive(Debug, Clone, Copy, FromSqlRow, AsExpression, PartialEq, Eq, Serialize, Deserialize)]

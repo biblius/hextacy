@@ -6,15 +6,16 @@ use diesel::{
     PgConnection,
 };
 
+/// Driver connection used by diesel.
 pub type DieselConnection = PooledConnection<ConnectionManager<PgConnection>>;
 
 /// Thin wrapper around a diesel postgres connection pool.
 #[derive(Debug, Clone)]
-pub struct PostgresDiesel {
+pub struct DieselPgDriver {
     pool: Pool<ConnectionManager<PgConnection>>,
 }
 
-impl PostgresDiesel {
+impl DieselPgDriver {
     pub fn new(
         host: &str,
         port: u16,
@@ -42,7 +43,7 @@ impl PostgresDiesel {
 }
 
 #[async_trait]
-impl Driver for PostgresDiesel {
+impl Driver for DieselPgDriver {
     type Connection = DieselConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

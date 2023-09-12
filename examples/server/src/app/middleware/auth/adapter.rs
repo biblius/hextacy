@@ -1,14 +1,14 @@
 use crate::cache::contracts::BasicCacheAccess;
-use crate::cache::AuthID;
+use crate::cache::TokenType;
 use crate::db::{models::session, repository::session::SessionRepository};
 use crate::{config::constants::SESSION_CACHE_DURATION, error::Error};
-use hextacy::Driver;
 use hextacy::{component, contract};
 
 #[component(
-    use Driver for Connection as driver,
-    use SessionRepository with Connection as S
+    use Driver as driver,
+    use SessionRepo
 )]
+#[derive(Debug, Clone)]
 pub struct AuthMwRepo {}
 
 #[component(
@@ -33,9 +33,10 @@ impl AuthMwRepo {
 }
 
 #[component(
-    use Driver for Connection as driver,
-    use BasicCacheAccess with Connection as SCA
+    use Driver as driver,
+    use Cache
 )]
+#[derive(Debug, Clone)]
 pub struct AuthMwCache {}
 
 #[component(
@@ -46,7 +47,7 @@ pub struct AuthMwCache {}
 impl AuthMwCache {
     async fn get_session_by_id(&self, id: &str) -> Result<session::Session, Error> {
         let mut conn = self.driver.connect().await?;
-        Cache::get_json(&mut conn, AuthID::Session, id)
+        Cache::get_json(&mut conn, TokenType::Session, id)
             .await
             .map_err(Error::new)
     }
@@ -55,7 +56,7 @@ impl AuthMwCache {
         let mut conn = self.driver.connect().await?;
         Cache::set_json(
             &mut conn,
-            AuthID::Session,
+            TokenType::Session,
             id,
             session,
             Some(SESSION_CACHE_DURATION),
@@ -68,37 +69,11 @@ impl AuthMwCache {
         let mut conn = self.driver.connect().await?;
         Cache::refresh(
             &mut conn,
-            AuthID::Session,
+            TokenType::Session,
             session_id,
             SESSION_CACHE_DURATION as i64,
         )
         .await
         .map_err(Error::new)
-    }
-}
-
-impl<D, C, S> Clone for AuthMwRepo<D, C, S>
-where
-    D: Driver<Connection = C> + Send + Sync + Clone,
-    S: SessionRepository<C> + Send + Sync,
-{
-    fn clone(&self) -> Self {
-        Self {
-            driver: self.driver.clone(),
-            ..*self
-        }
-    }
-}
-
-impl<D, C, Cache> Clone for AuthMwCache<D, C, Cache>
-where
-    D: Driver<Connection = C> + Send + Sync + Clone,
-    Cache: BasicCacheAccess<C> + Send + Sync,
-{
-    fn clone(&self) -> Self {
-        Self {
-            driver: self.driver.clone(),
-            ..*self
-        }
     }
 }

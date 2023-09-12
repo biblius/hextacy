@@ -3,14 +3,12 @@ pub mod resources;
 
 use super::setup::auth_middleware::AuthenticationMiddleware;
 use crate::config::AppState;
-use crate::db::models::role::Role;
 use crate::services::oauth::OAuthProviders;
 use actix_web::web;
 use hextacy::{route, scope, web::Configure};
 
 pub fn route(state: &AppState, cfg: &mut web::ServiceConfig) {
-    let auth_guard =
-        AuthenticationMiddleware::new(state.pg_sea.clone(), state.redis.clone(), Role::User);
+    let auth_guard = AuthenticationMiddleware::new(state);
 
     health::route(cfg);
     resources::route(cfg);

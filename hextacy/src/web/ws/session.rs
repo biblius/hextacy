@@ -99,7 +99,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 ///
 ///     assert!(matches!(res, Ok(())));
 ///
-///     tokio::time::sleep(Duration::from_millis(100)).await;
+///     tokio::time::sleep(Duration::from_millis(10)).await;
 ///
 ///     actor.send(Assert(1)).await.unwrap();
 ///
