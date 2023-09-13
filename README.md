@@ -10,7 +10,7 @@ Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexa
   - full - Enable everything
 
   - db-full - Enables all database adapters
-  - web - Enable actix, actix-web and actix-web-actors and a broker implementation
+  - web - Enable http, cookie and mime crates
   - email - Enable lettre and a simple template SMTP mailer
 
   - db-postgres-diesel - Enables the diesel postgres driver adapter
