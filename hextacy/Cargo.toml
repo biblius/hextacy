@@ -15,26 +15,25 @@ path = "src/lib.rs"
 
 [dependencies]
 async-trait = "0.1.42"
+data-encoding = { version = "2.3.2" }
 dotenv = "0.15.0"
 hextacy_macros = { path = "../hextacy_macros" }
 serde = { version = "1.0.137", features = ["derive"] }
 serde_json = "1.0.81"
 thiserror = "1.0.37"
-tokio = { version = "1.32.0", features = ["macros", "rt"] }
 
 # Time
 chrono = { version = "0.4", features = ["serde"] }
 
 # Crypto
-bcrypt = "0.14.0"
-data-encoding = "2.3.2"
-hmac = "0.12.1"
-jsonwebtoken = "8.1.1"
-rand = "0.8.5"
-rsa = { version = "0.8.2", features = ["pem"] }
-sha2 = "0.10.6"
-thotp = "0.1.11"
-uuid = { version = "1.1.2", features = ["v4"] }
+bcrypt = { version = "0.14.0", optional = true }
+hmac = { version = "0.12.1", optional = true }
+jsonwebtoken = { version = "8.1.1", optional = true }
+rand = { version = "0.8.5", optional = true }
+rsa = { version = "0.8.2", features = ["pem"], optional = true }
+sha2 = { version = "0.10.6", optional = true }
+thotp = { version = "0.1.11", optional = true }
+uuid = { version = "1.1.2", features = ["v4"], optional = true }
 
 # Logging
 env_logger = "0.10.0"
@@ -43,9 +42,9 @@ log4rs = "1.2.0"
 tracing = "0.1.37"
 
 # web
-actix = { version = "0.13.0", optional = true }
-actix-web = { version = "4", optional = true }
-actix-web-actors = { version = "4.1.0", optional = true }
+cookie = { version = "0.17.0", features = ["secure"], optional = true }
+http = { version = "0.2.9", optional = true }
+mime = { version = "0.3.17", optional = true }
 
 # cache-redis, cache-full
 deadpool-redis = { version = "0.12.0", features = ["serde"], optional = true }
@@ -73,9 +72,10 @@ mongodb = { version = "2.3.1", features = ["tokio-runtime"], optional = true }
 # email
 lettre = { version = "0.10.4", features = ["pool"], optional = true }
 
+
 [features]
 default = ["full"]
-full = ["cache-full", "db-full", "email", "web"]
+full = ["cache-full", "crypto", "db-full", "email", "web"]
 
 cache-full = ["cache-inmem", "cache-redis"]
 
@@ -88,6 +88,17 @@ db-mongo = ["dep:mongodb"]
 db-postgres-diesel = ["dep:diesel"]
 db-postgres-seaorm = ["dep:sea-orm"]
 
-web = ["dep:actix", "dep:actix-web", "dep:actix-web-actors"]
+web = ["dep:cookie", "dep:http", "dep:mime"]
 
 email = ["dep:lettre"]
+
+crypto = [
+  "dep:bcrypt",
+  "dep:hmac",
+  "dep:jsonwebtoken",
+  "dep:rand",
+  "dep:rsa",
+  "dep:sha2",
+  "dep:thotp",
+  "dep:uuid",
+]

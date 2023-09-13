@@ -433,7 +433,7 @@ impl Loader for EnvLoader {
 
         let quoted = quote!(
             #async_fn fn #id () -> Result<#strct, #config_err> {
-                let params = ::hextacy::config::env::get_multiple(&[#( #env_keys ),*]);
+                let params = ::hextacy::env::get_multiple(&[#( #env_keys ),*]);
                 #(#variables)*
                 Ok(#constructor)
             }

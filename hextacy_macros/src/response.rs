@@ -10,6 +10,6 @@ pub fn impl_response(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn
     }
 
     Ok(quote!(
-        impl #im Response<'_> for #ident #ty #wh {}
+        impl #im hextacy::web::xhttp::response::RestResponse<'_> for #ident #ty #wh {}
     ))
 }

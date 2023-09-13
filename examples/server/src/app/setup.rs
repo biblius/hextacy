@@ -1,5 +1,8 @@
 use crate::AppState;
-use actix_web::web;
+
+// Web
+
+use actix_web::{web, web::ServiceConfig};
 use hextacy::web::Configure;
 
 // Database
@@ -16,9 +19,19 @@ use crate::db::adapters::postgres::diesel::{
     user::PgUserAdapter as UserAdapter,
 };
 
+// Uncomment for sea orm
+
 /* use crate::db::adapters::postgres::seaorm::{
-    oauth::PgOAuthAdapter, session::PgSessionAdapter, user::PgUserAdapter,
-}; */
+    oauth::PgOAuthAdapter as OAuthAdapter, session::PgSessionAdapter as SessionAdapter,
+    user::PgUserAdapter as UserAdapter,
+};*/
+
+// Uncomment for Mongo
+
+/* use crate::db::adapters::mongo::{
+    oauth::PgOAuthAdapter as OAuthAdapter, session::PgSessionAdapter as SessionAdapter,
+    user::PgUserAdapter as UserAdapter,
+};*/
 
 pub(super) mod auth_middleware {
     use super::*;
@@ -47,6 +60,7 @@ pub(super) mod auth_middleware {
 }
 
 pub(super) mod auth_service {
+
     use super::*;
     use crate::app::core::auth::{
         contracts::{
@@ -62,8 +76,8 @@ pub(super) mod auth_service {
         Email,
     >;
 
-    impl Configure<AppState> for AuthenticationService {
-        fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
+    impl Configure<AppState, ServiceConfig> for AuthenticationService {
+        fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
                 repository: AuthenticationRepositoryAccess::new(
                     state.pg_diesel.clone(),
@@ -83,6 +97,7 @@ pub(super) mod auth_service {
 }
 
 pub(super) mod oauth_service {
+
     use super::*;
     use crate::app::core::auth::{
         contracts::{cache::AuthenticationCacheAccess, repository::AuthenticationRepositoryAccess},
@@ -94,8 +109,8 @@ pub(super) mod oauth_service {
         AuthenticationCacheAccess<RedisDriver, BasicCache>,
     >;
 
-    impl Configure<AppState> for OAuthService {
-        fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
+    impl Configure<AppState, ServiceConfig> for OAuthService {
+        fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
                 repository: AuthenticationRepositoryAccess::new(
                     state.pg_diesel.clone(),
@@ -116,8 +131,8 @@ pub(super) mod user_service {
 
     pub type UserService = Users<UsersRepository<Database, UserAdapter>>;
 
-    impl Configure<AppState> for UserService {
-        fn configure(state: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
+    impl Configure<AppState, ServiceConfig> for UserService {
+        fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
                 repository: UsersRepository::new(state.pg_diesel.clone(), UserAdapter),
             };

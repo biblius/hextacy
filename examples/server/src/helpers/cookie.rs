@@ -1,4 +1,4 @@
-use actix_web::cookie::{time::Duration, Cookie, CookieBuilder, SameSite};
+use hextacy::web::cookie::{time::Duration, Cookie, CookieBuilder, SameSite};
 use serde::Serialize;
 
 const PATH: &str = "/";

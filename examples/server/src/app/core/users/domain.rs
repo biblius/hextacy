@@ -4,9 +4,9 @@ use super::{
     data::{GetUsersPaginated, UserResponse},
 };
 use crate::error::Error;
-use actix_web::HttpResponse;
 use async_trait::async_trait;
-use hextacy::web::http::response::Response;
+use hextacy::web::{http::Response, xhttp::response::RestResponse};
+
 use reqwest::StatusCode;
 
 pub struct Users<R>
@@ -21,7 +21,7 @@ impl<R> ServiceContract for Users<R>
 where
     R: UsersRepositoryContract + Send + Sync,
 {
-    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<HttpResponse, Error> {
+    async fn get_paginated(&self, data: GetUsersPaginated) -> Result<Response<String>, Error> {
         let users = self
             .repository
             .get_paginated(
@@ -32,7 +32,7 @@ where
             .await?;
 
         Ok(UserResponse::new(users)
-            .to_response(StatusCode::OK)
-            .finish())
+            .into_response(StatusCode::OK)
+            .json()?)
     }
 }

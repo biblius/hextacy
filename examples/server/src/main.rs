@@ -10,8 +10,11 @@ use crate::config::{
     constants::{OPEN_SSL_CERT_PATH, OPEN_SSL_KEY_PATH},
     AppState,
 };
-use actix_web::{middleware::Logger, App, HttpServer};
-use hextacy::{config::env, web::http};
+use actix_web::{
+    middleware::{DefaultHeaders, Logger},
+    App, HttpServer,
+};
+use hextacy::env;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use tracing::info;
 
@@ -56,10 +59,31 @@ async fn main() -> std::io::Result<()> {
             .configure(|cfg| app::router::route(&state, cfg))
             .service(actix_web::web::resource("/hello").to(|| async { "OK" }))
             .wrap(config::cors::setup_cors(&["127.0.0.1"], &["test-header"]))
-            .wrap(http::security_headers::default())
+            .wrap(security_headers())
             .wrap(Logger::default())
     })
     .bind_openssl(addr, builder)?
     .run()
     .await
+}
+
+/// Builds the default security header middleware
+pub fn security_headers() -> DefaultHeaders {
+    use hextacy::web::xhttp::security_headers::*;
+    DefaultHeaders::new()
+        .add(default_content_security_policy())
+        .add(cross_origin_embedder_policy("require-corp"))
+        .add(cross_origin_opener_policy("same-origin"))
+        .add(cross_origin_resource_policy("same-origin"))
+        .add(referrer_policy(&["no-referrer", "same-origin"]))
+        .add(strict_transport_security(
+            31536000, // 1 year
+            Some("includeSubDomains"),
+        ))
+        .add(no_sniff())
+        .add(dns_prefetch_control(false))
+        .add(ie_no_open())
+        .add(frame_options(true))
+        .add(cross_domain_policies("none"))
+        .add(xss_filter(false))
 }

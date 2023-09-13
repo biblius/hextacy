@@ -7,6 +7,7 @@ use super::data::{
     FreezeAccountResponse, Logout, Otp, RegistrationData, RegistrationStartResponse,
     ResendRegToken, ResetPassword, TwoFactorAuthResponse,
 };
+use crate::app::controllers::data::MessageResponse;
 use crate::cache::TokenType;
 use crate::config::constants::{
     COOKIE_S_ID, MAXIMUM_LOGIN_ATTEMPTS, OTP_THROTTLE_INCREMENT, SESSION_DURATION,
@@ -19,8 +20,12 @@ use crate::{
     app::core::auth::data::AuthenticationSuccessResponse,
     error::{AuthenticationError, Error},
 };
-use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder};
 use data_encoding::{BASE32, BASE64URL};
+use hextacy::web::http::Response;
+use hextacy::web::http::{
+    header::{self, HeaderName, HeaderValue},
+    StatusCode,
+};
 use hextacy::{
     contract,
     crypto::{
@@ -28,11 +33,7 @@ use hextacy::{
         hmac::{generate_hmac, verify_hmac},
         {bcrypt_hash, bcrypt_verify, pw_and_hash, token, uuid},
     },
-    web::http::response::{MessageResponse, Response},
-};
-use reqwest::{
-    header::{self, HeaderName, HeaderValue},
-    StatusCode,
+    web::xhttp::response::RestResponse,
 };
 use tracing::{debug, info};
 
@@ -57,7 +58,7 @@ where
 {
     /// Verify the user's email and password and establish a session if they don't have 2FA. If the `remember`
     /// flag is true the session established will be permanent (applies for `verify_otp` as well).
-    async fn login(&self, credentials: Credentials) -> Result<HttpResponse, Error> {
+    async fn login(&self, credentials: Credentials) -> Result<Response<String>, Error> {
         let Credentials {
             ref email,
             ref password,
@@ -105,8 +106,8 @@ where
                 &user.email,
                 "Your account has been frozen due to too many invalid login attempts",
             )
-            .to_response(StatusCode::LOCKED)
-            .finish());
+            .into_response(StatusCode::LOCKED)
+            .json()?);
         }
 
         // If the user has 2FA turned on, stop here and cache the user ID so we can quickly verify their otp
@@ -118,15 +119,15 @@ where
             self.cache.set_otp_token(&token, &user.id).await?;
 
             return Ok(TwoFactorAuthResponse::new(&user.username, &token, remember)
-                .to_response(StatusCode::OK)
-                .finish());
+                .into_response(StatusCode::OK)
+                .json()?);
         }
 
         self.establish_session(user, remember).await
     }
 
     /// Verifies the given OTP using the token generated on the credentials login. Throttles by 2*attempts seconds on each failed attempt.
-    async fn verify_otp(&self, otp: Otp) -> Result<HttpResponse, Error> {
+    async fn verify_otp(&self, otp: Otp) -> Result<Response<String>, Error> {
         let Otp {
             ref password,
             ref token,
@@ -174,7 +175,7 @@ where
     }
 
     /// Stores the initial data in the users table and sends an email to the user with the registration token.
-    async fn start_registration(&self, data: RegistrationData) -> Result<HttpResponse, Error> {
+    async fn start_registration(&self, data: RegistrationData) -> Result<Response<String>, Error> {
         let RegistrationData {
             ref email,
             ref username,
@@ -185,8 +186,8 @@ where
         // which emails exist in the db
         let response = || {
             MessageResponse::new("Successfully sent registration token.")
-                .to_response(StatusCode::OK)
-                .finish()
+                .into_response(StatusCode::OK)
+                .json()
         };
 
         info!("Starting registration for {}", email);
@@ -194,7 +195,7 @@ where
         let user = self.repository.get_user_by_email(email).await;
 
         match user {
-            Ok(_) => return Ok(response()),
+            Ok(_) => return Ok(response()?),
             Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => {}
             Err(e) => return Err(e),
         }
@@ -205,7 +206,7 @@ where
             .repository
             .create_user(email, username, &hashed)
             .await?;
-        let secret = hextacy::config::env::get("REG_TOKEN_SECRET")?;
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
         let token = generate_hmac(secret.as_bytes(), user.id.as_bytes(), BASE64URL)?;
 
         self.cache.set_registration_token(&token, &user.id).await?;
@@ -218,12 +219,12 @@ where
             &user.username,
             &user.email,
         )
-        .to_response(StatusCode::CREATED)
-        .finish())
+        .into_response(StatusCode::CREATED)
+        .json()?)
     }
 
     /// Verifies the registration token sent via email upon registration.
-    async fn verify_registration_token(&self, data: EmailToken) -> Result<HttpResponse, Error> {
+    async fn verify_registration_token(&self, data: EmailToken) -> Result<Response<String>, Error> {
         let token = &data.token;
 
         let user_id = match self.cache.get_registration_token(token).await {
@@ -234,7 +235,7 @@ where
         info!("Verfiying registration token for {user_id}");
 
         // Verify the token with the hashed user ID, error if they mismatch
-        let secret = hextacy::config::env::get("REG_TOKEN_SECRET")?;
+        let secret = hextacy::env::get("REG_TOKEN_SECRET")?;
         if !verify_hmac(
             secret.as_bytes(),
             user_id.as_bytes(),
@@ -252,13 +253,16 @@ where
 
         Ok(
             MessageResponse::new("Successfully verified registration token. Good job.")
-                .to_response(StatusCode::OK)
-                .finish(),
+                .into_response(StatusCode::OK)
+                .json()?,
         )
     }
 
     /// Resends a registration token to the user if they are not already verified
-    async fn resend_registration_token(&self, data: ResendRegToken) -> Result<HttpResponse, Error> {
+    async fn resend_registration_token(
+        &self,
+        data: ResendRegToken,
+    ) -> Result<Response<String>, Error> {
         let email = data.email.as_str();
         info!("Resending registration token to {email}");
 
@@ -266,18 +270,18 @@ where
             MessageResponse::new(
                 "An email will be sent with further instructions if it exists in the database.",
             )
-            .to_response(StatusCode::OK)
-            .finish()
+            .into_response(StatusCode::OK)
+            .json()
         };
 
         let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
-            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()?),
             Err(e) => return Err(e),
         };
 
         if user.email_verified_at.is_some() {
-            return Ok(response());
+            return Ok(response()?);
         }
 
         if self.cache.get_email_throttle(&user.id).await.ok().is_some() {
@@ -293,12 +297,12 @@ where
 
         self.cache.set_email_throttle(&user.id).await?;
 
-        Ok(response())
+        Ok(response()?)
     }
 
     /// Generates an OTP secret for the user and returns it in a QR code in the response. Requires a valid
     /// session beforehand.
-    async fn set_otp_secret(&self, session: Session) -> Result<HttpResponse, Error> {
+    async fn set_otp_secret(&self, session: Session) -> Result<Response<String>, Error> {
         let Session { ref user_id, .. } = session;
 
         let secret = crypto::otp::generate_secret(160, BASE32);
@@ -313,12 +317,15 @@ where
 
         info!("Successfully set OTP secret for {}", user.id);
 
-        Ok(HttpResponseBuilder::new(StatusCode::OK)
-            .append_header((
+        let a = hextacy::web::http::response::Builder::new()
+            .status(StatusCode::OK)
+            .header(
                 header::CONTENT_TYPE,
                 header::HeaderValue::from_static("image/svg+xml"),
-            ))
-            .body(BoxBody::new(qr)))
+            )
+            .body(qr);
+
+        a.map_err(Error::new)
     }
 
     /// Updates the user's password. Purges all sessions and sends an email with a reset token.
@@ -326,7 +333,7 @@ where
         &self,
         session: Session,
         data: ChangePassword,
-    ) -> Result<HttpResponse, Error> {
+    ) -> Result<Response<String>, Error> {
         let password = data.password.as_str();
 
         let hashed = bcrypt_hash(password, 10)?;
@@ -348,15 +355,15 @@ where
         info!("Successfully changed password for {}", session.user_id);
 
         Ok(MessageResponse::new("Successfully changed password. All sessions have been purged, please log in again to continue.")
-        .to_response(StatusCode::OK)
-        .finish())
+        .into_response(StatusCode::OK)
+        .json()?)
     }
 
     /// Verify the forgot pw email token and update the user's password
     async fn verify_forgot_password(
         &self,
         data: ForgotPasswordVerify,
-    ) -> Result<HttpResponse, Error> {
+    ) -> Result<Response<String>, Error> {
         info!("Verifying forgot password");
 
         let ForgotPasswordVerify {
@@ -384,7 +391,7 @@ where
     }
 
     /// Updates a user's password to a random string and sends it to them in the email
-    async fn reset_password(&self, data: ResetPassword) -> Result<HttpResponse, Error> {
+    async fn reset_password(&self, data: ResetPassword) -> Result<Response<String>, Error> {
         let pw_token = data.token.as_str();
 
         // Check if there's a reset PW token in the cache
@@ -415,13 +422,13 @@ where
 
         Ok(
             MessageResponse::new("Successfully reset password. Incoming email.")
-                .to_response(StatusCode::OK)
-                .finish(),
+                .into_response(StatusCode::OK)
+                .json()?,
         )
     }
 
     /// Resets the user's password and sends an email with a temporary one. Guarded by a half min throttle.
-    async fn forgot_password(&self, data: ForgotPassword) -> Result<HttpResponse, Error> {
+    async fn forgot_password(&self, data: ForgotPassword) -> Result<Response<String>, Error> {
         info!("{} forgot password, sending email", data.email);
 
         let email = data.email.as_str();
@@ -432,13 +439,13 @@ where
             MessageResponse::new(
                 "An email will be sent with further instructions if it exists in the database.",
             )
-            .to_response(StatusCode::OK)
-            .finish()
+            .into_response(StatusCode::OK)
+            .json()
         };
 
         let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
-            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()),
+            Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()?),
             Err(e) => return Err(e),
         };
 
@@ -457,11 +464,11 @@ where
 
         self.cache.set_email_throttle(&user.id).await?;
 
-        Ok(response())
+        Ok(response()?)
     }
 
     /// Deletes the user's current session and if purge is true expires all their sessions
-    async fn logout(&self, session: Session, data: Logout) -> Result<HttpResponse, Error> {
+    async fn logout(&self, session: Session, data: Logout) -> Result<Response<String>, Error> {
         info!("Logging out {}", session.username);
 
         if data.purge {
@@ -475,9 +482,9 @@ where
         let cookie = crate::helpers::cookie::create(COOKIE_S_ID, &session.id, true)?;
 
         Ok(MessageResponse::new("Successfully logged out, bye!")
-            .to_response(StatusCode::OK)
-            .with_cookies(vec![cookie])
-            .finish())
+            .into_response(StatusCode::OK)
+            .with_cookies(&[cookie])?
+            .json()?)
     }
 
     /// Expires all sessions in the database and deletes all corresponding cached sessions
@@ -490,7 +497,11 @@ where
     }
 
     /// Generates a 200 OK HTTP response with a CSRF token in the headers and the user's session in a cookie.
-    async fn establish_session(&self, user: User, remember: bool) -> Result<HttpResponse, Error> {
+    async fn establish_session(
+        &self,
+        user: User,
+        remember: bool,
+    ) -> Result<Response<String>, Error> {
         let csrf_token = uuid().to_string();
 
         let session = self
@@ -519,12 +530,12 @@ where
 
         // Respond with the x-csrf header and the session ID
         Ok(AuthenticationSuccessResponse::new(user)
-            .to_response(StatusCode::OK)
-            .with_cookies(vec![session_cookie])
-            .with_headers(vec![(
+            .into_response(StatusCode::OK)
+            .with_cookies(&[session_cookie])?
+            .with_headers(&[(
                 HeaderName::from_static("x-csrf-token"),
                 HeaderValue::from_str(&csrf_token)?,
             )])
-            .finish())
+            .json()?)
     }
 }

@@ -68,6 +68,4 @@ pub enum CryptoError {
     Thotp(#[from] thotp::ThotpError),
     #[error("{0}")]
     FromUtf8(#[from] std::string::FromUtf8Error),
-    #[error("{0}")]
-    Env(#[from] std::env::VarError),
 }

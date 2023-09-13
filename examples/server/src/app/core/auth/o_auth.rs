@@ -2,6 +2,7 @@ use super::contracts::{
     cache::AuthenticationCacheAccessContract, repository::AuthenticationRepositoryAccessContract,
 };
 use super::data::OAuthCodeExchange;
+use crate::app::controllers::data::MessageResponse;
 use crate::cache::TokenType;
 use crate::services::oauth::OAuthTokenResponse;
 use crate::{
@@ -14,12 +15,8 @@ use crate::{
     db::models::{session::Session, user::User},
     services::oauth::OAuth,
 };
-use actix_web::HttpResponse;
-use hextacy::{
-    contract,
-    crypto::uuid,
-    web::http::response::{MessageResponse, Response},
-};
+use hextacy::web::xhttp::response::RestResponse;
+use hextacy::{contract, crypto::uuid, web::http::Response as HttpResponse};
 use reqwest::{
     header::{HeaderName, HeaderValue},
     StatusCode,
@@ -54,7 +51,7 @@ where
         &self,
         provider: T,
         code: OAuthCodeExchange,
-    ) -> Result<HttpResponse, Error> {
+    ) -> Result<HttpResponse<String>, Error> {
         let OAuthCodeExchange { ref code } = code;
         // Get the token_res and obtain the account
         let mut token_res = provider.exchange_code(code).await?;
@@ -105,7 +102,7 @@ where
         provider: T,
         mut session: Session,
         code: OAuthCodeExchange,
-    ) -> Result<HttpResponse, Error> {
+    ) -> Result<HttpResponse<String>, Error> {
         let _ = session
             .oauth_token
             .ok_or(AuthenticationError::InvalidToken(TokenType::OAuth))?;
@@ -134,8 +131,8 @@ where
         self.cache.set_session(&session.id, &session).await?;
 
         Ok(MessageResponse::new("lol")
-            .to_response(StatusCode::OK)
-            .finish())
+            .into_response(StatusCode::OK)
+            .json()?)
     }
 
     async fn establish_session(
@@ -143,7 +140,7 @@ where
         provider_id: OAuthProvider,
         token_res: &OAuthTokenResponse,
         user: User,
-    ) -> Result<HttpResponse, Error> {
+    ) -> Result<HttpResponse<String>, Error> {
         let csrf_token = uuid().to_string();
 
         let expiration = token_res.expires_in;
@@ -169,13 +166,13 @@ where
 
         // Respond with the x-csrf header and the session ID
         Ok(AuthenticationSuccessResponse::new(user)
-            .to_response(StatusCode::OK)
-            .with_cookies(vec![session_cookie])
-            .with_headers(vec![(
+            .into_response(StatusCode::OK)
+            .with_cookies(&[session_cookie])?
+            .with_headers(&[(
                 HeaderName::from_static("x-csrf-token"),
                 HeaderValue::from_str(&csrf_token)?,
             )])
-            .finish())
+            .json()?)
     }
 }
 /*

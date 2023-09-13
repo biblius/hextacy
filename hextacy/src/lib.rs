@@ -17,11 +17,12 @@ pub use driver::{Atomic, Driver, DriverError};
 /// Re-exports the underlying libraries used for the implementation.
 pub mod adapters;
 
+#[cfg(feature = "crypto")]
 /// Cryptographic utilities
 pub mod crypto;
 
-/// Utilities for configuring stuff.
-pub mod config;
+/// Utilities for loading dotenv and grabbing stuff from the env.
+pub mod env;
 
 /// A logger that can be set up to use stdout or a file.
 // TODO: Feature flag
@@ -37,7 +38,7 @@ pub mod time;
 pub mod web;
 
 /// Quality of life macros.
-pub use hextacy_macros::{component, contract, Constructor, HttpResponse, State};
+pub use hextacy_macros::{component, contract, Constructor, RestResponse, State};
 
 /// Re-exported libraries for convenience and out of the box implementations.
 /// This will vary based on features flags.

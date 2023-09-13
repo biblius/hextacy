@@ -59,7 +59,7 @@ mod response;
 /// - Variables can be parsed by appending `as T`, e.g. `"MY_VAR" as usize`
 /// - Both can be applied by appending `as Option<T>`, e.g. `"MY_VAR" as Option<u16>`
 ///  
-/// The function generated calls `hextacy::config::env::get_multiple`, parses the variables if specified and calls the
+/// The function generated calls `hextacy::env::get_multiple`, parses the variables if specified and calls the
 /// struct's constructor.
 ///
 /// #### Example
@@ -148,7 +148,7 @@ pub fn derive_constructor(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         .into()
 }
 
-#[proc_macro_derive(HttpResponse, attributes(code))]
+#[proc_macro_derive(RestResponse, attributes(code))]
 #[proc_macro_error]
 pub fn derive_response(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input: syn::DeriveInput = syn::parse(input).unwrap();

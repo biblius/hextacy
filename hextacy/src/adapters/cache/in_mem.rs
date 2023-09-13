@@ -117,9 +117,8 @@ impl Driver for InMemCache {
 
 #[cfg(test)]
 mod tests {
-    use crate::driver::Driver;
-
     use super::InMemCache;
+    use crate::adapters::cache::in_mem::InMemConnection;
 
     #[derive(Debug, Clone)]
     struct SomeItem {
@@ -127,10 +126,10 @@ mod tests {
         b: &'static str,
     }
 
-    #[tokio::test]
-    async fn works() {
-        let cache = InMemCache::new();
-        let mut conn = cache.connect().await.unwrap();
+    #[test]
+    fn works() {
+        let cache = InMemCache::new().pool;
+        let mut conn = InMemConnection { cache };
 
         conn.set("ayy", "lmao");
         conn.set(

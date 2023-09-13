@@ -1,5 +1,4 @@
-use actix_web::http::header::*;
-use actix_web::middleware::DefaultHeaders;
+use http::header::*;
 
 //TODO : Create with params
 /// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
@@ -174,26 +173,6 @@ pub fn xss_filter(on: bool) -> (HeaderName, HeaderValue) {
         X_XSS_PROTECTION,
         HeaderValue::from_static(if on { "1; mode=block" } else { "0" }),
     )
-}
-
-/// Builds the default security header middleware
-pub fn default() -> DefaultHeaders {
-    DefaultHeaders::new()
-        .add(default_content_security_policy())
-        .add(cross_origin_embedder_policy("require-corp"))
-        .add(cross_origin_opener_policy("same-origin"))
-        .add(cross_origin_resource_policy("same-origin"))
-        .add(referrer_policy(&["no-referrer", "same-origin"]))
-        .add(strict_transport_security(
-            31536000, // 1 year
-            Some("includeSubDomains"),
-        ))
-        .add(no_sniff())
-        .add(dns_prefetch_control(false))
-        .add(ie_no_open())
-        .add(frame_options(true))
-        .add(cross_domain_policies("none"))
-        .add(xss_filter(false))
 }
 
 #[cfg(test)]

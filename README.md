@@ -11,6 +11,7 @@ Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexa
 
   - db-full - Enables all database adapters
   - web - Enable actix, actix-web and actix-web-actors and a broker implementation
+  - email - Enable lettre and a simple template SMTP mailer
 
   - db-postgres-diesel - Enables the diesel postgres driver adapter
   - db-postgres-seaorm - Enables the seaorm postgres driver adapter
@@ -39,7 +40,7 @@ Because we are now working with completely generic types, we have a completely d
 
 First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](./examples/server/src/) in the examples repo to see how everything is ultimately set up.
 
-## **The server**
+## **The server** TODO: This is outdated needs fix pls
 
 First things first, we have to define the data we'll use:
 

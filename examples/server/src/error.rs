@@ -34,12 +34,14 @@ pub enum Error {
     ToStr(#[from] reqwest::header::ToStrError),
     #[error("Validation Error")]
     Validation(Vec<ValidationError>),
-    #[error("Http Error: {0}")]
-    Http(#[from] hextacy::web::http::HttpError),
     #[error("OAuth Provider Error: {0}")]
     OAuthProvider(#[from] crate::services::oauth::OAuthProviderError),
     #[error("Smtp Mailer: {0}")]
     TemplateMailer(#[from] TemplateMailerError),
+    #[error("Response builder error: {0}")]
+    HttpResponse(#[from] hextacy::web::xhttp::response::ResponseError),
+    #[error("Http error: {0}")]
+    Http(#[from] hextacy::web::http::Error),
     /// Useful for testing when you need an error response
     #[error("None")]
     #[allow(dead_code)]

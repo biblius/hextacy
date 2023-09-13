@@ -23,12 +23,12 @@ use crate::{
 use actix_web::body::to_bytes;
 use data_encoding::{BASE32, BASE64URL};
 use hextacy::{
-    config::env,
     crypto::{
         hmac::generate_hmac,
         {bcrypt_hash, uuid},
     },
-    web::http::response::Response,
+    env,
+    web::xhttp::response::RestResponse,
 };
 use lazy_static::lazy_static;
 use reqwest::StatusCode;
@@ -269,8 +269,9 @@ async fn credentials_no_otp() {
         .expect_establish_session()
         .return_once_st(move |_, _| {
             Ok(AuthenticationSuccessResponse::new(USER_NO_OTP.clone())
-                .to_response(StatusCode::OK)
-                .finish())
+                .into_response(StatusCode::OK)
+                .json()
+                .unwrap())
         });
     let auth = Authentication {
         repository,

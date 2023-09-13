@@ -1,12 +1,14 @@
-pub mod http;
-pub mod middleware;
 pub mod router;
-pub mod ws;
 
-use actix_web::web::ServiceConfig;
+/// Utilities for working with http. The big boy of this module is the the [RestResponse][xhttp::response::RestResponse].
+pub mod xhttp;
 
-/// A trait for hooking services up to actix' [ServiceConfig]. The usual application is simply
-/// instantiating a service, wrapping it in [Data][actix_web::web::Data] and calling `cfg.app_data()` with it.
-pub trait Configure<T> {
-    fn configure(state: &T, cfg: &mut ServiceConfig);
+pub use cookie;
+pub use http;
+pub use mime;
+
+/// A trait for hooking services up to application configurations. The usual application is simply
+/// instantiating a service and calling a framework specific function to hook it up to a service.
+pub trait Configure<T, C> {
+    fn configure(state: &T, cfg: &mut C);
 }

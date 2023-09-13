@@ -4,8 +4,11 @@ pub mod resources;
 use super::setup::auth_middleware::AuthenticationMiddleware;
 use crate::config::AppState;
 use crate::services::oauth::OAuthProviders;
-use actix_web::web;
-use hextacy::{route, scope, web::Configure};
+use actix_web::{body::MessageBody, web, Responder};
+use hextacy::{
+    route, scope,
+    web::{http::Response, Configure},
+};
 
 pub fn route(state: &AppState, cfg: &mut web::ServiceConfig) {
     let auth_guard = AuthenticationMiddleware::new(state);
@@ -62,11 +65,27 @@ fn user_service(
     cfg: &mut web::ServiceConfig,
     auth_guard: AuthenticationMiddleware,
 ) {
-    use super::core::users::handler::*;
+    use super::controllers::users::*;
     use super::setup::user_service::*;
     UserService::configure(state, cfg);
     route!(
         UserService, cfg,
         get => "/users" => | auth_guard => get_paginated
     );
+}
+
+pub struct AppResponse<T>(pub Response<T>);
+
+impl<T: MessageBody + 'static> Responder for AppResponse<T> {
+    type Body = T;
+
+    fn respond_to(self, req: &actix_web::HttpRequest) -> actix_web::HttpResponse<Self::Body> {
+        let mut res = actix_web::HttpResponse::new(self.0.status());
+        let (parts, body) = self.0.into_parts();
+        res.headers_mut().reserve(parts.headers.len());
+        for (h, v) in parts.headers {
+            res.headers_mut().append(h.unwrap(), v);
+        }
+        res.set_body(body).respond_to(req)
+    }
 }

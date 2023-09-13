@@ -1,5 +1,5 @@
 use crate::db::models::user::{SortOptions, User};
-use hextacy::{web::http::response::Response, Constructor};
+use hextacy::{Constructor, RestResponse};
 use serde::{Deserialize, Serialize};
 use validify::Validify;
 
@@ -13,9 +13,7 @@ pub struct GetUsersPaginated {
     pub sort_by: Option<SortOptions>,
 }
 
-#[derive(Debug, Serialize, Constructor)]
+#[derive(Debug, Serialize, Constructor, RestResponse)]
 pub struct UserResponse {
     users: Vec<User>,
 }
-
-impl Response<'_> for UserResponse {}

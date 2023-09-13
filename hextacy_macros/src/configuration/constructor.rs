@@ -81,7 +81,7 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
         quote!(
             impl #im #struct_id #ty #whe {
                 pub fn new_from_env() -> Option<Self> {
-                    let params = hextacy::config::env::get_multiple(&[ #( #env_vars ),* ]);
+                    let params = hextacy::env::get_multiple(&[ #( #env_vars ),* ]);
 
                     #(
                         let #field_ids = params.get( #env_vars ) #conversions
@@ -105,7 +105,7 @@ pub fn impl_constructor(input: DeriveInput) -> Result<proc_macro2::TokenStream, 
         impl #im #struct_id #ty #whe {
             #(
                 pub fn #fn_ids() -> Option<#types> {
-                    hextacy::config::env::get(#env_vars).ok() #conversions
+                    hextacy::env::get(#env_vars).ok() #conversions
                 }
             )*
         }

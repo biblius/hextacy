@@ -28,7 +28,7 @@ pub struct OAuthProviders {
     pub google: Arc<GoogleOAuth>,
 }
 
-impl hextacy::web::Configure<AppState> for OAuthProviders {
+impl hextacy::web::Configure<AppState, actix_web::web::ServiceConfig> for OAuthProviders {
     fn configure(_: &AppState, cfg: &mut actix_web::web::ServiceConfig) {
         let github = GithubOAuth::new_from_env().unwrap();
         let google = GoogleOAuth::new_from_env().unwrap();

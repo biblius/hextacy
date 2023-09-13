@@ -1,5 +1,5 @@
 use crate::{db::models::user::User, helpers::validation::EMAIL_REGEX};
-use hextacy::{web::http::response::Response, Constructor, HttpResponse};
+use hextacy::{Constructor, RestResponse};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use validify::Validify;
@@ -96,7 +96,7 @@ RESPONSES
 */
 
 /// Sent when the user successfully authenticates with credentials and has 2FA enabled
-#[derive(Debug, Serialize, Constructor, HttpResponse)]
+#[derive(Debug, Serialize, Constructor, RestResponse)]
 pub struct TwoFactorAuthResponse<'a> {
     username: &'a str,
     token: &'a str,
@@ -104,14 +104,14 @@ pub struct TwoFactorAuthResponse<'a> {
 }
 
 /// Sent when the user exceeds the maximum invalid login attempts
-#[derive(Debug, Serialize, Constructor, HttpResponse)]
+#[derive(Debug, Serialize, Constructor, RestResponse)]
 pub struct FreezeAccountResponse<'a> {
     email: &'a str,
     message: &'a str,
 }
 
 /// Sent when a user registers for the very first time
-#[derive(Debug, Serialize, Constructor, HttpResponse)]
+#[derive(Debug, Serialize, Constructor, RestResponse)]
 pub struct RegistrationStartResponse<'a> {
     message: &'a str,
     username: &'a str,
@@ -119,7 +119,7 @@ pub struct RegistrationStartResponse<'a> {
 }
 
 /// Sent when the user completely authenticates
-#[derive(Debug, Serialize, Constructor, HttpResponse)]
+#[derive(Debug, Serialize, Constructor, RestResponse)]
 pub struct AuthenticationSuccessResponse {
     user: User,
 }
