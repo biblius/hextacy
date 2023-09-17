@@ -174,20 +174,27 @@ pub fn derive_response(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 ///     // We do not have to bind the generics here
 ///     use Contract // [, Other]+
 /// )]
-/// struct MyServiceComponent {}
+/// struct MyServiceComponent<E> {
+///     existing: E // Works with existing generics
+/// }
 ///
 /// trait SomeAccessTrait<C> { /* ... */ }
+///
+/// trait Something { }
 ///
 /// #[component(
 ///     // The component impl must specify a connection for the driver to create
 ///     // This will bind the driver's connection to `Conn`
-///     use Driver for Conn, // [, use Driver2 for Other]
+///     use Driver for Conn, // [, use Driver2 for Other]+
 ///
 ///     // Specify which access trait will use which connection.
-///     use SomeAccessTrait with Conn, // [, use OtherAccess with Other]
+///     use SomeAccessTrait with Conn as SAT, // [, use OtherAccess with Other as OAT]+
 /// )]
 /// #[contract] // Can be combined with contract for that sweet boilerplate reduction
-/// impl MyServiceComponent {
+/// impl<E> MyServiceComponent<E>
+/// where
+///   E: Something
+/// {
 ///     /* ... */
 /// }
 /// ```
