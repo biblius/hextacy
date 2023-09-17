@@ -7,7 +7,8 @@ use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, OAuthTokenResponse};
-use hextacy::{component, contract, info};
+use hextacy::{component, contract};
+use tracing::info;
 
 #[component(
     use Driver as driver,

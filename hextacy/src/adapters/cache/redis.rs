@@ -9,7 +9,7 @@ use std::fmt::Debug;
 
 pub type RedisConnection = Connection;
 
-/// Contains a redis deadpool instance. Should be shared through the app with arcs.
+/// Contains a redis deadpool instance.
 #[derive(Clone)]
 pub struct RedisDriver {
     pool: Pool,

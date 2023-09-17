@@ -448,7 +448,7 @@ impl Loader for EnvLoader {
     }
 
     fn error_log(&self) -> TokenStream {
-        quote!(hextacy::error!(
+        quote!(tracing::error!(
             "Error occurred while loading from env: {e}"
         ))
     }
@@ -618,7 +618,7 @@ impl Loader for RawLoader {
     }
 
     fn error_log(&self) -> TokenStream {
-        quote!(hextacy::error!("Error occurred while loading raw: {e}"))
+        quote!(tracing::error!("Error occurred while loading raw: {e}"))
     }
 }
 

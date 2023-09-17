@@ -102,8 +102,9 @@ impl SimpleTemplateMailer {
         Ok(())
     }
 
-    pub fn set_delimiters(&mut self, delims: (char, char)) {
+    pub fn set_delimiters(&mut self, delims: (char, char), len: usize) {
         self.target_delims = Some(delims);
+        self.delim_len = len;
     }
 
     /// Send an email with the given params
@@ -209,6 +210,7 @@ fn find_template_placeholders(
                 return Err(TemplateMailerError::from_placeholder(
                     "Template placeholders must not contain newlines",
                     start_delim,
+                    delim_len,
                     template,
                     current,
                 ));
@@ -226,15 +228,15 @@ fn find_template_placeholders(
             if char == end_delim && delims_found == delim_len {
                 open = false;
                 delims_found = 0;
-                current.end_i = i + 1;
+                current.end_i = i + 1; // range in replace_targets is not inclusive so we bump by 1
 
                 placeholders.push(current);
                 current = TemplatePlaceholder::default();
             }
         } else {
             if char != start_delim {
-                current = TemplatePlaceholder::default();
                 delims_found = 0;
+                current = TemplatePlaceholder::default();
                 continue;
             }
 
@@ -254,6 +256,7 @@ fn find_template_placeholders(
         return Err(TemplateMailerError::from_placeholder(
             "Unterminated placeholder found",
             start_delim,
+            delim_len,
             template,
             current,
         ));
@@ -290,6 +293,7 @@ impl TemplateMailerError {
     fn from_placeholder(
         message: &str,
         delim: char,
+        len: usize,
         content: &str,
         holder: TemplatePlaceholder,
     ) -> TemplateMailerError {
@@ -303,10 +307,11 @@ impl TemplateMailerError {
         let f = if end < content.len() { "..." } else { "" };
 
         let from = &content[start..holder.start_i];
-        let to = &content[holder.start_i + 2..end];
+        let to = &content[holder.start_i + len..end];
 
         TemplateMailerError::TemplatePlaceholder(format!(
-            "{message}: \"{s}{from} --> {delim}{delim} <-- {to}{f}\""
+            "{message}: \"{s}{from} --> {} <-- {to}{f}\"",
+            delim.to_string().repeat(len)
         ))
     }
 }

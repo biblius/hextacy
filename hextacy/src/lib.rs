@@ -25,20 +25,21 @@ pub mod crypto;
 pub mod env;
 
 /// A logger that can be set up to use stdout or a file.
-// TODO: Feature flag
 pub mod logger;
-pub use tracing::{self, debug, error, info, warn};
 
 /// Utilities for time related stuff.
 pub mod time;
 
 /// Utilities for web related stuff. Contains a WS and broker implementation
 /// as well as some HTTP helpers.
-#[cfg(any(feature = "full", feature = "web"))]
+#[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "web")]
+pub use hextacy_macros::RestResponse;
+
 /// Quality of life macros.
-pub use hextacy_macros::{component, contract, Constructor, RestResponse, State};
+pub use hextacy_macros::{component, contract, Constructor, State};
 
 /// Re-exported libraries for convenience and out of the box implementations.
 /// This will vary based on features flags.
@@ -55,4 +56,7 @@ pub mod exports {
     pub use mongodb;
     #[cfg(feature = "db-postgres-seaorm")]
     pub use sea_orm;
+
+    #[cfg(feature = "crypto")]
+    pub use {bcrypt, hmac, jsonwebtoken, rand, rsa, sha2, thotp, uuid};
 }
