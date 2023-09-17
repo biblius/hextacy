@@ -52,7 +52,7 @@ deadpool-redis = { version = "0.12.0", features = ["serde"], optional = true }
 # db-full
 
 # db-postgres-seaorm
-sea-orm = { version = "0.11.2", features = [
+sea-orm = { version = "0.12.2", features = [
   "macros",
   "runtime-actix-native-tls",
   "sqlx-postgres",
