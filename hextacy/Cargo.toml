@@ -47,7 +47,7 @@ http = { version = "0.2.9", optional = true }
 mime = { version = "0.3.17", optional = true }
 
 # cache-redis, cache-full
-deadpool-redis = { version = "0.12.0", features = ["serde"], optional = true }
+deadpool-redis = { version = "0.13.0", features = ["serde"], optional = true }
 
 # db-full
 
