@@ -14,7 +14,7 @@ cfg_if!(
     } else if #[cfg(feature = "db-sqlite-diesel")] {
         type Connection = diesel::SqliteConnection;
     } else {
-        compile_error!("At least one diesel driver must be selected")
+        compile_error! {"At least one diesel driver must be selected"}
     }
 );
 

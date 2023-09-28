@@ -3,7 +3,7 @@ pub mod proxy;
 pub mod render;
 
 use self::proxy::{CommandInfo, CommandProxy, OptionField, OptionsProxy, SubcommandProxy};
-use crate::commands::interactive::proxy::{CryptoProxy,  MigrationProxy};
+use crate::commands::interactive::proxy::{CryptoProxy, MigrationProxy};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -56,7 +56,7 @@ pub enum Window {
 impl AlxApp {
     fn new() -> Self {
         use CommandProxy::*;
-        let commands = vec![ Migration, Crypto, Envex];
+        let commands = vec![Migration, Crypto, Envex];
         let mut this = Self {
             commands: StatefulList::with_items(commands.clone()),
             subcommands: StatefulList::with_items(vec![]),
@@ -90,8 +90,12 @@ impl AlxApp {
     }
 
     fn handle_char(&mut self, ch: char, opt: OptionField) {
-        let Window::Options = self.active_window else { return };
-        let Some(ref mut active) = self.active_opts else { return };
+        let Window::Options = self.active_window else {
+            return;
+        };
+        let Some(ref mut active) = self.active_opts else {
+            return;
+        };
 
         let push_or_insert = |opt: &mut Option<String>, ch: char| match opt {
             Some(ref mut val) => val.push(ch),
@@ -146,8 +150,12 @@ impl AlxApp {
     }
 
     fn handle_backspace(&mut self, opt: OptionField) {
-        let Window::Options = self.active_window else { return };
-        let Some(ref mut active) = self.active_opts else { return };
+        let Window::Options = self.active_window else {
+            return;
+        };
+        let Some(ref mut active) = self.active_opts else {
+            return;
+        };
 
         let pop_opt = |opt: &mut Option<String>| {
             if let Some(ref mut val) = opt {
@@ -159,7 +167,6 @@ impl AlxApp {
         };
 
         match active {
-
             OptionsProxy::GenMig(ref mut opts) => {
                 if let OptionField::Name = opt {
                     opts.name.pop();
@@ -426,7 +433,9 @@ fn options_list<B: Backend>(frame: &mut Frame<B>, app: &mut AlxApp, subcommand: 
 }
 
 fn create_opt_list_item<'a>(app: &AlxApp, opt: &OptionField, width: u16) -> ListItem<'a> {
-    let Some(ref active) = app.active_opts else { panic!("`create_opt_list` called without options") };
+    let Some(ref active) = app.active_opts else {
+        panic!("`create_opt_list` called without options")
+    };
 
     let header = Spans::from(vec![
         Span::styled(
@@ -438,11 +447,15 @@ fn create_opt_list_item<'a>(app: &AlxApp, opt: &OptionField, width: u16) -> List
 
     let value = match active {
         OptionsProxy::GenMig(opts) => {
-            let OptionField::Name = opt else { unreachable!() };
+            let OptionField::Name = opt else {
+                unreachable!()
+            };
             opts.name.clone()
         }
         OptionsProxy::RedoMig(opts) => {
-            let OptionField::All = opt else { unreachable!() };
+            let OptionField::All = opt else {
+                unreachable!()
+            };
             format!("{}", opts.all)
         }
         OptionsProxy::CrySecret(opts) => match opt {

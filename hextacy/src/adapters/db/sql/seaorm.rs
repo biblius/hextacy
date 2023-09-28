@@ -8,7 +8,7 @@ use sea_orm::{ConnectOptions, Database, DatabaseTransaction};
     not(feature = "db-mysql-seaorm"),
     not(feature = "db-sqlite-seaorm")
 ))]
-compile_error!("At least one seaorm driver must be selected");
+compile_error! {"At least one seaorm driver must be selected"}
 
 /// Driver connectin used by sea_orm
 pub use sea_orm::DatabaseConnection;

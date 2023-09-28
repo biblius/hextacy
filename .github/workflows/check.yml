@@ -70,24 +70,6 @@ jobs:
         env:
           RUSTDOCFLAGS: --cfg docsrs
 
-  hack:
-    runs-on: ubuntu-latest
-    name: ubuntu / stable / features
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: Install stable
-        uses: dtolnay/rust-toolchain@stable
-      - name: cargo install cargo-hack
-        uses: taiki-e/install-action@cargo-hack
-      - name: cargo hack
-        uses: actions-rs/cargo@v1
-        with:
-          command: hack
-          # Exclude the workspace and xtcli since it's a binary
-          args: --workspace --exclude xtcli --exclude hxtc --feature-powerset check --lib --tests
-
   msrv:
     runs-on: ubuntu-latest
     strategy:

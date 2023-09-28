@@ -20,7 +20,7 @@ use tracing::info;
 pub struct AuthenticationRepositoryAccess {}
 
 #[component(
-    use Driver:Atomic for 
+    use Driver:Atomic for
         User: UserRepository,
         Session: SessionRepository
 )]
@@ -28,8 +28,10 @@ pub struct AuthenticationRepositoryAccess {}
 impl<OAuth> AuthenticationRepositoryAccess<OAuth>
 where
     // Just to try out component with existing generics
-    OAuth:
-        OAuthRepository<Driver::Connection> + OAuthRepository<<Driver::Connection as hextacy::Atomic>::TransactionResult> + Send + Sync,
+    OAuth: OAuthRepository<Driver::Connection>
+        + OAuthRepository<<Driver::Connection as hextacy::Atomic>::TransactionResult>
+        + Send
+        + Sync,
 {
     async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let mut conn = self.driver.connect().await?;
