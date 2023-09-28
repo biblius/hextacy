@@ -29,8 +29,7 @@ where
 // Example end
 
 #[component(
-    use Driver for Connection:Atomic,
-    use UserRepository with Connection as User
+    use Driver for User: UserRepository
 )]
 #[contract]
 impl UsersRepository {

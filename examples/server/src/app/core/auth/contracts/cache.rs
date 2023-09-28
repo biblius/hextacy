@@ -11,13 +11,12 @@ use hextacy::{component, contract};
 
 #[component(
     use Driver as driver,
-    use CacheAccess
+    use Cache
 )]
 pub struct AuthenticationCacheAccess {}
 
 #[component(
-    use Driver for C,
-    use BasicCacheAccess with C as Cache
+    use Driver for Cache: BasicCacheAccess
 )]
 #[contract]
 impl AuthenticationCacheAccess {

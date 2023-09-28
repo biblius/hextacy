@@ -3,7 +3,7 @@ pub mod proxy;
 pub mod render;
 
 use self::proxy::{CommandInfo, CommandProxy, OptionField, OptionsProxy, SubcommandProxy};
-use crate::commands::interactive::proxy::{CryptoProxy, GenerateProxy, MigrationProxy};
+use crate::commands::interactive::proxy::{CryptoProxy,  MigrationProxy};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -20,7 +20,6 @@ use tui::{
 
 use super::{
     crypto::{PWOpts, SecretOpts},
-    generate::GenerateArgs,
     migration::{GenMigration, RedoMigration},
 };
 
@@ -57,7 +56,7 @@ pub enum Window {
 impl AlxApp {
     fn new() -> Self {
         use CommandProxy::*;
-        let commands = vec![Generate, Migration, Crypto, Envex];
+        let commands = vec![ Migration, Crypto, Envex];
         let mut this = Self {
             commands: StatefulList::with_items(commands.clone()),
             subcommands: StatefulList::with_items(vec![]),
@@ -102,14 +101,6 @@ impl AlxApp {
         };
 
         match active {
-            OptionsProxy::GenerateR(ref mut opts) | OptionsProxy::GenerateMW(ref mut opts) => {
-                match opt {
-                    OptionField::Name => opts.name.push(ch),
-                    OptionField::Apis => push_or_insert(&mut opts.components, ch),
-                    OptionField::Path => push_or_insert(&mut opts.path, ch),
-                    _ => unreachable!(),
-                }
-            }
             OptionsProxy::GenMig(ref mut opts) => {
                 if let OptionField::Name = opt {
                     opts.name.push(ch)
@@ -168,16 +159,7 @@ impl AlxApp {
         };
 
         match active {
-            OptionsProxy::GenerateR(ref mut opts) | OptionsProxy::GenerateMW(ref mut opts) => {
-                match opt {
-                    OptionField::Name => {
-                        opts.name.pop();
-                    }
-                    OptionField::Apis => pop_opt(&mut opts.components),
-                    OptionField::Path => pop_opt(&mut opts.path),
-                    _ => unreachable!(),
-                }
-            }
+
             OptionsProxy::GenMig(ref mut opts) => {
                 if let OptionField::Name = opt {
                     opts.name.pop();
@@ -221,16 +203,6 @@ impl AlxApp {
             Window::Subcommand => {
                 let active = self.subcommands.items[self.subcommands.state.selected().unwrap()];
                 match active {
-                    SubcommandProxy::Generate(proxy) => match proxy {
-                        GenerateProxy::Route => {
-                            self.active_opts =
-                                Some(OptionsProxy::GenerateR(GenerateArgs::default()))
-                        }
-                        GenerateProxy::Middleware => {
-                            self.active_opts =
-                                Some(OptionsProxy::GenerateMW(GenerateArgs::default()))
-                        }
-                    },
                     SubcommandProxy::Migration(proxy) => match proxy {
                         MigrationProxy::Gen => {
                             self.active_opts = Some(OptionsProxy::GenMig(GenMigration::default()))
@@ -281,10 +253,6 @@ impl AlxApp {
         use SubcommandProxy::*;
         self.subcommands.items = vec![];
         match command {
-            CommandProxy::Generate => {
-                use GenerateProxy::*;
-                self.subcommands.items = vec![Generate(Route), Generate(Middleware)];
-            }
             CommandProxy::Migration => {
                 use MigrationProxy::*;
                 self.subcommands.items = vec![
@@ -310,7 +278,6 @@ impl AlxApp {
         use OptionField::*;
         use SubcommandProxy::*;
         match command {
-            Generate(_) => self.options.items = vec![Name, Apis, Path],
             Migration(proxy) => match proxy {
                 MigrationProxy::Gen => self.options.items = vec![Name],
                 MigrationProxy::Redo => self.options.items = vec![All],
@@ -470,12 +437,6 @@ fn create_opt_list_item<'a>(app: &AlxApp, opt: &OptionField, width: u16) -> List
     ]);
 
     let value = match active {
-        OptionsProxy::GenerateR(opts) | OptionsProxy::GenerateMW(opts) => match opt {
-            OptionField::Name => opts.name.clone(),
-            OptionField::Apis => opts.components.clone().unwrap_or_default(),
-            OptionField::Path => opts.path.clone().unwrap_or_default(),
-            _ => unreachable!(),
-        },
         OptionsProxy::GenMig(opts) => {
             let OptionField::Name = opt else { unreachable!() };
             opts.name.clone()

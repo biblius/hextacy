@@ -1,13 +1,11 @@
 use crate::commands::{
     crypto::{PWOpts, SecretOpts},
-    generate::GenerateArgs,
     migration::{GenMigration, RedoMigration},
 };
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CommandProxy {
-    Generate,
     Envex,
     Migration,
     Crypto,
@@ -15,15 +13,8 @@ pub enum CommandProxy {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SubcommandProxy {
-    Generate(GenerateProxy),
     Migration(MigrationProxy),
     Crypto(CryptoProxy),
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum GenerateProxy {
-    Route,
-    Middleware,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -43,8 +34,6 @@ pub enum CryptoProxy {
 
 #[derive(Debug, Clone)]
 pub enum OptionsProxy {
-    GenerateR(GenerateArgs),
-    GenerateMW(GenerateArgs),
     GenMig(GenMigration),
     RedoMig(RedoMigration),
     CrySecret(SecretOpts),
@@ -54,8 +43,6 @@ pub enum OptionsProxy {
 #[derive(Debug, Clone, Copy)]
 pub enum OptionField {
     Name,
-    Apis,
-    Path,
     All,
     Length,
     Encoding,
@@ -65,8 +52,6 @@ impl std::fmt::Display for OptionField {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             OptionField::Name => write!(f, "Name"),
-            OptionField::Apis => write!(f, "Apis"),
-            OptionField::Path => write!(f, "Path"),
             OptionField::All => write!(f, "All"),
             OptionField::Length => write!(f, "Length"),
             OptionField::Encoding => write!(f, "Encoding"),
@@ -88,32 +73,29 @@ pub trait CommandInfo: Debug {
 
 impl CommandInfo for CommandProxy {
     fn title(&self) -> &'static str {
-        use CommandProxy::*;
+        use CommandProxy as Cmd;
         match self {
-            Generate => "Generate",
-            Envex => "Envex",
-            Migration => "Migration",
-            Crypto => "Crypto",
+            Cmd::Envex => "Envex",
+            Cmd::Migration => "Migration",
+            Cmd::Crypto => "Crypto",
         }
     }
 
     fn description(&self) -> &'static str {
-        use CommandProxy::*;
+        use CommandProxy as Cmd;
         match self {
-            Generate => "Create server endpoints and middleware",
-            Envex => "Create a `.env.example` file from the `.env` file in the root",
-            Migration => "Run, revert or create postgres migrations",
-            Crypto => "Create secrets to be used by the server",
+            Cmd::Envex => "Create a `.env.example` file from the `.env` file in the root",
+            Cmd::Migration => "Run, revert or create postgres migrations",
+            Cmd::Crypto => "Create secrets to be used by the server",
         }
     }
 
     fn command_repr(&self) -> String {
-        use CommandProxy::*;
+        use CommandProxy as Cmd;
         match self {
-            Generate => "xtc g".to_string(),
-            Envex => "xtc envex".to_string(),
-            Migration => "xtc m".to_string(),
-            Crypto => "xtc c".to_string(),
+            Cmd::Envex => "xtc envex".to_string(),
+            Cmd::Migration => "xtc m".to_string(),
+            Cmd::Crypto => "xtc c".to_string(),
         }
     }
 }
@@ -121,10 +103,6 @@ impl CommandInfo for CommandProxy {
 impl CommandInfo for SubcommandProxy {
     fn title(&self) -> &'static str {
         match self {
-            SubcommandProxy::Generate(sub) => match sub {
-                GenerateProxy::Route => "Route",
-                GenerateProxy::Middleware => "Middleware",
-            },
             SubcommandProxy::Migration(sub) => match sub {
                 MigrationProxy::Gen => "Generate",
                 MigrationProxy::Run => "Run",
@@ -141,10 +119,6 @@ impl CommandInfo for SubcommandProxy {
 
     fn command_repr(&self) -> String {
         match self {
-            SubcommandProxy::Generate(sub) => match sub {
-                GenerateProxy::Route => "r".to_string(),
-                GenerateProxy::Middleware => "mw".to_string(),
-            },
             SubcommandProxy::Migration(sub) => match sub {
                 MigrationProxy::Gen => "gen".to_string(),
                 MigrationProxy::Run => "run".to_string(),
@@ -163,8 +137,6 @@ impl CommandInfo for SubcommandProxy {
 impl CommandInfo for OptionsProxy {
     fn title(&self) -> &'static str {
         match self {
-            OptionsProxy::GenerateR(_) => "Generate",
-            OptionsProxy::GenerateMW(_) => "Generate",
             OptionsProxy::GenMig(_) => "Generate",
             OptionsProxy::RedoMig(_) => "Redo",
             OptionsProxy::CrySecret(_) => "Secret",
@@ -174,36 +146,6 @@ impl CommandInfo for OptionsProxy {
 
     fn command_repr(&self) -> String {
         match self {
-            OptionsProxy::GenerateR(opts) => {
-                let components = opts
-                    .components
-                    .as_ref()
-                    .map_or_else(String::new, |s| format!("-c {s}"));
-                let name = format!("{}", &opts.name);
-                let path = opts
-                    .path
-                    .as_ref()
-                    .map_or_else(String::new, |s| format!("-p {s}"));
-                format!(
-                    "{name} {components} {path} | Full path: {DEFAULT_ROUTER_PATH}/{}",
-                    path.replace("-p ", "")
-                )
-            }
-            OptionsProxy::GenerateMW(opts) => {
-                let components = opts
-                    .components
-                    .as_ref()
-                    .map_or_else(String::new, |s| format!("-c {s}"));
-                let name = format!("{}", &opts.name);
-                let path = opts
-                    .path
-                    .as_ref()
-                    .map_or_else(String::new, |s| format!("-p {s}"));
-                format!(
-                    "{name} {components} {path} | Full path: {DEFAULT_MIDDLEWARE_PATH}/{}",
-                    path.replace("-p ", "")
-                )
-            }
             OptionsProxy::GenMig(opts) => {
                 format!("{}", opts.name)
             }

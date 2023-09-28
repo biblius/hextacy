@@ -3,46 +3,34 @@ use async_trait::async_trait;
 use sea_orm::TransactionTrait;
 use sea_orm::{ConnectOptions, Database, DatabaseTransaction};
 
+#[cfg(all(
+    not(feature = "db-postgres-seaorm"),
+    not(feature = "db-mysql-seaorm"),
+    not(feature = "db-sqlite-seaorm")
+))]
+compile_error!("At least one seaorm driver must be selected");
+
 /// Driver connectin used by sea_orm
 pub use sea_orm::DatabaseConnection;
 
 /// Contains a connection pool for postgres with sea-orm. An instance of this
 /// should be shared through the app with Arcs
 #[derive(Debug, Clone)]
-pub struct SeaPgDriver {
+pub struct SeaormDriver {
     pool: DatabaseConnection,
 }
 
-impl SeaPgDriver {
-    pub async fn new(
-        host: &str,
-        port: u16,
-        user: &str,
-        password: &str,
-        db: &str,
-        pool_size: Option<u32>,
-    ) -> Self {
-        let url = format!("postgresql://{user}:{password}@{host}:{port}/{db}");
-
-        let mut options = ConnectOptions::new(url);
-
-        options.max_connections(pool_size.unwrap_or(8));
-
-        let pool = Database::connect(options)
+impl SeaormDriver {
+    pub async fn new(url: &str) -> Self {
+        let pool = Database::connect(ConnectOptions::new(url))
             .await
-            .expect("Could not establish PostgresSea connection");
-
-        tracing::debug!(
-            "Successfully initialised PG pool (seaorm) at {}",
-            format!("postgressql://{user}:***@{host}:{port}/{db}")
-        );
-
+            .expect("Could not establish database connection");
         Self { pool }
     }
 }
 
 #[async_trait]
-impl Driver for SeaPgDriver {
+impl Driver for SeaormDriver {
     type Connection = DatabaseConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {

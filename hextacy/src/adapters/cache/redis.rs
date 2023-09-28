@@ -24,14 +24,7 @@ impl Debug for RedisDriver {
 }
 
 impl RedisDriver {
-    pub fn new(
-        host: &str,
-        port: u16,
-        user: Option<&str>,
-        password: Option<&str>,
-        db: i64,
-        pool_size: Option<usize>,
-    ) -> Self {
+    pub fn new(host: &str, port: u16, user: Option<&str>, password: Option<&str>, db: i64) -> Self {
         let db_url = format!("redis://{host}:{port}");
         let mut conn_info = db_url.clone().into_connection_info().unwrap();
         conn_info.redis.password = password.map(|pw| pw.to_string());
@@ -40,11 +33,9 @@ impl RedisDriver {
         let pool = Config::from_connection_info(conn_info)
             .builder()
             .expect("Could not create redis pool builder")
-            .max_size(pool_size.unwrap_or(8))
             .runtime(Runtime::Tokio1)
             .build()
             .expect("Could not create redis connection pool");
-        tracing::debug!("Successfully initialised Redis client at {db_url}");
         Self { pool }
     }
 }

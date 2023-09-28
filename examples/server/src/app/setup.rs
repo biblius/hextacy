@@ -1,14 +1,12 @@
 use crate::AppState;
+use hextacy::Configure;
 
 // Web
 
 use actix_web::{web, web::ServiceConfig};
-use hextacy::web::Configure;
 
 // Database
-use hextacy::adapters::{
-    cache::redis::RedisDriver, db::postgres::diesel::DieselPgDriver as Database,
-};
+use hextacy::adapters::{cache::redis::RedisDriver, db::sql::diesel::DieselDriver as Database};
 
 // Cache
 use crate::cache::adapters::redis::RedisAdapter as BasicCache;

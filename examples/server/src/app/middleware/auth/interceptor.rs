@@ -6,7 +6,6 @@ use crate::error::{AuthenticationError, Error};
 use actix_web::cookie::Cookie;
 use actix_web::dev::{Service, ServiceRequest, ServiceResponse, Transform};
 use actix_web::HttpMessage;
-use futures_util::FutureExt;
 use std::rc::Rc;
 use tracing::{debug, info};
 use tracing::{trace, warn};
@@ -74,7 +73,7 @@ where
         let guard = self.inner.clone();
         let service = self.service.clone();
 
-        async move {
+        Box::pin(async move {
             // Get the csrf header
             let csrf = match guard.get_csrf_header(&req) {
                 Ok(token) => token,
@@ -103,8 +102,7 @@ where
             let res = service.call(req).await?;
 
             Ok(res)
-        }
-        .boxed_local()
+        })
     }
 }
 

@@ -35,7 +35,7 @@ use hextacy::{
     },
     web::xhttp::response::RestResponse,
 };
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 pub struct Authentication<R, C, E> {
     pub repository: R,
@@ -266,6 +266,7 @@ where
         let email = data.email.as_str();
         info!("Resending registration token to {email}");
 
+        // Prevents email scraping
         let response = || {
             MessageResponse::new(
                 "An email will be sent with further instructions if it exists in the database.",
@@ -277,7 +278,10 @@ where
         let user = match self.repository.get_user_by_email(email).await {
             Ok(u) => u,
             Err(Error::Adapter(RepoAdapterError::DoesNotExist)) => return Ok(response()?),
-            Err(e) => return Err(e),
+            Err(e) => {
+                error!("{e}");
+                return Ok(response()?);
+            }
         };
 
         if user.email_verified_at.is_some() {

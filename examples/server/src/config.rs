@@ -7,7 +7,7 @@ use hextacy::{
         cache::redis::RedisDriver,
         db::{
             mongo::MongoDriver,
-            postgres::{diesel::DieselPgDriver, seaorm::SeaPgDriver},
+            sql::{diesel::DieselDriver, seaorm::SeaormDriver},
         },
         email::SimpleTemplateMailer,
     },
@@ -17,26 +17,12 @@ use std::sync::Arc;
 
 #[derive(Debug, Clone, State)]
 pub struct AppState {
-    #[env(
-        "PG_HOST",
-        "PG_PORT" as u16,
-        "PG_USER",
-        "PG_PASSWORD",
-        "PG_DATABASE",
-        "PG_POOL_SIZE" as Option<u32>
-    )]
-    pub pg_diesel: DieselPgDriver,
+    #[env("POSTGRES_URL")]
+    pub pg_diesel: DieselDriver,
 
-    #[env(
-        "PG_HOST",
-        "PG_PORT" as u16,
-        "PG_USER",
-        "PG_PASSWORD",
-        "PG_DATABASE",
-        "PG_POOL_SIZE" as Option<u32>
-    )]
+    #[env("POSTGRES_URL")]
     #[load_async]
-    pub pg_sea: SeaPgDriver,
+    pub pg_sea: SeaormDriver,
 
     #[env(
         "RD_HOST",
@@ -44,9 +30,8 @@ pub struct AppState {
         "RD_USER" as Option,
         "RD_PASSWORD" as Option,
         "RD_DATABASE" as i64,
-        "RD_POOL_SIZE" as Option<usize>
     )]
-    #[raw("127.0.0.1", 6379, None, None, 0, Some(8))]
+    #[raw("127.0.0.1", 6379, None, None, 0)]
     pub redis: RedisDriver,
 
     #[env("SMTP_HOST", "SMTP_PORT" as u16, "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM", "SMTP_SENDER")]

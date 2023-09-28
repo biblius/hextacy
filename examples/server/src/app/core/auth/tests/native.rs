@@ -362,20 +362,25 @@ async fn invalid_credentails() {
     let mut repository = MockRepository::new();
     let cache = MockCache::new();
     let email = MockEmailContract::new();
+
     repository
         .expect_get_user_by_email()
         .return_once(move |_| Err(RepoAdapterError::DoesNotExist.into()));
+
     let invalid_email = Credentials {
         email: "doesnt@exist.ever".to_string(),
         password: "not good".to_string(),
         remember: false,
     };
+
     let service = Authentication {
         repository,
         cache,
         email,
     };
+
     let res = service.login(invalid_email).await;
+
     match res {
         Ok(_) => panic!("Not good"),
         Err(e) => assert!(matches!(

@@ -1,4 +1,4 @@
-use super::{crypto::Crypto, envex::EnvExOptions, generate::GenerateSubject, migration::Migration};
+use super::{crypto::Crypto, envex::EnvExOptions, migration::Migration};
 use clap::{Parser, Subcommand};
 use std::fmt::Display;
 
@@ -11,11 +11,6 @@ pub struct Xtc {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
-    // xtc component generation
-    Generate(GenerateSubject),
-    Gen(GenerateSubject),
-    G(GenerateSubject),
-
     // .env.example
     Envex(EnvExOptions),
 
@@ -31,21 +26,13 @@ pub enum Command {
     // start interactive
     Interactive,
     I,
+
+    Init,
 }
 
 impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Command::Generate(s) | Command::Gen(s) | Command::G(s) => match s.subject {
-                super::generate::GenerateSubcommand::Route(_)
-                | super::generate::GenerateSubcommand::R(_) => {
-                    write!(f, "Generating route")
-                }
-                super::generate::GenerateSubcommand::Middleware(_)
-                | super::generate::GenerateSubcommand::MW(_) => {
-                    write!(f, "Generating middleware")
-                }
-            },
             Command::Envex(_) => write!(f, "Generating .env.example"),
             Command::Migration(c) | Command::Mig(c) | Command::M(c) => match c.action {
                 super::migration::MigrationSubcommand::Gen(_) => write!(f, "Generating migration"),
@@ -55,6 +42,7 @@ impl Display for Command {
             },
             Command::C(_) | Command::Crypto(_) => write!(f, "Cryptographying"),
             Command::Interactive | Command::I => write!(f, "Initiating interactive session"),
+            Command::Init => write!(f, "Initialising 6tc template"),
         }
     }
 }

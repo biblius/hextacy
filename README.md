@@ -7,17 +7,22 @@ Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexa
 ## **Feature flags**
 
 ```bash
-  - full - Enable everything
+  # Enable everything, sql default is postgres
+  - full
 
-  - db-full - Enables all database adapters
-  - web - Enable http, cookie and mime crates
-  - email - Enable lettre and a simple template SMTP mailer
+  # Enable http, cookie and mime crates
+  - web 
 
-  - db-postgres-diesel - Enables the diesel postgres driver adapter
-  - db-postgres-seaorm - Enables the seaorm postgres driver adapter
-  - db-mongo - Enables the mongodb driver adapter
-  - cache-redis - Enables the redis driver and cache access trait
-  - cache-inmem - Enables an in memory cache for quickly prototyping
+  # Enable lettre and a simple template SMTP mailer
+  - email 
+
+  # Enable the specified backend for the specified driver  
+  - db - postgres|mysql|sqlite - diesel|seaorm
+  - db-mongo
+
+  # Enable the redis driver and an in memory cache for quickly prototyping
+  - cache-redis
+  - cache-inmem 
 ```
 
 ## **Architecture**

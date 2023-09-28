@@ -8,7 +8,7 @@ use crate::{
 use async_trait::async_trait;
 use chrono::Utc;
 use diesel::{ExpressionMethods, QueryDsl, RunQueryDsl};
-use hextacy::adapters::db::postgres::diesel::DieselConnection;
+use hextacy::adapters::db::sql::diesel::DieselConnection;
 use std::fmt::Debug;
 
 #[derive(Debug, Clone)]

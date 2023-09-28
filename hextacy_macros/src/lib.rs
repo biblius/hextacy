@@ -69,13 +69,13 @@ mod response;
 ///
 /// #[derive(Debug, State)]
 /// struct MyAppState {
-///     // Must follow the order of the variables in the constructor of MyPgAdapter
+///     // Must follow the order of the variables in the constructor of DummyAdapter
 ///     #[env(
 ///         "HOST",
 ///         "PORT" as u16,
 ///         "POOL_SIZE" as Option<u16>
 ///     )]
-///     pub postgres: Arc<Mutex<MyPgAdapter>>
+///     pub postgres: Arc<Mutex<DummyAdapter>>
 /// }
 /// ```
 ///
@@ -92,7 +92,7 @@ mod response;
 /// #[derive(Debug, State)]
 /// struct MyAppState {
 ///     #[raw("localhost", 5432, Some(8))]
-///     pub postgres: Arc<MyPgAdapter>
+///     pub postgres: Arc<DummyAdapter>
 /// }
 /// ```
 ///
@@ -117,8 +117,8 @@ mod response;
 ///     // Raw is used as a fallback here
 ///     #[raw("localhost", 5432, Some(8))]
 ///     #[load_async]
-///     #[load_with(MyPgAdapter::new_async)]
-///     pub postgres: Arc<MyPgAdapter>
+///     #[load_with(DummyAdapter::new_async)]
+///     pub postgres: Arc<DummyAdapter>
 /// }
 /// ````
 #[proc_macro_derive(State, attributes(env, raw, load_async, load_with))]

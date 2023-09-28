@@ -7,7 +7,7 @@ use crate::db::repository::user::UserRepository;
 use crate::db::RepoAdapterError;
 use crate::error::Error;
 use crate::services::oauth::{OAuthProvider, OAuthTokenResponse};
-use hextacy::{component, contract};
+use hextacy::{component, contract, transaction};
 use tracing::info;
 
 #[component(
@@ -20,16 +20,16 @@ use tracing::info;
 pub struct AuthenticationRepositoryAccess {}
 
 #[component(
-    use Driver for Connection:Atomic,
-    use UserRepository with Connection as User,
-    use SessionRepository with Connection as Session,
+    use Driver:Atomic for 
+        User: UserRepository,
+        Session: SessionRepository
 )]
 #[contract]
 impl<OAuth> AuthenticationRepositoryAccess<OAuth>
 where
     // Just to try out component with existing generics
     OAuth:
-        OAuthRepository<Connection> + OAuthRepository<Connection::TransactionResult> + Send + Sync,
+        OAuthRepository<Driver::Connection> + OAuthRepository<<Driver::Connection as hextacy::Atomic>::TransactionResult> + Send + Sync,
 {
     async fn get_user_by_id(&self, id: &str) -> Result<user::User, Error> {
         let mut conn = self.driver.connect().await?;
@@ -120,49 +120,48 @@ where
         provider: OAuthProvider,
     ) -> Result<(user::User, OAuthMeta), Error> {
         let conn = self.driver.connect().await?;
-        let mut conn = conn.start_transaction().await?;
+        transaction!(
+            conn: Driver => {
+                let user =  match User::get_by_email(&mut conn, email).await {
+                    Ok(user) => User::update_oauth_id(&mut conn, &user.id, account_id, provider)
+                        .await
+                        .map_err(Error::new)?,
+                    Err(RepoAdapterError::DoesNotExist) => {
+                        User::create_from_oauth(&mut conn, account_id, email, username, provider)
+                            .await
+                            .map_err(Error::new)?
+                    }
+                    Err(e) => {
+                        return Err(Error::new(e));
+                    }
+                };
 
-        let user = match User::get_by_email(&mut conn, email).await {
-            Ok(user) => User::update_oauth_id(&mut conn, &user.id, account_id, provider)
-                .await
-                .map_err(Error::new)?,
-            Err(RepoAdapterError::DoesNotExist) => {
-                User::create_from_oauth(&mut conn, account_id, email, username, provider)
-                    .await
-                    .map_err(Error::new)?
+                let existing_oauth = match OAuth::get_by_account_id(&mut conn, account_id).await {
+                    Ok(oauth) => oauth,
+                    Err(e) => match e {
+                        // If the entry does not exist, we must create one for the user
+                        RepoAdapterError::DoesNotExist => {
+                            info!("OAuth entry does not exist, creating");
+                            let data = OAuthMetaData {
+                                user_id: &user.id,
+                                access_token: &tokens.access_token,
+                                refresh_token: tokens.refresh_token.as_deref(),
+                                provider,
+                                scope: &tokens.scope,
+                                account_id: Some(account_id),
+                            };
+                            OAuth::create(&mut conn, data).await.map_err(Error::new)?
+                        }
+                        e => {
+                            return Err(Error::new(e));
+                        }
+                    },
+                };
+
+                Ok((user, existing_oauth))
             }
-            Err(e) => {
-                Connection::abort_transaction(conn).await?;
-                return Err(Error::new(e));
-            }
-        };
-
-        let existing_oauth = match OAuth::get_by_account_id(&mut conn, account_id).await {
-            Ok(oauth) => oauth,
-            Err(e) => match e {
-                // If the entry does not exist, we must create one for the user
-                RepoAdapterError::DoesNotExist => {
-                    info!("OAuth entry does not exist, creating");
-                    let data = OAuthMetaData {
-                        user_id: &user.id,
-                        access_token: &tokens.access_token,
-                        refresh_token: tokens.refresh_token.as_deref(),
-                        provider,
-                        scope: &tokens.scope,
-                        account_id: Some(account_id),
-                    };
-                    OAuth::create(&mut conn, data).await.map_err(Error::new)?
-                }
-                e => {
-                    Connection::abort_transaction(conn).await?;
-                    return Err(Error::new(e));
-                }
-            },
-        };
-
-        Connection::commit_transaction(conn).await?;
-
-        Ok((user, existing_oauth))
+        )
+        .map_err(Error::new)
     }
 
     async fn get_oauth_by_account_id(&self, account_id: &str) -> Result<OAuthMeta, Error> {

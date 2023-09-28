@@ -34,7 +34,6 @@ pub trait Driver {
 /// mitigate 2 different implementations).
 #[async_trait]
 pub trait Atomic: Sized {
-    // Atomic bound here is so we can call commit and abort directly on the result
     type TransactionResult: Send;
 
     async fn start_transaction(self) -> Result<Self::TransactionResult, DriverError>;
@@ -42,27 +41,56 @@ pub trait Atomic: Sized {
     async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DriverError>;
 }
 
+#[macro_export]
+macro_rules! transaction {
+    ($conn:ident : $id:ident $(::Connection)? => $b:block) => {{
+        let mut $conn = <$id::Connection as hextacy::Atomic>::start_transaction($conn).await?;
+        match $b {
+            Ok(v) => match <$id::Connection as hextacy::Atomic>::commit_transaction($conn).await {
+                Ok(_) => Ok(v),
+                Err(e) => Err(e),
+            },
+            Err(e) => match <$id::Connection as hextacy::Atomic>::abort_transaction($conn).await {
+                Ok(_) => Err(e),
+                Err(er) => Err(er),
+            },
+        }
+    }};
+}
+
 /// The error returned by driver implementations. Use [DriverError::Custom] if you are implementing
 /// the [Driver] trait on your own types.
 #[derive(Debug, Error)]
 pub enum DriverError {
-    #[cfg(any(feature = "full", feature = "db-full", feature = "db-mongo"))]
+    #[cfg(feature = "db-mongo")]
     #[error("Mongo driver error: {0}")]
     Mongo(#[from] mongodb::error::Error),
 
-    #[cfg(any(feature = "full", feature = "db-full", feature = "db-postgres-diesel"))]
+    #[cfg(any(
+        feature = "db-postgres-diesel",
+        feature = "db-mysql-diesel",
+        feature = "db-sqlite-diesel",
+    ))]
     #[error("Postgres pool error: {0}")]
     DieselConnection(#[from] diesel::r2d2::PoolError),
 
-    #[cfg(any(feature = "full", feature = "db-full", feature = "db-postgres-diesel"))]
+    #[cfg(any(
+        feature = "db-postgres-diesel",
+        feature = "db-mysql-diesel",
+        feature = "db-sqlite-diesel",
+    ))]
     #[error("Diesel error: {0}")]
     DieselResult(#[from] diesel::result::Error),
 
-    #[cfg(any(feature = "full", feature = "db-full", feature = "db-postgres-seaorm"))]
+    #[cfg(any(
+        feature = "db-postgres-seaorm",
+        feature = "db-mysql-seaorm",
+        feature = "db-sqlite-seaorm"
+    ))]
     #[error("SeaORM Error: {0}")]
     SeaormConnection(#[from] sea_orm::DbErr),
 
-    #[cfg(any(feature = "full", feature = "cache-full", feature = "cache-redis"))]
+    #[cfg(feature = "cache-redis")]
     #[error("Redis pool error: {0}")]
     RedisConnection(#[from] deadpool_redis::PoolError),
 

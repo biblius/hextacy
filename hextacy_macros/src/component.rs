@@ -41,8 +41,7 @@ fn impl_impl_block(component: ComponentImpl, item_impl: ItemImpl) -> proc_macro:
         ),
     };
 
-    let impl_generics = component.impl_generics();
-    let ty_generics = component.ty_generics();
+    let generics = component.generics();
 
     let mut where_clause = quote!(where);
 
@@ -57,7 +56,7 @@ fn impl_impl_block(component: ComponentImpl, item_impl: ItemImpl) -> proc_macro:
 
     quote!(
         #(#attrs)*
-        impl<#(#impl_generics),*, #existing_impl> #original_struct <#(#ty_generics),*, #(#existing_ty),*> #where_clause
+        impl<#(#generics),*, #existing_impl> #original_struct <#(#generics),*, #(#existing_ty),*> #where_clause
         {
             #(#original_fns)*
         }
@@ -174,56 +173,48 @@ fn quote_struct(component: &ComponentStruct, item_struct: &ItemStruct) -> proc_m
 #[derive(Debug, Default)]
 struct ComponentImpl {
     drivers: Vec<DriverImpl>,
-    contracts: Vec<ContractImpl>,
 }
 
 impl ComponentImpl {
-    fn impl_generics(&self) -> Vec<Ident> {
-        let mut generics: Vec<_> = self.drivers.iter().map(|d| d.driver_id.clone()).collect();
-        let conns = self.drivers.iter().map(|d| d.conn_id.clone());
-        let contracts = self.contracts.iter().map(|d| d.name.clone());
+    fn generics(&self) -> Vec<&Ident> {
+        let mut generics = vec![];
 
-        generics.extend(conns);
-        generics.extend(contracts);
+        // Important for ordering
+        for driver in self.drivers.iter() {
+            generics.push(&driver.driver_id);
+        }
 
-        generics
-    }
-
-    fn ty_generics(&self) -> Vec<Ident> {
-        let mut generics: Vec<_> = self.drivers.iter().map(|d| d.driver_id.clone()).collect();
-        let contracts = self.contracts.iter().map(|d| d.name.clone());
-
-        generics.extend(contracts);
+        for driver in self.drivers.iter() {
+            for contract in driver.contracts.iter() {
+                generics.push(&contract.name)
+            }
+        }
 
         generics
     }
 
     fn extend_where_clause(&self, where_clause: &mut proc_macro2::TokenStream) {
-        let mut atomic_conns = Vec::new();
-
         for driver in self.drivers.iter() {
             let id = &driver.driver_id;
-            let conn = &driver.conn_id;
-            let atomic = driver.atomic.then_some(quote!(hextacy::Atomic+));
-            if driver.atomic {
-                atomic_conns.push(conn.clone());
-            }
-            where_clause.extend(quote!(
-                #conn: #atomic Send,
-                #id: hextacy::Driver<Connection = #conn> + Send + Sync,
-            ));
-        }
+            let atomic = driver.atomic.then_some(quote!(+ hextacy::Atomic));
 
-        for contract in self.contracts.iter() {
-            let name = &contract.name;
-            let trait_id = &contract.trait_id;
-            let conn = &contract.conn_id;
-            let atomic = atomic_conns
-                .contains(conn)
-                .then_some(quote!( + #trait_id<#conn::TransactionResult>));
             where_clause.extend(quote!(
-                #name: #trait_id<#conn> #atomic + Send + Sync,
+                #id: hextacy::Driver + Send + Sync,
+                #id::Connection: Send #atomic,
             ));
+
+            for contract in driver.contracts.iter() {
+                let name = &contract.name;
+                let trait_id = &contract.trait_id;
+
+                let atomic = driver.atomic.then_some(
+                    quote!( + #trait_id<<#id::Connection as hextacy::Atomic>::TransactionResult>),
+                );
+
+                where_clause.extend(quote!(
+                    #name: #trait_id<#id::Connection> #atomic + Send + Sync,
+                ));
+            }
         }
     }
 }
@@ -233,16 +224,8 @@ impl Parse for ComponentImpl {
         let mut this = Self::default();
 
         while input.parse::<Token!(use)>().is_ok() {
-            // Checks for 'with' or a fully qualified path
-            if input.peek2(Ident) || input.peek2(Token!(::)) {
-                let contract = input.parse()?;
-                this.contracts.push(contract);
-            }
-
-            if input.peek2(Token!(for)) {
-                let driver = input.parse()?;
-                this.drivers.push(driver);
-            }
+            let driver = input.parse()?;
+            this.drivers.push(driver);
         }
         Ok(this)
     }
@@ -251,46 +234,48 @@ impl Parse for ComponentImpl {
 #[derive(Debug)]
 struct DriverImpl {
     driver_id: Ident,
-    conn_id: Ident,
+    contracts: Vec<ContractImpl>,
     atomic: bool,
 }
 
 impl Parse for DriverImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let driver_id: Ident = input.parse()?;
-        input.parse::<Token!(for)>()?;
-        let conn_id: Ident = input.parse()?;
-
         let mut this = DriverImpl {
             driver_id,
-            conn_id: conn_id.clone(),
+            contracts: vec![],
             atomic: false,
         };
 
-        if input.peek(Token!(,)) {
-            input.parse::<Token!(,)>().unwrap();
-            return Ok(this);
-        }
-
         if input.peek(Token!(:)) {
-            input.parse::<Token!(:)>().unwrap();
-            if let Ok(id) = input.parse::<Ident>() {
-                if id == "Atomic" {
-                    this.atomic = true;
-                } else {
-                    return Err(syn::Error::new(id.span(), "Invalid connection modifier"));
-                }
+            input.parse::<Token!(:)>()?;
+            let ident = input.parse::<Ident>()?;
+            if ident != "Atomic" {
+                return Err(syn::Error::new(
+                    ident.span(),
+                    &format!("Expected `Atomic`, found {ident}"),
+                ));
             }
+            this.atomic = true;
         }
 
-        if input.peek(Token!(,)) {
-            input.parse::<Token!(,)>().unwrap();
-            return Ok(this);
-        }
+        input.parse::<Token!(for)>()?;
 
-        match input.parse::<Token!(,)>() {
-            Ok(_) => Ok(this),
-            Err(_) => Ok(this),
+        loop {
+            let contract = match input.parse() {
+                Ok(c) => c,
+                Err(e) => return Err(e),
+            };
+
+            this.contracts.push(contract);
+
+            if input.peek(Token!(,)) {
+                input.parse::<Token!(,)>()?;
+            }
+
+            if input.peek(Token!(use)) || input.is_empty() {
+                return Ok(this);
+            }
         }
     }
 }
@@ -298,30 +283,15 @@ impl Parse for DriverImpl {
 #[derive(Debug)]
 struct ContractImpl {
     trait_id: syn::Path,
-    conn_id: Ident,
     name: Ident,
 }
 
 impl Parse for ContractImpl {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let trait_id = input.parse()?;
-        let with = input.parse::<Ident>()?;
-        if with != "with" {
-            return Err(syn::Error::new(with.span(), "Expected token 'with'"));
-        }
-        let conn_id = input.parse()?;
-        input.parse::<Token!(as)>()?;
-        let name = input.parse()?;
-        let this = Self {
-            trait_id,
-            conn_id,
-            name,
-        };
-
-        match input.parse::<Token!(,)>() {
-            Ok(_) => Ok(this),
-            Err(_) => Ok(this),
-        }
+        let name = input.parse::<Ident>()?;
+        input.parse::<Token![:]>()?;
+        let trait_id = input.parse::<syn::Path>()?;
+        Ok(Self { name, trait_id })
     }
 }
 
