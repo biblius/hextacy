@@ -110,7 +110,7 @@ fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macr
         )
     });
 
-    let args_new = component.driver_and_contract_fields();
+    let args_new = component.driver_and_contract_fields(false);
     let struct_fields_new = component.driver_contract_fields_new();
 
     let new = quote!(
@@ -159,7 +159,7 @@ fn quote_struct(component: &ComponentStruct, item_struct: &ItemStruct) -> proc_m
     }
 
     let existing_fields = item_struct.fields.iter().collect::<Vec<_>>();
-    let fields = component.driver_and_contract_fields();
+    let fields = component.driver_and_contract_fields(true);
 
     quote!(
         #(#attrs),*
@@ -253,7 +253,7 @@ impl Parse for DriverImpl {
             if ident != "Atomic" {
                 return Err(syn::Error::new(
                     ident.span(),
-                    &format!("Expected `Atomic`, found {ident}"),
+                    format!("Expected `Atomic`, found {ident}"),
                 ));
             }
             this.atomic = true;
@@ -310,8 +310,9 @@ impl ComponentStruct {
         generics
     }
 
-    fn driver_and_contract_fields(&self) -> proc_macro2::TokenStream {
+    fn driver_and_contract_fields(&self, _pub: bool) -> proc_macro2::TokenStream {
         let mut tokens = quote!();
+        let _pub = _pub.then_some(quote!(pub));
         for driver in self.drivers.iter() {
             let field = Ident::new(
                 &pascal_to_snake(&driver.name.to_string()),
@@ -319,14 +320,14 @@ impl ComponentStruct {
             );
             let name = &driver.driver_id;
             tokens.extend(quote!(
-                #field: #name,
+                #_pub #field: #name,
             ));
         }
 
         for generic in self.generics.iter() {
             let field = Ident::new(&pascal_to_snake(&generic.to_string()), Span::call_site());
             tokens.extend(quote!(
-                #field: #generic,
+                #_pub #field: #generic,
             ));
         }
 

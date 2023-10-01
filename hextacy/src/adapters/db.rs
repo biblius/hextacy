@@ -1,4 +1,4 @@
-#[cfg(any(feature = "db-mongo"))]
+#[cfg(feature = "db-mongo")]
 pub mod mongo;
 
 #[cfg(any(

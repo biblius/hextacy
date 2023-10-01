@@ -165,53 +165,72 @@ pub fn derive_response(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 /// ## Example
 ///
 /// ```ignore
+/// trait SomeAccessTrait<C> { /* ... */ }
+///
+/// trait SomeOtherTrait { /* ... */ }
+///
 /// #[component(
 ///     // Defines a field named `driver` which will be of generic type `Driver`
 ///     // Any number of fields can be created this way
-///     use Driver as driver,  // [, use Other as other]+
+///     use Driver as driver,
 ///
-///     // Defines fields for given generic. The fields will be converted to snake_case
-///     // We do not have to bind the generics here
-///     use Contract // [, Other]+
+///     // Defines fields for given generic. Everything after `use` will be converted to snake_case
+///     // and will end up as a field on the driver, e.g. `something: Something`.
+///     // We do not have to bind the generics to anything here
+///     use Something
 /// )]
 /// struct MyServiceComponent<E> {
-///     existing: E // Works with existing generics
+///     existing: E // Works with existing generics and fields
 /// }
 ///
-/// trait SomeAccessTrait<C> { /* ... */ }
-///
-/// trait Something { }
-///
 /// #[component(
-///     // The component impl must specify a connection for the driver to create
-///     // This will bind the driver's connection to `Conn`
-///     use Driver for Conn, // [, use Driver2 for Other]+
-///
-///     // Specify which access trait will use which connection.
-///     use SomeAccessTrait with Conn as SAT, // [, use OtherAccess with Other as OAT]+
+///     // The component impl must specify which adapters use which drivers.
+///     // `SomeAccessTrait` will work with the connection created with `Driver`
+///     use D[:Atomic] for
+///         SAT: SomeAccessTrait
 /// )]
-/// #[contract] // Can be combined with contract for that sweet boilerplate reduction
 /// impl<E> MyServiceComponent<E>
 /// where
-///   E: Something
+///   E: SomeOtherTrait
 /// {
 ///     /* ... */
 /// }
 /// ```
-/// In the example above, `Driver` will use `Conn` as its associated type
-/// and `SomeAccessTrait` will use the same connection (assuming `Contract` is a trait that accepts
-/// a single generic parameter). All contracts will be bound to phantom data.
 ///
-/// Multiple drivers can be applied in a single call. Drivers and contracts are made distinct
-/// with `for` and `with`, respectively, and are parsed in the order provided. If called on an impl block,
-/// the order of the declarations must match the order of the implementing struct's generics
+/// In the example above, `SomeAccessTrait` will use `Driver`'s connection (assuming it is a trait that accepts
+/// a single generic parameter). The above code expands to:
+///
+/// ```ignore
+/// struct MyServiceComponent<Driver, Something, E> {
+///     driver: Driver,
+///     something: Something,
+///     existing: E,
+/// }
+///
+/// impl<D, SAT, E> for MyServiceComponent<D, SAT, E>
+/// where
+///   D: hextacy::Driver + Send + Sync,
+///   D::Connection: Send [+ hextacy::Atomic],
+///   SAT: SomeAccessTrait<D::Connection>
+///     [+ SomeAccessTrait<<D::Connection as hextacy::Atomic>::TransactionResult>]
+///     + Send
+///     + Sync,
+///   E: SomeOtherTrait
+/// {
+///     /* ... */
+/// }
+/// ```
+///
+/// ### The gotchas
+///
+/// If called on an impl block, the order of the declarations must match the order of the implementing struct's generics
 /// (or the order of its component attribute if it has one).
 ///
 /// If there are any existing generics, they will always be at the end of the struct's and impl block's generic lists
 /// and must be accounted for in the impl block.
 ///
-/// Struct annotations also receive a `new` function to easily instantiate themselves with
-/// concrete drivers and access structs.
+/// If `component` is used on an empty struct, it also generate a `new` function to easily instantiate structs with
+/// concrete drivers and adapters.
 pub fn component(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,
