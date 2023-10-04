@@ -1,4 +1,4 @@
-use super::{crypto::Crypto, envex::EnvExOptions, migration::Migration};
+use super::{crypto::Crypto, envex::EnvExOptions};
 use clap::{Parser, Subcommand};
 use std::fmt::Display;
 
@@ -13,11 +13,6 @@ pub struct Xtc {
 pub enum Command {
     // .env.example
     Envex(EnvExOptions),
-
-    // postgres migrations
-    Migration(Migration),
-    Mig(Migration),
-    M(Migration),
 
     // crypto utils
     Crypto(Crypto),
@@ -34,12 +29,6 @@ impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Command::Envex(_) => write!(f, "Generating .env.example"),
-            Command::Migration(c) | Command::Mig(c) | Command::M(c) => match c.action {
-                super::migration::MigrationSubcommand::Gen(_) => write!(f, "Generating migration"),
-                super::migration::MigrationSubcommand::Run => write!(f, "Running migrations"),
-                super::migration::MigrationSubcommand::Rev => write!(f, "Reversing migration"),
-                super::migration::MigrationSubcommand::Redo(_) => write!(f, "Restarting migration"),
-            },
             Command::C(_) | Command::Crypto(_) => write!(f, "Cryptographying"),
             Command::Interactive | Command::I => write!(f, "Initiating interactive session"),
             Command::Init => write!(f, "Initialising 6tc template"),

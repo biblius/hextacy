@@ -3,7 +3,7 @@ pub mod proxy;
 pub mod render;
 
 use self::proxy::{CommandInfo, CommandProxy, OptionField, OptionsProxy, SubcommandProxy};
-use crate::commands::interactive::proxy::{CryptoProxy, MigrationProxy};
+use crate::commands::interactive::proxy::CryptoProxy;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -18,10 +18,7 @@ use tui::{
     Frame, Terminal,
 };
 
-use super::{
-    crypto::{PWOpts, SecretOpts},
-    migration::{GenMigration, RedoMigration},
-};
+use super::crypto::{PWOpts, SecretOpts};
 
 #[derive(Debug)]
 pub struct AlxApp {
@@ -56,7 +53,7 @@ pub enum Window {
 impl AlxApp {
     fn new() -> Self {
         use CommandProxy::*;
-        let commands = vec![Migration, Crypto, Envex];
+        let commands = vec![Crypto, Envex];
         let mut this = Self {
             commands: StatefulList::with_items(commands.clone()),
             subcommands: StatefulList::with_items(vec![]),
@@ -105,12 +102,6 @@ impl AlxApp {
         };
 
         match active {
-            OptionsProxy::GenMig(ref mut opts) => {
-                if let OptionField::Name = opt {
-                    opts.name.push(ch)
-                }
-            }
-            OptionsProxy::RedoMig(_) => {}
             OptionsProxy::CrySecret(opts) => match opt {
                 OptionField::Name => opts.name.push(ch),
                 OptionField::Length => {
@@ -167,12 +158,6 @@ impl AlxApp {
         };
 
         match active {
-            OptionsProxy::GenMig(ref mut opts) => {
-                if let OptionField::Name = opt {
-                    opts.name.pop();
-                }
-            }
-            OptionsProxy::RedoMig(_) => {}
             OptionsProxy::CrySecret(opts) => match opt {
                 OptionField::Name => {
                     opts.name.pop();
@@ -210,16 +195,6 @@ impl AlxApp {
             Window::Subcommand => {
                 let active = self.subcommands.items[self.subcommands.state.selected().unwrap()];
                 match active {
-                    SubcommandProxy::Migration(proxy) => match proxy {
-                        MigrationProxy::Gen => {
-                            self.active_opts = Some(OptionsProxy::GenMig(GenMigration::default()))
-                        }
-                        MigrationProxy::Run => todo!(),
-                        MigrationProxy::Rev => todo!(),
-                        MigrationProxy::Redo => {
-                            self.active_opts = Some(OptionsProxy::RedoMig(RedoMigration::default()))
-                        }
-                    },
                     SubcommandProxy::Crypto(proxy) => match proxy {
                         CryptoProxy::Secret => {
                             self.active_opts = Some(OptionsProxy::CrySecret(SecretOpts::default()))
@@ -260,15 +235,6 @@ impl AlxApp {
         use SubcommandProxy::*;
         self.subcommands.items = vec![];
         match command {
-            CommandProxy::Migration => {
-                use MigrationProxy::*;
-                self.subcommands.items = vec![
-                    Migration(Gen),
-                    Migration(Run),
-                    Migration(Rev),
-                    Migration(Redo),
-                ];
-            }
             CommandProxy::Crypto => {
                 use CryptoProxy::*;
                 self.subcommands.items = vec![Crypto(Secret), Crypto(Rsa), Crypto(Password)];
@@ -285,12 +251,6 @@ impl AlxApp {
         use OptionField::*;
         use SubcommandProxy::*;
         match command {
-            Migration(proxy) => match proxy {
-                MigrationProxy::Gen => self.options.items = vec![Name],
-                MigrationProxy::Redo => self.options.items = vec![All],
-                MigrationProxy::Run => todo!(),
-                MigrationProxy::Rev => todo!(),
-            },
             Crypto(proxy) => match proxy {
                 CryptoProxy::Secret => self.options.items = vec![Name, Length, Encoding],
                 CryptoProxy::Rsa => todo!(),
@@ -446,18 +406,6 @@ fn create_opt_list_item<'a>(app: &AlxApp, opt: &OptionField, width: u16) -> List
     ]);
 
     let value = match active {
-        OptionsProxy::GenMig(opts) => {
-            let OptionField::Name = opt else {
-                unreachable!()
-            };
-            opts.name.clone()
-        }
-        OptionsProxy::RedoMig(opts) => {
-            let OptionField::All = opt else {
-                unreachable!()
-            };
-            format!("{}", opts.all)
-        }
         OptionsProxy::CrySecret(opts) => match opt {
             OptionField::Name => opts.name.clone(),
             OptionField::Encoding => opts.encoding.clone().unwrap_or_default(),

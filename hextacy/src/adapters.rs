@@ -14,3 +14,5 @@ pub mod db;
 
 #[cfg(feature = "email")]
 pub mod email;
+
+pub mod queue;

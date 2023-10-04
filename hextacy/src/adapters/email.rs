@@ -65,7 +65,7 @@ impl SimpleTemplateMailer {
         }
     }
 
-    pub fn load_templates<P: AsRef<Path>>(&mut self, dir: P) -> Result<(), TemplateMailerError> {
+    pub fn load_templates(&mut self, dir: impl AsRef<Path>) -> Result<(), TemplateMailerError> {
         let dir = fs::read_dir(dir)?;
 
         for entry in dir.filter_map(Result::ok) {
@@ -266,6 +266,7 @@ fn find_template_placeholders(
 }
 
 #[derive(Debug, Error)]
+/// Everything that can go wrong when using the simple template mailer.
 pub enum TemplateMailerError {
     #[error("Sender or recipient: {0}")]
     Address(#[from] lettre::address::AddressError),

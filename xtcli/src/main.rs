@@ -3,9 +3,6 @@ mod error;
 
 use crate::commands::crypto::{generate_rsa_key_pair, write_pw, write_secret};
 use crate::commands::interactive::init_interactive;
-use crate::commands::migration::{
-    migration_generate, migration_redo, migration_rev, migration_run,
-};
 use crate::commands::xtc::{Command, Xtc};
 use clap::Parser;
 use reqwest::header;
@@ -23,12 +20,6 @@ pub fn main() -> Result<(), std::io::Error> {
         Command::Envex(args) => {
             commands::envex::envex(args.path);
         }
-        Command::Migration(sc) | Command::Mig(sc) | Command::M(sc) => match sc.action {
-            commands::migration::MigrationSubcommand::Gen(opts) => migration_generate(opts),
-            commands::migration::MigrationSubcommand::Run => migration_run(),
-            commands::migration::MigrationSubcommand::Rev => migration_rev(),
-            commands::migration::MigrationSubcommand::Redo(opts) => migration_redo(opts),
-        },
         Command::Crypto(sc) | Command::C(sc) => match sc.action {
             commands::crypto::CryptoSubcommand::PW(opts) => write_pw(opts),
             commands::crypto::CryptoSubcommand::Rsa => {
@@ -64,11 +55,21 @@ pub fn main() -> Result<(), std::io::Error> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct InitArgs {
+    /// The name of the project that will be created
+    name: String,
+
+    /// The path to the directory where the project will be initialised
+    path: String,
+}
+
 /// Solely used by the init command to find the src directory of the extracted repo tarball
 fn find_src(path: &PathBuf) -> Option<PathBuf> {
     let dir = fs::read_dir(path).ok()?;
     let dir = dir.collect::<Vec<_>>();
 
+    // Checks for the initial dir with everything inside
     if dir
         .iter()
         .filter(|e| e.as_ref().is_ok_and(|e| e.path().is_dir()))
@@ -86,7 +87,7 @@ fn find_src(path: &PathBuf) -> Option<PathBuf> {
         }
     }
 
-    return None;
+    None
 }
 
 fn move_dir_all(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {

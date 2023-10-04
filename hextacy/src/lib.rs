@@ -19,6 +19,8 @@ pub use driver::{Atomic, Driver, DriverError};
 ))]
 pub mod adapters;
 
+pub mod queue;
+
 #[cfg(feature = "crypto")]
 /// Cryptographic utilities
 pub mod crypto;

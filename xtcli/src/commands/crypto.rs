@@ -91,7 +91,7 @@ pub fn write_secret(opts: SecretOpts) {
         encoding,
     } = opts;
 
-    let mut env_file = fs::read_to_string(format!("{}/.env", &path_to_env))
+    let mut env_file = fs::read_to_string(format!("{path_to_env}/.env"))
         .unwrap_or_else(|_| panic!("Could not find .env file at '{path_to_env}'"));
 
     let name = if name.trim().is_empty() {
@@ -116,7 +116,7 @@ pub fn write_secret(opts: SecretOpts) {
         length,
     );
 
-    write!(env_file, "{name} = \"{secret}\"\n").unwrap();
+    writeln!(env_file, "{name} = \"{secret}\"").unwrap();
 
     fs::write(format!("{path_to_env}/.env"), env_file).unwrap();
 }

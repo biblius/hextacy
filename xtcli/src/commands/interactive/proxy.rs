@@ -1,28 +1,15 @@
-use crate::commands::{
-    crypto::{PWOpts, SecretOpts},
-    migration::{GenMigration, RedoMigration},
-};
+use crate::commands::crypto::{PWOpts, SecretOpts};
 use std::fmt::Debug;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum CommandProxy {
     Envex,
-    Migration,
     Crypto,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum SubcommandProxy {
-    Migration(MigrationProxy),
     Crypto(CryptoProxy),
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum MigrationProxy {
-    Gen,
-    Run,
-    Rev,
-    Redo,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -34,8 +21,6 @@ pub enum CryptoProxy {
 
 #[derive(Debug, Clone)]
 pub enum OptionsProxy {
-    GenMig(GenMigration),
-    RedoMig(RedoMigration),
     CrySecret(SecretOpts),
     CryPW(PWOpts),
 }
@@ -76,7 +61,6 @@ impl CommandInfo for CommandProxy {
         use CommandProxy as Cmd;
         match self {
             Cmd::Envex => "Envex",
-            Cmd::Migration => "Migration",
             Cmd::Crypto => "Crypto",
         }
     }
@@ -85,7 +69,6 @@ impl CommandInfo for CommandProxy {
         use CommandProxy as Cmd;
         match self {
             Cmd::Envex => "Create a `.env.example` file from the `.env` file in the root",
-            Cmd::Migration => "Run, revert or create postgres migrations",
             Cmd::Crypto => "Create secrets to be used by the server",
         }
     }
@@ -94,7 +77,6 @@ impl CommandInfo for CommandProxy {
         use CommandProxy as Cmd;
         match self {
             Cmd::Envex => "xtc envex".to_string(),
-            Cmd::Migration => "xtc m".to_string(),
             Cmd::Crypto => "xtc c".to_string(),
         }
     }
@@ -103,12 +85,6 @@ impl CommandInfo for CommandProxy {
 impl CommandInfo for SubcommandProxy {
     fn title(&self) -> &'static str {
         match self {
-            SubcommandProxy::Migration(sub) => match sub {
-                MigrationProxy::Gen => "Generate",
-                MigrationProxy::Run => "Run",
-                MigrationProxy::Rev => "Revert",
-                MigrationProxy::Redo => "Redo",
-            },
             SubcommandProxy::Crypto(sub) => match sub {
                 CryptoProxy::Secret => "Secret",
                 CryptoProxy::Rsa => "RSA Keypair",
@@ -119,12 +95,6 @@ impl CommandInfo for SubcommandProxy {
 
     fn command_repr(&self) -> String {
         match self {
-            SubcommandProxy::Migration(sub) => match sub {
-                MigrationProxy::Gen => "gen".to_string(),
-                MigrationProxy::Run => "run".to_string(),
-                MigrationProxy::Rev => "rev".to_string(),
-                MigrationProxy::Redo => "redo".to_string(),
-            },
             SubcommandProxy::Crypto(sub) => match sub {
                 CryptoProxy::Secret => "secret".to_string(),
                 CryptoProxy::Rsa => "rsa".to_string(),
@@ -137,8 +107,6 @@ impl CommandInfo for SubcommandProxy {
 impl CommandInfo for OptionsProxy {
     fn title(&self) -> &'static str {
         match self {
-            OptionsProxy::GenMig(_) => "Generate",
-            OptionsProxy::RedoMig(_) => "Redo",
             OptionsProxy::CrySecret(_) => "Secret",
             OptionsProxy::CryPW(_) => "Password",
         }
@@ -146,16 +114,6 @@ impl CommandInfo for OptionsProxy {
 
     fn command_repr(&self) -> String {
         match self {
-            OptionsProxy::GenMig(opts) => {
-                format!("{}", opts.name)
-            }
-            OptionsProxy::RedoMig(opts) => {
-                if opts.all {
-                    "-a".to_string()
-                } else {
-                    String::new()
-                }
-            }
             OptionsProxy::CrySecret(opts) => {
                 let enc = opts
                     .encoding

@@ -1,5 +1,5 @@
 use super::CryptoError;
-use jsonwebtoken::*;
+use jsonwebtoken::{encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -61,6 +61,7 @@ pub fn parse<T: Serialize + DeserializeOwned>(
 
 #[cfg(test)]
 mod tests {
+    use jsonwebtoken::decode;
     use rand::{rngs::StdRng, SeedableRng};
     use rsa::{
         pkcs1::EncodeRsaPrivateKey,
