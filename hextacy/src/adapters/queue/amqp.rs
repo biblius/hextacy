@@ -1,14 +1,14 @@
 use async_trait::async_trait;
 use futures_util::StreamExt;
 use lapin::{
-    options::{BasicConsumeOptions, QueueDeclareOptions},
+    options::{BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions},
     types::FieldTable,
-    Connection, ConnectionProperties,
+    BasicProperties, Connection, ConnectionProperties,
 };
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, sync::Arc};
 
-use crate::queue::{Consumer, QueueError};
+use crate::queue::{Consumer, Producer, QueueError};
 
 #[derive(Clone)]
 pub struct AmqpDriver {
@@ -35,12 +35,20 @@ impl AmqpDriver {
 
     #[inline]
     /// Calls [create_channel][lapin::Channel] on the connection and sets up a producer for the queue.
-    pub async fn publisher_default(&self, queue: &str) -> Result<lapin::Channel, lapin::Error> {
+    pub async fn publisher_default(
+        &self,
+        queue: &str,
+        exchange: Option<&str>,
+    ) -> Result<AmqpPublisher, lapin::Error> {
         let channel = self.conn.create_channel().await?;
         channel
             .queue_declare(queue, QueueDeclareOptions::default(), FieldTable::default())
             .await?;
-        Ok(channel)
+        Ok(AmqpPublisher {
+            queue: queue.to_string(),
+            exchange: exchange.map(ToOwned::to_owned),
+            channel,
+        })
     }
 
     #[inline]
@@ -60,6 +68,34 @@ impl AmqpDriver {
             )
             .await?;
         Ok(consumer)
+    }
+}
+
+#[derive(Debug)]
+pub struct AmqpPublisher {
+    queue: String,
+    exchange: Option<String>,
+    channel: lapin::Channel,
+}
+
+#[async_trait]
+impl Producer for AmqpPublisher {
+    type Error = QueueError<lapin::Error>;
+    async fn publish<M>(&mut self, message: M) -> Result<(), Self::Error>
+    where
+        M: Serialize + Send + Sync + 'static,
+    {
+        self.channel
+            .basic_publish(
+                self.exchange.as_deref().unwrap_or_default(),
+                &self.queue,
+                BasicPublishOptions::default(),
+                serde_json::to_string(&message)?.as_bytes(),
+                BasicProperties::default(),
+            )
+            .await
+            .map(|_| ())
+            .map_err(QueueError::Driver)
     }
 }
 

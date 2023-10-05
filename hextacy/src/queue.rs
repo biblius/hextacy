@@ -1,10 +1,11 @@
 //! Provides the basic interfaces for interacting with message brokers. Current concrete implementations only support JSON out of the box.
-//! See [the adapters module][crate::adapters::queue] for examples on how to implement the [Consumer] trait.
+//! See [the adapters module][crate::adapters::queue] for examples on how to implement the [Producer] and [Consumer] traits.
 //!
-//! The traits are designed to work on enums, meaning you want to implement the [QueueHandler] and
-//! [Producer] traits with the `M` as an enum.
+//! The traits are designed to work on enums, meaning you want to implement the [QueueHandler]
+//! with the `M` as an enum.
 
 use async_trait::async_trait;
+use serde::Serialize;
 use std::{fmt::Display, marker::PhantomData};
 use thiserror::Error;
 use tokio::sync::oneshot::{self, Receiver, Sender};
@@ -22,9 +23,11 @@ where
 
 /// Implement on structs that need to publish messages.
 #[async_trait]
-pub trait Producer<M> {
+pub trait Producer {
     type Error: Display;
-    async fn publish(&self, message: M) -> Result<(), Self::Error>;
+    async fn publish<M>(&mut self, message: M) -> Result<(), Self::Error>
+    where
+        M: Serialize + Send + Sync + 'static;
 }
 
 /// Implemented on concrete queue consumers. Check out the `adapters` module for

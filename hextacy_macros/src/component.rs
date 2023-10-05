@@ -120,12 +120,12 @@ fn impl_struct(component: ComponentStruct, item_struct: ItemStruct) -> proc_macr
         <#( #generics ),*, #existing_generics>
         #where_clause
         {
-                pub fn new(#args_new #existing_args ) -> Self {
-                    Self {
-                        #existing_struct_fields
-                        #(#struct_fields_new),*
-                    }
+            pub fn new(#args_new #existing_args ) -> Self {
+                Self {
+                    #existing_struct_fields
+                    #(#struct_fields_new),*
                 }
+            }
         }
     );
 

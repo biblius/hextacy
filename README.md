@@ -5,8 +5,9 @@ A repository designed to bootstrap backend development. Hextacy is a work in pro
 - [x] Database drivers (SQL(diesel, seaorm), Mongo)
 - [x] Cache drivers (Redis, TODO: Memcachd)
 - [x] Notifications (Email via SMTP)
-- [x] Message Queue (Amqp, TODO: Redis)
+- [x] Message Queue (Amqp, Redis)
 - [ ] Scheduled jobs (crons with tokio-cron)
+- [ ] CLI tool for creating app infrastructure (in progress)
 
 Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
 
