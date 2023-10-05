@@ -14,8 +14,6 @@ use thiserror::Error;
 /// connections for those repositories.
 ///
 /// Check out the [adapters module][crate::adapters] to see concrete implementations.
-///
-/// The MVP of 6TC.
 pub trait Driver {
     type Connection;
     async fn connect(&self) -> Result<Self::Connection, DriverError>;
@@ -41,6 +39,30 @@ pub trait Atomic: Sized {
     async fn abort_transaction(tx: Self::TransactionResult) -> Result<(), DriverError>;
 }
 
+/// Utility for grouping actions together in a transaction.
+///
+/// Takes in a closure and exposes a connection to it with a started transaction.
+/// The closure must return a result. The wraps the closure and matches the result returned from it.
+/// Before executing the closure, a transaction will be started on the connection.
+/// The result of the closure will be matched and the transaction will then either be
+/// committed if the closure returns `Ok` or aborted if it returns an `Err`.
+///
+/// ### Example
+///
+/// Assume a component which has a generic driver `D` that is able to create a connection.
+/// The driver's connection must be bound with [Atomic] in order to use it with this macro.
+///
+/// ```
+/// let conn = self.driver.connect().await?;
+/// transaction!(
+///     conn: D => {
+///         self.some_repo_create(&mut conn, /* ... */).await?;
+///         self.other_repo_create(&mut conn, /* ... */).await?;
+///     }
+/// )
+/// ```
+///
+/// If any of the above create actions fail, none of them will leave any side effects.
 #[macro_export]
 macro_rules! transaction {
     ($conn:ident : $id:ident $(::Connection)? => $b:block) => {{

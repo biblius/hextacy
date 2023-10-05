@@ -31,9 +31,10 @@ use crate::queue::{Consumer, Producer, QueueError};
 /// }
 ///
 /// let redis_q = RedisMessageQueue::new(/* ... */);
+///
 /// let mut publisher = redis_q.publisher("my-queue").await.unwrap();
 /// let consumer = redis_q.consumer("my-queue").await.unwrap();
-/// consumer.start(MyMessage);
+/// consumer.start(MyMessageHandler {});
 ///
 /// publisher.publish(MyMessage::SomeVariant);
 /// ```

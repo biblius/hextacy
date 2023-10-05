@@ -75,7 +75,7 @@ futures-util = "0.3.28"
 
 
 [features]
-default = ["cache-inmem", "crypto", "db-postgres-seaorm", "email", "web"]
+default = ["cache-redis", "crypto", "db-postgres-seaorm", "email", "web"]
 
 cache-inmem = []
 cache-redis = ["dep:deadpool-redis"]

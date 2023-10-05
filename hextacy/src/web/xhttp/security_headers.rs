@@ -1,7 +1,7 @@
 use http::header::*;
 
 //TODO : Create with params
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy>
 pub fn default_content_security_policy() -> (HeaderName, HeaderValue) {
     (
         CONTENT_SECURITY_POLICY,
@@ -23,7 +23,7 @@ pub fn default_content_security_policy() -> (HeaderName, HeaderValue) {
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Embedder-Policy>
 ///
 /// Accepts: `"require-corp" | "unsafe-none"`
 pub fn cross_origin_embedder_policy(policy: &'static str) -> (HeaderName, HeaderValue) {
@@ -36,7 +36,7 @@ pub fn cross_origin_embedder_policy(policy: &'static str) -> (HeaderName, Header
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Opener-Policy>
 ///
 /// Accepts: `"same-origin" | "same-origin-allow-popups" | "unsafe-none"`
 pub fn cross_origin_opener_policy(policy: &'static str) -> (HeaderName, HeaderValue) {
@@ -49,7 +49,7 @@ pub fn cross_origin_opener_policy(policy: &'static str) -> (HeaderName, HeaderVa
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Resource-Policy
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cross-Origin-Resource-Policy>
 ///
 /// Accepts: `"same-site" | "same-origin" | "cross-origin"`
 pub fn cross_origin_resource_policy(policy: &'static str) -> (HeaderName, HeaderValue) {
@@ -65,7 +65,7 @@ pub fn cross_origin_resource_policy(policy: &'static str) -> (HeaderName, Header
 /// If given a slice with 1 element the header will be set to the given element if it is valid.
 /// When specifying more than 1 policy the desired policy should be given last, where every preceding
 /// value is a fallback to the next if a browser doesn't support it.
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Referrer-Policy>
 ///
 /// Accepts: `&["no-referrer",
 /// "no-referrer-when-downgrage",
@@ -97,7 +97,7 @@ pub fn referrer_policy(policies: &[&'static str]) -> (HeaderName, HeaderValue) {
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security#preloading_strict_transport_security
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security#preloading_strict_transport_security>
 ///
 /// Accepts: `max_age` in seconds, `Some("includeSubDomains" | "preload")` as an extra option or `None`
 pub fn strict_transport_security(
@@ -119,12 +119,12 @@ pub fn strict_transport_security(
 }
 
 /// Sets the `x-content-type-options` header to `nosniff`
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Content-Type-Options>
 pub fn no_sniff() -> (HeaderName, HeaderValue) {
     (X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"))
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-DNS-Prefetch-Control>
 ///
 /// Accepts: `true => "on"`, `false => "off"`
 pub fn dns_prefetch_control(on: bool) -> (HeaderName, HeaderValue) {
@@ -142,7 +142,7 @@ pub fn ie_no_open() -> (HeaderName, HeaderValue) {
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-Frame-Options>
 ///
 /// Accepts: `true => "sameorigin"`, `false => "deny"`
 pub fn frame_options(sameorigin: bool) -> (HeaderName, HeaderValue) {
@@ -152,7 +152,7 @@ pub fn frame_options(sameorigin: bool) -> (HeaderName, HeaderValue) {
     )
 }
 
-/// See https://owasp.org/www-project-secure-headers/#x-permitted-cross-domain-policies
+/// See <https://owasp.org/www-project-secure-headers/#x-permitted-cross-domain-policies>
 ///
 /// Accepts: `"none" | "master-only" | "by-content-type" | "all"`
 pub fn cross_domain_policies(policy: &'static str) -> (HeaderName, HeaderValue) {
@@ -165,7 +165,7 @@ pub fn cross_domain_policies(policy: &'static str) -> (HeaderName, HeaderValue) 
     )
 }
 
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection
+/// See <https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/X-XSS-Protection>
 ///
 /// Accepts: `true => "1; mode=block"`, `false => "0"`
 pub fn xss_filter(on: bool) -> (HeaderName, HeaderValue) {
