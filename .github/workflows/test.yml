@@ -53,6 +53,7 @@ jobs:
 
       - name: install mysqlclient
         run: brew install mysql-client
+      - run: export LDFLAGS="-L/usr/local/opt/mysql-client/lib"
 
       - name: cargo test
         run: cargo test --workspace --locked --all-features --all-targets
