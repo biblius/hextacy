@@ -33,31 +33,6 @@ jobs:
       - name: cargo test --locked
         run: cargo test --workspace --locked --all-features --all-targets
 
-  os-check:
-    runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }} / stable
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - name: Install stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: cargo generate-lockfile
-        if: hashFiles('Cargo.lock') == ''
-        run: cargo generate-lockfile
-
-      - name: install mysqlclient
-        run: brew install mysql-client
-      - run: export LDFLAGS="-L/usr/local/opt/mysql-client/lib"
-
-      - name: cargo test
-        run: cargo test --workspace --locked --all-features --all-targets
-
   coverage:
     runs-on: ubuntu-latest
     name: ubuntu / stable / coverage
