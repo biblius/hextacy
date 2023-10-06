@@ -1,3 +1,0 @@
-# **⬡ Hextacy ⬡**
-
-TODO: Pages
