@@ -2,10 +2,10 @@ permissions:
   contents: read
 on:
   push:
-    branches: 
-      - "master"
-      - "feature/**"
-      - "bugfix/**"
+    branches:
+      - 'master'
+      - 'feature/**'
+      - 'bugfix/**'
   pull_request:
 name: test
 jobs:
@@ -50,6 +50,9 @@ jobs:
       - name: cargo generate-lockfile
         if: hashFiles('Cargo.lock') == ''
         run: cargo generate-lockfile
+
+      - name: install mysqlclient
+        run: brew install mysql-client
 
       - name: cargo test
         run: cargo test --workspace --locked --all-features --all-targets
