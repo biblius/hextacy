@@ -17,10 +17,7 @@ use crate::{
 };
 use hextacy::web::xhttp::response::RestResponse;
 use hextacy::{contract, crypto::uuid, web::http::Response as HttpResponse};
-use reqwest::{
-    header::{HeaderName, HeaderValue},
-    StatusCode,
-};
+use reqwest::StatusCode;
 use tracing::info;
 
 pub struct OAuthService<R, C>
@@ -168,10 +165,7 @@ where
         Ok(AuthenticationSuccessResponse::new(user)
             .into_response(StatusCode::OK)
             .with_cookies(&[session_cookie])?
-            .with_headers(&[(
-                HeaderName::from_static("x-csrf-token"),
-                HeaderValue::from_str(&csrf_token)?,
-            )])
+            .with_headers([("x-csrf-token", csrf_token)])
             .json()?)
     }
 }

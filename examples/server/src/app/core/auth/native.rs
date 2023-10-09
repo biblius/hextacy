@@ -22,10 +22,7 @@ use crate::{
 };
 use data_encoding::{BASE32, BASE64URL};
 use hextacy::web::http::Response;
-use hextacy::web::http::{
-    header::{self, HeaderName, HeaderValue},
-    StatusCode,
-};
+use hextacy::web::http::{header, StatusCode};
 use hextacy::{
     contract,
     crypto::{
@@ -536,10 +533,7 @@ where
         Ok(AuthenticationSuccessResponse::new(user)
             .into_response(StatusCode::OK)
             .with_cookies(&[session_cookie])?
-            .with_headers(&[(
-                HeaderName::from_static("x-csrf-token"),
-                HeaderValue::from_str(&csrf_token)?,
-            )])
+            .with_headers([("x-csrf-token", csrf_token)])
             .json()?)
     }
 }

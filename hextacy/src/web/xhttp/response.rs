@@ -38,7 +38,13 @@ impl<T> ResponseBuilder<T> {
         Ok(self)
     }
 
-    pub fn with_headers(mut self, headers: &[(HeaderName, HeaderValue)]) -> ResponseBuilder<T> {
+    pub fn with_headers<K, V, const N: usize>(mut self, headers: [(K, V); N]) -> ResponseBuilder<T>
+    where
+        HeaderName: TryFrom<K>,
+        <HeaderName as TryFrom<K>>::Error: Into<http::Error>,
+        HeaderValue: TryFrom<V>,
+        <HeaderValue as TryFrom<V>>::Error: Into<http::Error>,
+    {
         for (key, value) in headers {
             self.builder = self.builder.header(key, value);
         }

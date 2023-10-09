@@ -35,7 +35,7 @@ pub fn main() -> Result<(), std::io::Error> {
             dir.push("temp");
 
             let res = reqwest::blocking::Client::new()
-                .get("https://api.github.com/repos/biblius/hxtc_template/tarball/")
+                .get("https://api.github.com/repos/biblius/hextacy/contents/examples/template")
                 .header(header::ACCEPT, "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header(header::USER_AGENT, "hextacy")

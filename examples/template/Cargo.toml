@@ -1,0 +1,28 @@
+[package]
+edition = "2021"
+name = "hxtc_template"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.68"
+axum = "0.6.20"
+axum-extra = { version = "0.8.0", features = ["cookie"] }
+chrono = "0.4.24"
+futures-util = "0.3.28"
+hextacy = { path = "../../hextacy", features = [
+    "cache-redis",
+    "db-postgres-seaorm",
+] }
+lapin = "2.3.1"
+lazy_static = "1.4.0"
+mockall = "0.11.4"
+rand = "0.8.5"
+sea-orm = { version = "0.12.3", features = ["runtime-tokio", "sqlx-postgres"] }
+serde = { version = "1.0.162", features = ["derive"] }
+serde_json = "1.0.105"
+thiserror = "1.0.40"
+tokio = { version = "1.32.0", features = ["rt-multi-thread", "macros"] }
+tracing = "0.1.37"
+validify = "1.0.12"

@@ -9,8 +9,6 @@ A repository designed to bootstrap backend development. Hextacy is a work in pro
 - [ ] Scheduled jobs (crons with tokio-cron)
 - [ ] CLI tool for creating app infrastructure (in progress)
 
-Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)>) also known as the _ports and adapters_ architecture. You can read great articles about it [here](https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749) and [here](https://blog.phuaxueyong.com/post/2020-05-25-what-architecture-is-netflix-using/).
-
 ## **Feature flags**
 
 ```bash
@@ -31,26 +29,6 @@ Hextacy is based on [hexagonal architecture](<https://en.wikipedia.org/wiki/Hexa
   - cache-redis
   - cache-inmem
 ```
-
-## **Architecture**
-
-In order to understand why hextacy is built the way it is, we first need to understand how its pieces tie together to provide a flexible architecture.
-
-Backend servers usually, if not always, consists of data stores. _Repositories_ provide methods through which an application's _Adapters_ can interact with to get access to database _Models_.
-
-In this architecture, a repository contains no implementation details. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model. For this reason, repository methods must always take in a completely generic connection parameter which is made concrete in adapter implementations.
-
-When business level services need access to the database, they can obtain it by having a service component struct which is bound to whichever repository traits it needs (to have a better clue what this means, take a look at the server example, or the user example below). For example, an authentication service may need access to a user and session repository.
-
-In the service's definition, its components must be constrained by any repository traits the service requires. This will require that the service components also takes in generic connection parameters. Since the service should be oblivious to the repository implementation, this means that the driver this service component uses to establish database connections must also be generic, since the service cannot know in advance which adapter it will be using.
-
-The generic connection could be mitigated by moving the driver from the business level to the adapter level, but unfortunately we would then lose the ability perfom database transactions (without a nightmare API). The business level must retain its ability to perform atomic queries.
-
-So far, we have 2 generic parameters, the driver and the connection, and we have repositories, interfaces our service repositories can utilise to obtain data, so good!
-
-Because we are now working with completely generic types, we have a completely decoupled architecture (yay), but unfortunately for us, we now have to endure rust's esoteric trait bounds on every service component we create (boo). Fortunately for us, we can utilise rust's most excellent feature - macros!
-
-First, let's go step by step to understand why we'll need these macros by examining an example of a simple user endpoint. Check out the [server example](./examples/server/src/) in the examples repo to see how everything is ultimately set up.
 
 ## **The server** TODO: This is outdated needs fix pls
 
