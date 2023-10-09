@@ -35,7 +35,7 @@ pub fn main() -> Result<(), std::io::Error> {
             dir.push("temp");
 
             let res = reqwest::blocking::Client::new()
-                .get("https://api.github.com/repos/biblius/hextacy/contents/examples/template")
+                .get("https://api.github.com/repos/biblius/hextacy/tarball")
                 .header(header::ACCEPT, "application/vnd.github+json")
                 .header("X-GitHub-Api-Version", "2022-11-28")
                 .header(header::USER_AGENT, "hextacy")
@@ -64,7 +64,7 @@ struct InitArgs {
     path: String,
 }
 
-/// Solely used by the init command to find the src directory of the extracted repo tarball
+/// Used by the init command to find the src directory of the extracted repo tarball
 fn find_src(path: &PathBuf) -> Option<PathBuf> {
     let dir = fs::read_dir(path).ok()?;
     let dir = dir.collect::<Vec<_>>();
@@ -82,6 +82,13 @@ fn find_src(path: &PathBuf) -> Option<PathBuf> {
 
     for entry in dir {
         let entry = entry.ok()?;
+
+        if entry.file_name() == "examples" {
+            let mut path = entry.path();
+            path.push("template");
+            return find_src(&path);
+        }
+
         if entry.file_name() == "src" {
             return Some(entry.path());
         }
