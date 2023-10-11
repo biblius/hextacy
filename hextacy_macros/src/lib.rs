@@ -228,9 +228,6 @@ pub fn derive_response(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 ///
 /// If there are any existing generics, they will always be at the end of the struct's and impl block's generic lists
 /// and must be accounted for in the impl block.
-///
-/// If `component` is used on an empty struct, it also generate a `new` function to easily instantiate structs with
-/// concrete drivers and adapters.
 pub fn component(
     attr: proc_macro::TokenStream,
     input: proc_macro::TokenStream,

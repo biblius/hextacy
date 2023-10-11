@@ -19,7 +19,7 @@ async fn main() -> std::io::Result<()> {
 
     env::load_from_file("examples/template/.env").unwrap();
 
-    let state = AppState::init().await;
+    let state = AppState::load().await.unwrap();
 
-    config::http::start_server(state).await
+    config::start_server(state).await
 }

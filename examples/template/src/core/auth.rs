@@ -7,15 +7,21 @@ use crate::{
     error::Error,
     AppResult,
 };
-use hextacy::{component, contract, exports::uuid::Uuid, transaction};
+use hextacy::{component, exports::uuid::Uuid, queue::Producer, transaction};
 use serde::Serialize;
 use thiserror::Error;
+
+#[derive(Debug, Serialize)]
+pub struct UserRegisteredEvent {
+    id: Uuid,
+    username: String,
+}
 
 #[component(
     use Repo as repo,
     use Cache as cache,
 
-    use UserRepo, SessionRepo, CacheAccess
+    use UserRepo, SessionRepo, CacheAccess, Publisher
 )]
 #[derive(Debug, Clone)]
 pub struct Authentication {}
@@ -28,9 +34,11 @@ pub struct Authentication {}
     use Cache for
         CA: BasicCacheAccess
 )]
-#[contract]
-impl Authentication {
-    async fn register(&self, username: &str, password: &str) -> AppResult<Session> {
+impl<P> Authentication<P>
+where
+    P: Producer,
+{
+    pub async fn register(&self, username: &str, password: &str) -> AppResult<Session> {
         let mut conn = self.repo.connect().await?;
 
         match self.user_repo.get_by_username(&mut conn, username).await {
@@ -45,6 +53,12 @@ impl Authentication {
             conn: Repo => {
                 let user = self.user_repo.create(&mut conn, username, &hashed).await?;
                 let session = self.session_repo.create(&mut conn, &user, true).await?;
+                self.publisher
+                    .publish(UserRegisteredEvent {
+                      id: user.id,
+                      username: user.username,
+                })
+                .await?;
                 Ok(session)
             }
         )?;
@@ -52,7 +66,12 @@ impl Authentication {
         Ok(session)
     }
 
-    async fn login(&self, username: &str, password: &str, remember: bool) -> AppResult<Session> {
+    pub async fn login(
+        &self,
+        username: &str,
+        password: &str,
+        remember: bool,
+    ) -> AppResult<Session> {
         let mut conn = self.repo.connect().await?;
 
         let user = match self.user_repo.get_by_username(&mut conn, username).await {
@@ -74,7 +93,7 @@ impl Authentication {
         Ok(session)
     }
 
-    async fn logout(&self, session_id: Uuid, purge: bool) -> AppResult<u64> {
+    pub async fn logout(&self, session_id: Uuid, purge: bool) -> AppResult<u64> {
         let mut conn = self.repo.connect().await?;
         let session = self.session_repo.expire(&mut conn, session_id).await?;
         if purge {

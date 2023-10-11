@@ -6,8 +6,8 @@
 
 use async_trait::async_trait;
 use serde::Serialize;
+use std::error::Error;
 use std::{fmt::Display, marker::PhantomData};
-use thiserror::Error;
 use tokio::sync::oneshot::{self, Receiver, Sender};
 use tracing::{debug, error, warn};
 
@@ -24,8 +24,7 @@ where
 /// Implement on structs that need to publish messages.
 #[async_trait]
 pub trait Producer {
-    type Error: Display;
-    async fn publish<M>(&mut self, message: M) -> Result<(), Self::Error>
+    async fn publish<M>(&self, message: M) -> Result<(), QueueError>
     where
         M: Serialize + Send + Sync + 'static;
 }
@@ -37,14 +36,12 @@ pub trait Consumer<M>: Sized + Send + 'static
 where
     M: Send + 'static,
 {
-    type Error: Display + Send;
-
     /// Poll this consumer's queue for an available message. This function should
     /// also be responsible for deserializing it, if necessary.
     ///
     /// When this method returns `Ok(None)` it means the consumer stream is closed
     /// and the whole consumer runtime is dropped.
-    async fn poll_queue(&mut self) -> Result<Option<M>, Self::Error>;
+    async fn poll_queue(&mut self) -> Result<Option<M>, QueueError>;
 
     /// Starts this consumer's loop in the tokio runtime and returns a handle for sending a stop signal for graceful shutdown.
     fn start(self, handler: impl QueueHandler<M> + Send + 'static) -> Sender<()> {
@@ -78,9 +75,8 @@ where
     H: QueueHandler<M>,
     C: Consumer<M> + Send,
     M: Send + 'static,
-    C::Error: Send,
 {
-    async fn run(mut self) -> Result<(), C::Error> {
+    async fn run(mut self) -> Result<(), QueueError> {
         let mut logged = false;
         loop {
             let message: M = match self.consumer.poll_queue().await {
@@ -115,10 +111,23 @@ where
     }
 }
 
-#[derive(Debug, Error)]
-pub enum QueueError<E: Display> {
-    #[error("serde: {0}")]
-    Serde(#[from] serde_json::Error),
-    #[error("driver: {0}")]
-    Driver(E),
+#[derive(Debug)]
+pub enum QueueError {
+    Serde(serde_json::Error),
+    Driver(Box<dyn Error + Send>),
+}
+
+impl Display for QueueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            QueueError::Serde(e) => write!(f, "{e}"),
+            QueueError::Driver(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl From<serde_json::Error> for QueueError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Serde(value)
+    }
 }

@@ -1,0 +1,354 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Infrastructure - Hextacy</title>
+
+
+        <!-- Custom HTML head -->
+        
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+
+    </head>
+    <body class="sidebar-visible no-js">
+    <div id="body-container">
+        <!-- Provide site root to javascript -->
+        <script>
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('light')
+            html.classList.add(theme);
+            var body = document.querySelector('body');
+            body.classList.remove('no-js')
+            body.classList.add('js');
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            var body = document.querySelector('body');
+            var sidebar = null;
+            var sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+            }
+            sidebar_toggle.checked = sidebar === 'visible';
+            body.classList.remove('sidebar-visible');
+            body.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../Quickstart.html"><strong aria-hidden="true">1.</strong> Quickstart</a></li><li class="chapter-item expanded "><a href="../Design/index.html"><strong aria-hidden="true">2.</strong> Design</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../Design/core.html"><strong aria-hidden="true">2.1.</strong> Core</a></li><li class="chapter-item expanded "><a href="../Design/core-6tc.html"><strong aria-hidden="true">2.2.</strong> Core ⬡</a></li><li class="chapter-item expanded "><a href="../Design/infrastructure.html" class="active"><strong aria-hidden="true">2.3.</strong> Infrastructure</a></li><li class="chapter-item expanded "><a href="../Design/state.html"><strong aria-hidden="true">2.4.</strong> State</a></li><li class="chapter-item expanded "><a href="../Design/testing.html"><strong aria-hidden="true">2.5.</strong> Testing</a></li></ol></li><li class="chapter-item expanded "><a href="../Driver.html"><strong aria-hidden="true">3.</strong> Driver</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <!-- Track and set sidebar scroll position -->
+        <script>
+            var sidebarScrollbox = document.querySelector('#sidebar .sidebar-scrollbox');
+            sidebarScrollbox.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') {
+                    sessionStorage.setItem('sidebar-scroll', sidebarScrollbox.scrollTop);
+                }
+            }, { passive: true });
+            var sidebarScrollTop = sessionStorage.getItem('sidebar-scroll');
+            sessionStorage.removeItem('sidebar-scroll');
+            if (sidebarScrollTop) {
+                // preserve sidebar scroll position when navigating via links within sidebar
+                sidebarScrollbox.scrollTop = sidebarScrollTop;
+            } else {
+                // scroll sidebar to current active section when navigating via "next/previous chapter" buttons
+                var activeSection = document.querySelector('#sidebar .active');
+                if (activeSection) {
+                    activeSection.scrollIntoView({ block: 'center' });
+                }
+            }
+        </script>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Hextacy</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="infrastructure"><a class="header" href="#infrastructure">Infrastructure</a></h1>
+<p>So far we have only been dealing with behaviour, now it's time to implement that behaviour on concrete units. There are 2 main pieces of infrastructure our application is missing; The interaction and the plumbing.</p>
+<p>Since we all know what an HTTP controller is, we'll be creating one with <code>axum</code> for the interaction. We choose HTTP because most people are familiar with it and it's the simplest to set up, though we could've chosen anything because nothing in the service specifies how it should be interacted with. Honourable mentions include a desktop or CLI app.</p>
+<p>For the plumbing, i.e. database and queue implementations, we'll be using postgres and redis with pubsub. We'll use them because, again, they are familiar to most people, but we could've chosen anything so long it can be plugged in as a <code>Driver</code> with its <code>Atomic</code> connection, and the publisher satisfies the <code>Producer</code> trait.</p>
+<h2 id="adapters"><a class="header" href="#adapters">Adapters</a></h2>
+<p>Since we'll be using postgres, generally we need to do the following:</p>
+<ol>
+<li>Create migrations that will define our <code>users</code> and <code>sessions</code> tables, run them</li>
+<li>Scan our schema with an ORM, in our case sea-orm (optional)</li>
+<li>Create ORM entities that correspond to our SQL data</li>
+</ol>
+<p>We won't go over these steps because they depend on the implementation, you may or may not use an ORM depending on preference. In any case, the first step is always performed. Since we'll be using sea-orm, we perform step 2, and subsequently sea-orm will generate the necessary ORM entities, completing step 3. All we need to do now is write the <code>From</code> implementations for our application models. The ORM entities allow us to perform queries on their respective tables.</p>
+<p>For more detail see <a href="https://github.com/biblius/migr">migr</a>, a very simple tool for generating migrations, <a href="https://www.sea-ql.org/sea-orm-tutorial/ch01-04-entity-generation.html">how to generate entities with sea-orm</a>, and the <a href="https://github.com/biblius/hextacy/tree/master/examples/template/src/db">examples directory</a>.</p>
+<p>Now that we have the necessary entities to perform database queries, we can create our adapter. For brevity, we'll be showcasing only the <code>UserAdapter</code> here, the session adapter can be viewed in the examples.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct UserAdapter;
+
+#[async_trait]
+impl&lt;C&gt; UserRepository&lt;C&gt; for UserAdapter
+where
+    C: ConnectionTrait + Send + Sync,
+{
+    async fn get_by_id(&amp;self, conn: &amp;mut C, id: Uuid) -&gt; Result&lt;Option&lt;User&gt;, AdapterError&gt; {
+        UserEntity::find_by_id(id)
+            .one(conn)
+            .await
+            .map_err(AdapterError::SeaORM)
+            .map(|u| u.map(User::from))
+    }
+
+    async fn get_by_username(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+    ) -&gt; Result&lt;Option&lt;User&gt;, AdapterError&gt; {
+        UserEntity::find()
+            .filter(Column::Username.eq(username))
+            .one(conn)
+            .await
+            .map_err(AdapterError::SeaORM)
+            .map(|user| user.map(User::from))
+    }
+
+    async fn create(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+        password: &amp;str,
+    ) -&gt; Result&lt;User, AdapterError&gt; {
+        let user: UserModel = User::new(username.to_string(), password.to_string()).into();
+        UserEntity::insert(user)
+            .exec_with_returning(conn)
+            .await
+            .map(User::from)
+            .map_err(AdapterError::SeaORM)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Ah, finally we see some action! The code is pretty self-explanatory so we won't go over it in too much detail.</p>
+<p><code>ConnectionTrait</code> is the sea-orm specific trait which can be passed into the <code>exec</code> calls on entities. This trait is implemented directly on a <code>sea_orm::DatabaseConnection</code> and <code>sea_orm::DatabaseTransaction</code>. Fortunately, most ORMs provide a connection trait so we don't have to implement the adapters for both their connection and transaction - that would be painful. We can obtain a <code>C: ConnectionTrait</code> via the sea-orm driver - a thin wrapper around a sea-orm connection pool that implemments <code>Driver</code>, making it suitable for our service.</p>
+<p><em>Quick sidenote:</em></p>
+<p><em>There are ORMs that start transactions in place on connections. These implement <code>Atomic</code> by starting the transaction and then just returning the connection. The reason <code>Atomic</code> exists is because of these different implementations, we need a way to abstract away the specific way a transaction is started, we do so with the <code>Atomic::TransactionResult</code>.</em></p>
+<p>One small thing to note is that we want to keep UUID generation within our control. Giving control to the database would mean the most critical part of our model is out of the application's control which would introduce problems later down the line if we ever need to switch our adapters. Here we're handling the ID generation in the user's <code>new</code> function.</p>
+<p>For the publisher, we can use hextacy's <a href="https://github.com/biblius/hextacy/blob/master/hextacy/src/adapters/queue/redis.rs">RedisPublisher</a>. It has the ability to create a producer for any given message as long as it implements <code>Serialize</code>. It implements the <code>Producer</code> trait which is just what we need.</p>
+<p>Since we will at some point have to make a concrete instance of our service, to reduce the boilerplate of specifying every one of its components wherever we use it, we create a type alias:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub type AuthenticationService = Authentication&lt;
+    SeaormDriver,
+    UserAdapter,
+    SessionAdapter,
+    RedisPublisher,
+&gt;;
+<span class="boring">}</span></code></pre></pre>
+<p>Now instead of specifying (and inevitably changing) the adapters everywhere we want to use the service, we have a single centralised location where we define its configuration and use this type wherever we want to use the service.</p>
+<p>We'll figure out how we manage the necessary state for it in a bit because first we'll define the controllers.</p>
+<h2 id="controllers"><a class="header" href="#controllers">Controllers</a></h2>
+<p>In this part we'll hook up a single handler function to a service because they look the same for each, give or take a cookie/header.</p>
+<p>We now define the HTTP handler for the service's <code>login</code> function.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Deserialize, Validify)]
+pub struct Login {
+    #[validate(length(min = 1))]
+    pub username: String,
+    #[validate(length(min = 1))]
+    pub password: String,
+    pub remember: bool,
+}
+
+pub async fn login(
+    State(service): State&lt;AuthenticationService&gt;,
+    Json(data): Json&lt;LoginPayload&gt;,
+) -&gt; Result&lt;Response&lt;String&gt;, Error&gt; {
+    let Login {
+        username,
+        password,
+        remember,
+    } = Login::validify(data).map_err(Error::new)?;
+    let session = service.login(&amp;username, &amp;password, remember).await?;
+    let session_id = session.id.to_string();
+    let cookie = session_cookie(&quot;S_ID&quot;, &amp;session_id, false);
+    MessageResponse::new(&quot;Successfully logged in&quot;)
+        .into_response(StatusCode::OK)
+        .with_cookies(&amp;[cookie])?
+        .json()
+        .map_err(Error::new)
+}
+
+// Helper for creating a cookie
+pub fn session_cookie&lt;'a&gt;(
+    key: &amp;'a str,
+    value: &amp;'a str,
+    expire: bool,
+) -&gt; Cookie&lt;'a&gt; {
+    CookieBuilder::new(key, value)
+        .path(&quot;/&quot;)
+        .domain(&quot;mysupercoolsite.com&quot;)
+        .max_age(if expire { Duration::ZERO } else { Duration::days(1) })
+        .same_site(SameSite::Lax)
+        .http_only(true)
+        .secure(true)
+        .finish()
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The first thing we do is define the data object we intend to accept from the client. The <code>Validify</code> derive macro exposes a <code>validify</code> method for the struct. It also creates a payload struct which we use in the <code>login</code> handler. The first argument to this function is the service type we've defined earlier, wrapped in an <code>axum::extractor::State</code>. Through it we obtain a reference to the concrete service.</p>
+<p>In the next section, we'll see how we can manage state and hook everything up so we have a working application.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../Design/core-6tc.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../Design/state.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../Design/core-6tc.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../Design/state.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+    </div>
+    </body>
+</html>

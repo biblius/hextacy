@@ -4,6 +4,7 @@ use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use hextacy::exports::deadpool_redis::redis;
+use hextacy::queue::QueueError;
 use hextacy::DriverError;
 use serde::Serialize;
 use serde_json::json;
@@ -15,32 +16,41 @@ pub enum Error {
     #[error("Authentication error: {0}")]
     Auth(#[from] AuthenticationError),
 
-    #[error("UUID error: {0}")]
+    #[error("UUID: {0}")]
     Uuid(#[from] hextacy::exports::uuid::Error),
 
-    #[error("Crypto error: {0}")]
+    #[error("Crypto: {0}")]
     Crypto(#[from] hextacy::crypto::CryptoError),
 
-    #[error("Adapter error: {0}")]
+    #[error("Adapter: {0}")]
     Adapter(#[from] AdapterError),
 
-    #[error("Redis error: {0}")]
+    #[error("Redis: {0}")]
     Redis(#[from] redis::RedisError),
 
-    #[error("Driver error: {0}")]
+    #[error("Driver: {0}")]
     Driver(#[from] DriverError),
 
-    #[error("Validation error: {0}")]
+    #[error("Validation: {0}")]
     Validation(#[from] ValidationErrors),
 
-    #[error("Serde error: {0}")]
+    #[error("Serde: {0}")]
     Serde(#[from] serde_json::Error),
 
-    #[error("Http response error: {0}")]
+    #[error("Http response: {0}")]
     HttpResponse(#[from] hextacy::web::xhttp::response::ResponseError),
 
-    #[error("Axum response error: {0}")]
+    #[error("Axum response: {0}")]
     AxumResponse(#[from] axum::http::Error),
+
+    #[error("Queue: {0}")]
+    Queue(QueueError),
+}
+
+impl From<QueueError> for Error {
+    fn from(value: QueueError) -> Self {
+        Self::Queue(value)
+    }
 }
 
 impl Error {

@@ -4,7 +4,7 @@ use deadpool_redis::redis::{
 };
 use futures_util::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, pin::Pin};
+use std::{fmt::Debug, pin::Pin, sync::Arc};
 
 use crate::queue::{Consumer, Producer, QueueError};
 
@@ -14,7 +14,9 @@ use crate::queue::{Consumer, Producer, QueueError};
 /// ### Example
 ///
 /// ```ignore
-/// struct MyMessageHandler {}
+/// struct MyMessageHandler {
+///   my_state: SomeState,
+/// }
 ///
 /// enum MyMessage {
 ///     SomeVariant
@@ -57,7 +59,7 @@ impl RedisMessageQueue {
         let conn = self.client.get_async_connection().await?;
         Ok(RedisPublisher {
             channel: channel.to_string(),
-            connection: conn,
+            connection: Arc::new(tokio::sync::RwLock::new(conn)),
         })
     }
 
@@ -71,9 +73,10 @@ impl RedisMessageQueue {
     }
 }
 
+#[derive(Clone)]
 pub struct RedisPublisher {
     channel: String,
-    connection: Connection,
+    connection: Arc<tokio::sync::RwLock<Connection>>,
 }
 
 impl Debug for RedisPublisher {
@@ -87,16 +90,17 @@ impl Debug for RedisPublisher {
 
 #[async_trait]
 impl Producer for RedisPublisher {
-    type Error = QueueError<RedisError>;
-    async fn publish<M>(&mut self, message: M) -> Result<(), Self::Error>
+    async fn publish<M>(&self, message: M) -> Result<(), QueueError>
     where
         M: Serialize + Send + Sync + 'static,
     {
         let message = serde_json::to_string(&message)?;
         self.connection
+            .write()
+            .await
             .publish(self.channel.as_str(), message)
             .await
-            .map_err(QueueError::Driver)
+            .map_err(|e| QueueError::Driver(Box::new(e)))
     }
 }
 
@@ -109,9 +113,7 @@ impl<M> Consumer<M> for RedisConsumer
 where
     M: DeserializeOwned + Send + 'static,
 {
-    type Error = QueueError<RedisError>;
-
-    async fn poll_queue(&mut self) -> Result<Option<M>, Self::Error> {
+    async fn poll_queue(&mut self) -> Result<Option<M>, QueueError> {
         let Some(message) = self.stream.next().await else {
             return Ok(None);
         };

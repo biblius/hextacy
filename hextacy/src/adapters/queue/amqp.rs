@@ -80,8 +80,7 @@ pub struct AmqpPublisher {
 
 #[async_trait]
 impl Producer for AmqpPublisher {
-    type Error = QueueError<lapin::Error>;
-    async fn publish<M>(&mut self, message: M) -> Result<(), Self::Error>
+    async fn publish<M>(&self, message: M) -> Result<(), QueueError>
     where
         M: Serialize + Send + Sync + 'static,
     {
@@ -95,7 +94,7 @@ impl Producer for AmqpPublisher {
             )
             .await
             .map(|_| ())
-            .map_err(QueueError::Driver)
+            .map_err(|e| QueueError::Driver(Box::new(e)))
     }
 }
 
@@ -104,13 +103,11 @@ impl<M> Consumer<M> for lapin::Consumer
 where
     M: DeserializeOwned + Send + Sync + 'static,
 {
-    type Error = QueueError<lapin::Error>;
-
-    async fn poll_queue(&mut self) -> Result<Option<M>, Self::Error> {
+    async fn poll_queue(&mut self) -> Result<Option<M>, QueueError> {
         let Some(msg) = self.next().await else {
             return Ok(None);
         };
-        let message = msg.map_err(QueueError::Driver)?;
+        let message = msg.map_err(|e| QueueError::Driver(Box::new(e)))?;
         let message: M = serde_json::from_slice(&message.data)?;
         Ok(Some(message))
     }

@@ -89,7 +89,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="Quickstart.html"><strong aria-hidden="true">1.</strong> Quickstart</a></li><li class="chapter-item expanded "><a href="Architecture.html"><strong aria-hidden="true">2.</strong> Architecture</a></li><li class="chapter-item expanded "><a href="Driver.html"><strong aria-hidden="true">3.</strong> Driver</a></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="Quickstart.html"><strong aria-hidden="true">1.</strong> Quickstart</a></li><li class="chapter-item expanded "><a href="Design/index.html"><strong aria-hidden="true">2.</strong> Design</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="Design/core.html"><strong aria-hidden="true">2.1.</strong> Core</a></li><li class="chapter-item expanded "><a href="Design/core-6tc.html"><strong aria-hidden="true">2.2.</strong> Core ⬡</a></li><li class="chapter-item expanded "><a href="Design/infrastructure.html"><strong aria-hidden="true">2.3.</strong> Infrastructure</a></li><li class="chapter-item expanded "><a href="Design/state.html"><strong aria-hidden="true">2.4.</strong> State</a></li><li class="chapter-item expanded "><a href="Design/testing.html"><strong aria-hidden="true">2.5.</strong> Testing</a></li></ol></li><li class="chapter-item expanded "><a href="Driver.html"><strong aria-hidden="true">3.</strong> Driver</a></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -173,10 +173,588 @@
                 <div id="content" class="content">
                     <main>
                         <h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
-<p>TODO</p>
-<div style="break-before: page; page-break-before: always;"></div><h1 id="architecture"><a class="header" href="#architecture">Architecture</a></h1>
-<p>TODO</p>
+<p>Hextacy is a library aimed to provide a flexible infrastructure for writing backend applications. It provides you with out of the box implementations so you can focus on the business aspects of your application without reinventing the wheel. Hextacy is a little opinionated, but it tries to be as less intrusive as possible. If its implementations do not suit your needs, it provides you with a set of traits so you can always roll out your own.</p>
+<p>This booklet serves to explain why hextacy is built the way it is, as well as provide some context for the traits it exposes.</p>
+<p>CLI tool coming soon™</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="design"><a class="header" href="#design">Design</a></h1>
+<p>In order to understand why hextacy is built the way it is, we first need to understand how its pieces tie together to provide a flexible project infrastructure.</p>
+<p>Hextacy is based on <a href="https://en.wikipedia.org/wiki/Hexagonal_architecture_(software)">hexagonal architecture</a> also known as the <em>ports and adapters</em>, <em>layered</em>, or <em>onion</em> architecture. You can read great articles about it <a href="https://netflixtechblog.com/ready-for-changes-with-hexagonal-architecture-b315ec967749">here</a> and <a href="https://jeffreypalermo.com/2008/07/the-onion-architecture-part-1/">here</a>.</p>
+<p>At the core of this kind of architectural design is the business layer. The business layer represents the problems the application is designed to solve and as such it largely depends on the requirements. It contains the entity definitions the application will work with. If you take a look at some of the diagrams that are used to represent these architectures, you will always see the business layer in the middle (the core). Each subsequent layer will depend on the previous one and you will usually see arrows pointing from the outer most layers to the inner ones.</p>
+<p><em>This follows the <code>D</code> of SOLID - dependency inversion. For example, at the outer layers of the application is the UI, which depends on the API of various services the application exposes, which depend on the domain entities/services of the business layer. Since the business layer is in the middle, it contains no dependencies and is standalone. As such, the core layer of the application is self-sufficient and should build successfully on its own, even when no concrete implementations are plugged into it.</em></p>
+<p>When we model the application core, we must provide it access to domain entities without coupling it to any concrete way of obtaining those entities. We do so by defining the core logic through behaviour - in rust, we define this behaviour through traits.</p>
+<p>As an example, <strong>Repositories</strong> provide methods through which <strong>Adapters</strong> can interact with to get access to application <strong>Entities</strong>.</p>
+<p>A repository contains no implementation details about a concrete persistence backend. It is simply an interface which adapters utilise for their specific implementations to obtain the underlying model.</p>
+<p>When business level services need access to domain entities, they couple themselves to repositories. By coupling the services only to the repositories, we gain the flexibility of swapping various implementations without ever touching the core logic.</p>
+<p>Even though we've talked only about repositories, this paradigm will be present in every aspect of our application. To name a few more examples, our application could contian some caching requirements and some kind of notification mechanism when certain events occur. We also want to design those in a manner where we hide away the implementations of those mechanisms from the core logic.</p>
+<p>In addition to having the <em>internals</em> decoupled, we are also decoupled from any potential <em>interactors</em> the application could use to access the core. You can think of interactors as the front-end to the application - since we have a standalone core, it becomes irrelevant whether we use HTTP, a desktop program or a CLI to access it.</p>
+<p>Keeping all of this in mind, we will next explore how we can implement these patterns in rust.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="core"><a class="header" href="#core">Core</a></h1>
+<p>The next few sections of the booklet will provide some examples on how to model a decoupled application and how hextacy can be utilised to efficiently write application code while hiding away rust's unavoidable boilerplate.</p>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
+<p>Let's imagine we are tasked with creating an authentication service. We choose an auth service because it is simple enough for everyone to understand while still being able to highlight the importance of a layered architecture. For brevity's sake, we will keep the service very simple and we will not provide a <code>logout</code> method for user retention. After an intense brainstorming session we have determined the following:</p>
+<p>The service must:</p>
+<ul>
+<li>
+<p>expose 2 methods: <code>register</code> and <code>login</code>.</p>
+</li>
+<li>
+<p>be able to work with 2 models (entities): <code>User</code> and <code>Session</code>.</p>
+</li>
+<li>
+<p>notify any interested third parties a user registered via a message broker.</p>
+</li>
+</ul>
+<h2 id="implementation"><a class="header" href="#implementation">Implementation</a></h2>
+<p>For brevity, we will not be writing out the application plumbing (imports, errors, etc.) because we want to focus solely on the design. Full examples with plumbing can be viewed <a href="https://github.com/biblius/hextacy/tree/master/examples/">in the examples directory</a>.</p>
+<h3 id="models-entities"><a class="header" href="#models-entities">Models (Entities)</a></h3>
+<p>First things first, we have to define the application models:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct User {
+    id: Uuid,
+    username: String,
+    password: String,
+    created_at: NaiveDateTime, // from chrono
+}
+
+pub struct Session {
+    id: Uuid,
+    user_id: Uuid,
+    created_at: NaiveDateTime,
+    expires_at: NaiveDateTime,
+}
+<span class="boring">}</span></code></pre></pre>
+<p>These models must be kept separate from ORM-specific entities. Any entity obtained from an ORM must be convertable to its respective application model. Here the <code>From</code> trait is our friend, but we will omit the implementation as it is straightforward.</p>
+<p><em>ORM entities are distinct (and confusingly named the same way) from our application entities, which from now on we will refer to as application models. An entity is a concept from domain driven design representing a data structure with semantic meaning to our application. Since we are dealing with authentication, the <code>User</code> and <code>Session</code> structs are the application entities as they represent core concepts from the real world. Each entity (application model) must be uniquely identifiable - as such, the ID generation for those entities must be in the hands of our app, rather than the underlying persistence implementation.</em></p>
+<h3 id="repository"><a class="header" href="#repository">Repository</a></h3>
+<p>We now define a set of interactions with a persistence layer. You can think of repositories as contracts an adapter must fulfill for it to be injected into a service.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[async_trait]
+pub trait UserRepository&lt;C&gt; {
+    async fn get_by_username(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+    ) -&gt; Result&lt;Option&lt;User&gt;, AdapterError&gt;;
+
+    async fn create(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+        password: &amp;str,
+    ) -&gt; Result&lt;User, AdapterError&gt;;
+}
+
+#[async_trait]
+pub trait SessionRepository&lt;C&gt; {
+    async fn get_valid_by_id(
+        &amp;self,
+        conn: &amp;mut C,
+        id: Uuid,
+    ) -&gt; Result&lt;Option&lt;Session&gt;, AdapterError&gt;;
+
+    async fn create(
+        &amp;self,
+        conn: &amp;mut C,
+        user: &amp;User,
+        expires: bool,
+    ) -&gt; Result&lt;Session, AdapterError&gt;;
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The service will now be able utilise these definitions and in doing so won't be coupled to any particular implementation. If you're wondering why the <code>C</code>, we could theoretically design a repository with no generics, but it will introduce problems later down the line when we stray off the happy path.</p>
+<h3 id="service"><a class="header" href="#service">Service</a></h3>
+<p>We now define the core authentication service struct. For the time being we will disregard the message broker requirement and focus solely on the first 2.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct Authentication&lt;D, UR, SR&gt; {
+    driver: D,
+    user_repo: UR,
+    session_repo: SR,
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Since we do not know which adapters the service will be instantiated with, we must define it in terms of generics. Another option would be to define the <code>*_repo</code> fields using trait objects, i.e. <code>Box&lt;dyn UserRepository&lt;C&gt;&gt;</code>, but then we would have to introduce another generic for the connection, namely <code>C</code>, which arguably does not help us when we enter generics hell in the next step when defining the core functionality.</p>
+<p>We now define the <code>login</code> method.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use hextacy::Driver;
+
+#[async_trait]
+impl&lt;D, UR, SR&gt; Authentication&lt;D, UR, SR&gt;
+where
+  D: Driver + Send + Sync,
+  D::Connection: Send,
+  UR: UserRepository&lt;Driver::Connection&gt; + Send + Sync,
+  SR: SessionRepository&lt;Driver::Connection&gt; + Send + Sync,
+{
+    async fn login(
+        &amp;self,
+        username: &amp;str,
+        password: &amp;str,
+        remember: bool,
+    ) -&gt; AppResult&lt;Session&gt; {
+        let mut conn = self.repo.connect().await?;
+
+        let user = match self.user_repo.get_by_username(&amp;mut conn, username).await {
+            Ok(Some(user)) =&gt; user,
+            Ok(None) =&gt; return Err(AuthenticationError::InvalidCredentials.into()),
+            Err(e) =&gt; return Err(e.into()),
+        };
+
+        let valid = hextacy::crypto::bcrypt_verify(password, &amp;user.password)?;
+        if !valid {
+            return Err(AuthenticationError::InvalidCredentials.into());
+        }
+
+        let session = self
+            .session_repo
+            .create(&amp;mut conn, &amp;user, !remember)
+            .await?;
+
+        Ok(session)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>In the first circle of generics hell we can observe the famous Send and Sync bounds from the async rust habitat...</em></p>
+<p>In the impl block's definition, we introduced the necessary generics for the service and we've bound those generics to the traits we want the service to use. We are essentially saying to the compiler &quot;<em>The authentication struct can use the <code>login</code> method if and only if its <code>driver</code> field implements <code>Driver</code> and its <code>*_repo</code> fields can work on the connection obtained from that driver</em>&quot;.</p>
+<p>The <a href="Design/../Driver.html">Driver</a> trait is a completely generic trait that exposes one method - <code>connect</code>. It is literally just</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[async_trait]
+pub trait Driver {
+    type Connection;
+    async fn connect(&amp;self) -&gt; Result&lt;Self::Connection, DriverError&gt;;
+}
+<span class="boring">}</span></code></pre></pre>
+<p>We need this trait because we've defined our repository to take in a generic <code>C</code> and now we can obtain that <code>C</code> from the driver. We still don't know which connection that will be - this is the whole point of the <code>Driver</code> trait and is how our service still remains oblivious to the adapter it will use.</p>
+<p>Because the generics are bound to repositories we get access to the necessary repository methods and can get a hold of our application models. So far, no implementation details are exposed to the service. The only thing the service is aware of is that it can create some connection and use that connection for its repositories.</p>
+<p>The real beauty of using a driver is in the next step, when we define our <code>register</code> method.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Same impl block as for the `login` method
+async fn register(&amp;self, username: &amp;str, password: &amp;str) -&gt; AppResult&lt;Session&gt; {
+    let mut conn = self.driver.connect().await?;
+
+    match self.user_repo.get_by_username(&amp;mut conn, username).await {
+        Ok(None) =&gt; {}
+        Ok(Some(_)) =&gt; return Err(AuthenticationError::UsernameTaken.into()),
+        Err(e) =&gt; return Err(e.into()),
+    };
+
+    let hashed = hextacy::crypto::bcrypt_hash(password, 10)?;
+
+    let user = self.user_repo.create(&amp;mut conn, username, &amp;hashed).await?;
+    let session = self.session_repo.create(&amp;mut conn, &amp;user, true).await?;
+
+    Ok(session)
+}
+
+<span class="boring">}</span></code></pre></pre>
+<p><em>...but this just looks like the login method, what's up?</em></p>
+<p>We now stray from the happy path.</p>
+<h3 id="transactions"><a class="header" href="#transactions">Transactions</a></h3>
+<p>Imagine the above <code>session_repo.create</code> call failed and the function returned an error. A user would still be created, but they would receive no session and they wouldn't be granted application access.
+This might not be a big deal for our simple auth service since the user could just login and continue on with their life, but imagine things are not so simple.</p>
+<p>Imagine we have to execute multiple state changes to multiple repositories. When there are multiple pending state changes, we want to persist those changes only if all of them succeed, and conversely we want to revert all changes if any of them fail. For this we need transactions. In order to use transactions, we must devise a way for our driver, specifically its connection, to allow us to perform atomic queries with it. Most connections/db clients provide this out of the box with 3 simple methods:</p>
+<ul>
+<li><code>start_transaction</code></li>
+<li><code>commit_transaction</code></li>
+<li><code>rollback_transaction</code></li>
+</ul>
+<p>For this purpose, hextacy provides this functionality on any generic connection via the <a href="Design/../Driver.html#Atomic">Atomic</a> trait.
+Because transactions usually operate on the same connections, i.e. queries on a connection that started a transaction will all be executed within that transaction's context, we get the answer to the age old question of &quot;Why put the <code>C</code> in the repository?&quot;.</p>
+<p>If our repository methods did not take in a <code>C</code>, then we would not be able to pass a transaction through multiple repository calls.</p>
+<p>We now update the register method to support transactions and isolate the creation of users and sessions to a neat little function. <code>//</code> marks lines added/changed.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use hextacy::{Atomic, Driver};
+
+#[async_trait]
+impl&lt;D, UR, SR&gt; Authentication&lt;D, UR, SR&gt;
+where
+  D: Driver + Send + Sync,
+  D::Connection: Atomic + Send, //
+  UR:
+    UserRepository&lt;D::Connection&gt; +
+    UserRepository&lt;&lt;D::Connection as Atomic&gt;::TransactionResult&gt; + //
+    Send +
+    Sync,
+  SR:
+    SessionRepository&lt;D::Connection&gt; +
+    SessionRepository&lt;&lt;D::Connection as Atomic&gt;::TransactionResult&gt; + //
+    Send +
+    Sync,
+{
+    pub async fn register(&amp;self, username: &amp;str, password: &amp;str) -&gt; AppResult&lt;Session&gt; {
+        let mut conn = self.driver.connect().await?;
+
+        match self.user_repo.get_by_username(&amp;mut conn, username).await {
+            Ok(None) =&gt; {}
+            Ok(Some(_)) =&gt; return Err(AuthenticationError::UsernameTaken.into()),
+            Err(e) =&gt; return Err(e.into()),
+        };
+
+        let hashed = hextacy::crypto::bcrypt_hash(password, 10)?;
+
+        let mut tx = conn.start_transaction().await?;
+        match self //
+            .create_user_and_session(&amp;mut tx, username, &amp;hashed)
+            .await
+        {
+            Ok(session) =&gt; {
+                &lt;Repo::Connection as Atomic&gt;::commit_transaction(tx).await?;
+                Ok(session)
+            }
+            Err(e) =&gt; {
+                &lt;Repo::Connection as Atomic&gt;::abort_transaction(tx).await?;
+                Err(e)
+            }
+        }
+    }
+
+    pub async fn create_user_and_session( //
+        &amp;self,
+        tx: &amp;mut &lt;Repo::Connection as Atomic&gt;::TransactionResult,
+        username: &amp;str,
+        password: &amp;str,
+    ) -&gt; AppResult&lt;Session&gt; {
+        let user = self.user_repo.create(tx, username, password).await?;
+        let session = self.session_repo.create(tx, &amp;user, true).await?;
+        Ok(session)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>...and in the 9th circle of generics hell we can observe the impenetrable wall of ultimate bounds</em></p>
+<p>I know, I know - who in their right mind would want to write all of this out? Our service has only 2 repositories and already half of our file is noisy generics. While we are reaping the benefit of having atomic queries we've stumbled upon another problem - boilerplate. We'll figure that one out in the next section, but first let's focus on how the code differs from our original implementation.</p>
+<p>Now, before we start with the state changes in our database we start a transaction. This is possible because we've bound the driver's connection to <code>Atomic</code>. When we get the results of <code>create_user_and_session</code>, we make sure to perform the necessary action on the transaction, ensuring the changes are only committed if everything was successful. This is where rust absolutely shines because we have total control on each of our interactions.</p>
+<p>One other thing to note for this approach is encapsulation. Since now the service is responsible for obtaining connections, one could argue that the driver does not belong in the service implementation logic since it is doing what is supposedly the repository's job. Repositories can be designed with no generics, as stated previously, and this would allow the service to completely remove the driver from its definition. This is a completely valid decision if one does not need atomicity in their queries and makes defining services with <code>Box&lt;dyn Repository&gt;</code> a great option. On the other hand, when we need transactions, the service always has the necessary context to reason about whether or not a transaction should succeed and should be left up to the service, in which case the <code>C</code> is unavoidable.</p>
+<p>In the next section we'll tear down the wall of generics and streamline the process of writing services using hextacy.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="core-"><a class="header" href="#core-">Core ⬡</a></h1>
+<p>If we take a look at the last impl block in the previous section, we can notice a pattern. We see the 2 repositories pretty much have the same driver bounds and everything has our beloved <code>Send</code> bound. If we were to add more, the pattern would repeat. Fortunately, rust provides us with excellent tooling to eliminate hand written repetition - macros! You know, those things you use to annotate your structs to print them to the terminal and stuff.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use hextacy::{component, transaction};
+
+#[component(
+    use D as driver,
+    use UserRepo, SessionRepo
+)]
+#[derive(Debug, Clone)]
+pub struct Authentication {}
+
+#[component(
+    use D:Atomic for
+        UR: UserRepository,
+        SR: SessionRepository,
+)]
+impl Authentication {
+    pub async fn register(&amp;self, username: &amp;str, password: &amp;str) -&gt; AppResult&lt;Session&gt; {
+        let mut conn = self.driver.connect().await?;
+
+        match self.user_repo.get_by_username(&amp;mut conn, username).await {
+            Ok(None) =&gt; {}
+            Ok(Some(_)) =&gt; return Err(AuthenticationError::UsernameTaken.into()),
+            Err(e) =&gt; return Err(e.into()),
+        };
+
+        let hashed = hextacy::crypto::bcrypt_hash(password, 10)?;
+
+        let session: Session = transaction!(
+            conn: D =&gt; {
+                let user = self.user_repo.create(&amp;mut conn, username, &amp;hashed).await?;
+                let session = self.session_repo.create(&amp;mut conn, &amp;user, true).await?;
+                Ok(session)
+            }
+        )?;
+
+        Ok(session)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Ain't it neat?</p>
+<p>Now that we've seen how a decoupled service would look like in 'vanilla' rust, we can dive in the <code>component</code> and <code>transaction</code> macros. The macros create the exact same code we've had to create by hand in the last part of the last section.</p>
+<p>The first invocation of the <code>component</code> macro on the struct definition creates a completely generic struct whose fields are exactly the same as the hand written implementation (PascalCase gets transformed into snake_case). For convenience, it also receives an associated <code>new</code> function.</p>
+<p>The second invocation takes the annotated impl block and 'injects' all the necessary generics and binds them to their respective types. This macro gives us a simple and concise way of specifying the repository components this service will use.</p>
+<p>The <code>transaction</code> macro allows us to easily write atomic queries without having to match the result every time. It takes in a connection (the variable <code>conn</code> in our case) and uses it to start a transaction before running whatever is inside the block. The block must return a <code>Result&lt;T&gt;</code> to be usable in the macro. Because we have the <code>AppResult</code> type, which is just <code>Result&lt;T, AppError&gt;</code>, we can use <code>thiserror</code> to easily create the <code>From</code> implementations for our global <code>AppError</code> and question everything where applicable. If any operations fail, the closure returns an error and the transaction is aborted.</p>
+<p>Another cool thing about the <code>component</code> macro is that it can be used on structs with existing fields and impl blocks. To demonstrate we'll add our final requirement, the message broker.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use hextacy::{component, transaction, queue::Publisher}; //
+
+#[derive(Debug, Serialize)] //
+pub struct UserRegisteredEvent {
+    id: Uuid,
+    username: String,
+}
+
+#[component(
+    use D as driver,
+    use UserRepo, SessionRepo, Publisher //
+)]
+#[derive(Debug, Clone)]
+pub struct Authentication&lt;Existing&gt; { //
+    e: Existing // Just to demonstrate
+    foo: usize, //
+}
+
+#[component(
+    use D:Atomic for
+        UR: UserRepository,
+        SR: SessionRepository,
+)]
+impl&lt;P, E&gt; Authentication&lt;P, E&gt; //
+where
+    P: Producer, //
+    E: Debug // Ordering matters here, existing stuff goes after the macro stuff
+{
+    pub async fn register(&amp;self, username: &amp;str, password: &amp;str) -&gt; AppResult&lt;Session&gt; {
+        let mut conn = self.driver.connect().await?;
+
+        match self.user_repo.get_by_username(&amp;mut conn, username).await {
+            Ok(None) =&gt; {}
+            Ok(Some(_)) =&gt; return Err(AuthenticationError::UsernameTaken.into()),
+            Err(e) =&gt; return Err(e.into()),
+        };
+
+        let hashed = hextacy::crypto::bcrypt_hash(password, 10)?;
+
+        let session: Session = transaction!(
+            conn: D =&gt; {
+                let user = self.user_repo.create(&amp;mut conn, username, &amp;hashed).await?;
+                let session = self.session_repo.create(&amp;mut conn, &amp;user, true).await?;
+                self.publisher //
+                    .publish(UserRegisteredEvent {
+                      id: user.id,
+                      username: user.username,
+                })
+                .await?;
+                Ok(session)
+            }
+        )?;
+
+        Ok(session)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>We've added some existing generics to the struct and it still works! The ordering is important though, so we have to keep in mind the existing generics, i.e. generics outside the <code>component</code> macro are always the last items in the struct.</p>
+<p>We've also added a publisher through the macro (we could've explicitly added it, but it's more concise with <code>component</code>) and in the impl block we've bound it to <code>Producer</code> which enables us to publish any structs that can be serialized. Do note if the publishing fails, neither of the last 2 state changes are applied. The service doesn't know where it'll be publishing, but that is not its concern and is up to the implementation.</p>
+<p>And that would be the end of our core logic - we've met the extreme requirements posed on us and designed a service with only the business, albeit not a very complex one. Most importantly, we haven't leaked any implementation details into the service. Instead, we've bounded its generic parameters to contracts which concrete instances must fulfil in order for the service to be constructed. Traits rule!</p>
+<p>Now we actually need to get the thing running, which is what we'll be exploring in the next section.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="infrastructure"><a class="header" href="#infrastructure">Infrastructure</a></h1>
+<p>So far we have only been dealing with behaviour, now it's time to implement that behaviour on concrete units. There are 2 main pieces of infrastructure our application is missing; The interaction and the plumbing.</p>
+<p>Since we all know what an HTTP controller is, we'll be creating one with <code>axum</code> for the interaction. We choose HTTP because most people are familiar with it and it's the simplest to set up, though we could've chosen anything because nothing in the service specifies how it should be interacted with. Honourable mentions include a desktop or CLI app.</p>
+<p>For the plumbing, i.e. database and queue implementations, we'll be using postgres and redis with pubsub. We'll use them because, again, they are familiar to most people, but we could've chosen anything so long it can be plugged in as a <code>Driver</code> with its <code>Atomic</code> connection, and the publisher satisfies the <code>Producer</code> trait.</p>
+<h2 id="adapters"><a class="header" href="#adapters">Adapters</a></h2>
+<p>Since we'll be using postgres, generally we need to do the following:</p>
+<ol>
+<li>Create migrations that will define our <code>users</code> and <code>sessions</code> tables, run them</li>
+<li>Scan our schema with an ORM, in our case sea-orm (optional)</li>
+<li>Create ORM entities that correspond to our SQL data</li>
+</ol>
+<p>We won't go over these steps because they depend on the implementation, you may or may not use an ORM depending on preference. In any case, the first step is always performed. Since we'll be using sea-orm, we perform step 2, and subsequently sea-orm will generate the necessary ORM entities, completing step 3. All we need to do now is write the <code>From</code> implementations for our application models. The ORM entities allow us to perform queries on their respective tables.</p>
+<p>For more detail see <a href="https://github.com/biblius/migr">migr</a>, a very simple tool for generating migrations, <a href="https://www.sea-ql.org/sea-orm-tutorial/ch01-04-entity-generation.html">how to generate entities with sea-orm</a>, and the <a href="https://github.com/biblius/hextacy/tree/master/examples/template/src/db">examples directory</a>.</p>
+<p>Now that we have the necessary entities to perform database queries, we can create our adapter. For brevity, we'll be showcasing only the <code>UserAdapter</code> here, the session adapter can be viewed in the examples.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct UserAdapter;
+
+#[async_trait]
+impl&lt;C&gt; UserRepository&lt;C&gt; for UserAdapter
+where
+    C: ConnectionTrait + Send + Sync,
+{
+    async fn get_by_id(&amp;self, conn: &amp;mut C, id: Uuid) -&gt; Result&lt;Option&lt;User&gt;, AdapterError&gt; {
+        UserEntity::find_by_id(id)
+            .one(conn)
+            .await
+            .map_err(AdapterError::SeaORM)
+            .map(|u| u.map(User::from))
+    }
+
+    async fn get_by_username(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+    ) -&gt; Result&lt;Option&lt;User&gt;, AdapterError&gt; {
+        UserEntity::find()
+            .filter(Column::Username.eq(username))
+            .one(conn)
+            .await
+            .map_err(AdapterError::SeaORM)
+            .map(|user| user.map(User::from))
+    }
+
+    async fn create(
+        &amp;self,
+        conn: &amp;mut C,
+        username: &amp;str,
+        password: &amp;str,
+    ) -&gt; Result&lt;User, AdapterError&gt; {
+        let user: UserModel = User::new(username.to_string(), password.to_string()).into();
+        UserEntity::insert(user)
+            .exec_with_returning(conn)
+            .await
+            .map(User::from)
+            .map_err(AdapterError::SeaORM)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p>Ah, finally we see some action! The code is pretty self-explanatory so we won't go over it in too much detail.</p>
+<p><code>ConnectionTrait</code> is the sea-orm specific trait which can be passed into the <code>exec</code> calls on entities. This trait is implemented directly on a <code>sea_orm::DatabaseConnection</code> and <code>sea_orm::DatabaseTransaction</code>. Fortunately, most ORMs provide a connection trait so we don't have to implement the adapters for both their connection and transaction - that would be painful. We can obtain a <code>C: ConnectionTrait</code> via the sea-orm driver - a thin wrapper around a sea-orm connection pool that implemments <code>Driver</code>, making it suitable for our service.</p>
+<p><em>Quick sidenote:</em></p>
+<p><em>There are ORMs that start transactions in place on connections. These implement <code>Atomic</code> by starting the transaction and then just returning the connection. The reason <code>Atomic</code> exists is because of these different implementations, we need a way to abstract away the specific way a transaction is started, we do so with the <code>Atomic::TransactionResult</code>.</em></p>
+<p>One small thing to note is that we want to keep UUID generation within our control. Giving control to the database would mean the most critical part of our model is out of the application's control which would introduce problems later down the line if we ever need to switch our adapters. Here we're handling the ID generation in the user's <code>new</code> function.</p>
+<p>For the publisher, we can use hextacy's <a href="https://github.com/biblius/hextacy/blob/master/hextacy/src/adapters/queue/redis.rs">RedisPublisher</a>. It has the ability to create a producer for any given message as long as it implements <code>Serialize</code>. It implements the <code>Producer</code> trait which is just what we need.</p>
+<p>Since we will at some point have to make a concrete instance of our service, to reduce the boilerplate of specifying every one of its components wherever we use it, we create a type alias:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub type AuthenticationService = Authentication&lt;
+    SeaormDriver,
+    UserAdapter,
+    SessionAdapter,
+    RedisPublisher,
+&gt;;
+<span class="boring">}</span></code></pre></pre>
+<p>Now instead of specifying (and inevitably changing) the adapters everywhere we want to use the service, we have a single centralised location where we define its configuration and use this type wherever we want to use the service.</p>
+<p>We'll figure out how we manage the necessary state for it in a bit because first we'll define the controllers.</p>
+<h2 id="controllers"><a class="header" href="#controllers">Controllers</a></h2>
+<p>In this part we'll hook up a single handler function to a service because they look the same for each, give or take a cookie/header.</p>
+<p>We now define the HTTP handler for the service's <code>login</code> function.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Deserialize, Validify)]
+pub struct Login {
+    #[validate(length(min = 1))]
+    pub username: String,
+    #[validate(length(min = 1))]
+    pub password: String,
+    pub remember: bool,
+}
+
+pub async fn login(
+    State(service): State&lt;AuthenticationService&gt;,
+    Json(data): Json&lt;LoginPayload&gt;,
+) -&gt; Result&lt;Response&lt;String&gt;, Error&gt; {
+    let Login {
+        username,
+        password,
+        remember,
+    } = Login::validify(data).map_err(Error::new)?;
+    let session = service.login(&amp;username, &amp;password, remember).await?;
+    let session_id = session.id.to_string();
+    let cookie = session_cookie(&quot;S_ID&quot;, &amp;session_id, false);
+    MessageResponse::new(&quot;Successfully logged in&quot;)
+        .into_response(StatusCode::OK)
+        .with_cookies(&amp;[cookie])?
+        .json()
+        .map_err(Error::new)
+}
+
+// Helper for creating a cookie
+pub fn session_cookie&lt;'a&gt;(
+    key: &amp;'a str,
+    value: &amp;'a str,
+    expire: bool,
+) -&gt; Cookie&lt;'a&gt; {
+    CookieBuilder::new(key, value)
+        .path(&quot;/&quot;)
+        .domain(&quot;mysupercoolsite.com&quot;)
+        .max_age(if expire { Duration::ZERO } else { Duration::days(1) })
+        .same_site(SameSite::Lax)
+        .http_only(true)
+        .secure(true)
+        .finish()
+}
+<span class="boring">}</span></code></pre></pre>
+<p>The first thing we do is define the data object we intend to accept from the client. The <code>Validify</code> derive macro exposes a <code>validify</code> method for the struct. It also creates a payload struct which we use in the <code>login</code> handler. The first argument to this function is the service type we've defined earlier, wrapped in an <code>axum::extractor::State</code>. Through it we obtain a reference to the concrete service.</p>
+<p>In the next section, we'll see how we can manage state and hook everything up so we have a working application.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="state"><a class="header" href="#state">State</a></h1>
+<p>So now that we have the application core, a way to talk to it, and a way for it to obtain the data, we can now tie everything together.</p>
+<p>We declare a <code>State</code> struct in which we keep references to concrete drivers, the concrete constructor for our service, and we move the concrete type alias here.</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use hextacy::adapters::db::sql::seaorm::SeaormDriver;
+use hextacy::adapters::queue::redis::RedisMessageQueue;
+use hextacy::adapters::queue::redis::RedisPublisher;
+
+pub type AuthenticationService = Authentication&lt;
+    SeaormDriver,
+    UserAdapter,
+    SessionAdapter,
+    RedisPublisher,
+&gt;;
+
+#[derive(Debug, Clone, State)]
+pub struct AppState {
+    #[env(&quot;DATABASE_URL&quot;)]
+    #[load_async]
+    pub repository: SeaormDriver,
+
+    #[env(
+        &quot;RD_HOST&quot;,
+        &quot;RD_PORT&quot; as u16,
+        &quot;RD_USER&quot; as Option,
+        &quot;RD_PASSWORD&quot; as Option,
+    )]
+    pub redis_q: RedisMessageQueue,
+}
+
+impl AuthenticationService {
+    pub async fn init(state: &amp;AppState) -&gt; AuthenticationService {
+        AuthenticationService::new(
+            state.repository.clone(),
+            UserAdapter,
+            SessionAdapter,
+            state
+                .redis_q
+                .publisher(&quot;my-channel&quot;)
+                .await
+                .expect(&quot;Could not create publisher&quot;),
+        )
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<p><em>Neat!</em></p>
+<p>For each field annotated with <code>env</code>, the <code>State</code> derive macro will attempt to call the type's associated <code>new</code> function, loading variables from <code>std::env</code> beforehand and passing them to the call. Luckily, both of these structs have them so we get an <code>AppState::load_repository_env</code> function and the same for <code>redis_q</code>. The <code>as</code> will attempt to parse the value of the env variable before passing it to <code>new</code>.</p>
+<p>In the impl block for the service we set it up by calling it's <code>new</code> function, created from the <code>component</code> macro. All the components being passed satisfy the service's bounds. Here it's worth mentioning that the adapters are zero-sized, meaning they do not actually allocate any memory and are here simply to satisfy the bound restriction of the service, a sort of behaviour struct. The repository is cloned, which clones only the underlying reference to the connection pool and a publisher is created.</p>
+<p>Finally, the main function.</p>
+<pre><pre class="playground"><code class="language-rust">#[tokio::main]
+async fn main() {
+    hextacy::env::load_from_file(&quot;path/to/.env&quot;).unwrap();
+
+    let state = AppState::configure().await.unwrap();
+
+    let (host, port) = (
+        env::get_or_default(&quot;HOST&quot;, &quot;127.0.0.1&quot;),
+        env::get_or_default(&quot;PORT&quot;, &quot;3000&quot;),
+    );
+
+        info!(&quot;Starting server on {addr}&quot;);
+
+    let router = router(&amp;state).await;
+
+    axum::Server::bind(&amp;addr.parse().unwrap())
+        .serve(router.into_make_service())
+        .await
+        .expect(&quot;couldn't start server&quot;);
+}
+
+pub async fn router(state: &amp;AppState) -&gt; Router {
+    use crate::controllers::http::auth::*;
+    let auth_service = AuthenticationService::init(state).await;
+    let router = Router::new()
+        .route(&quot;/register&quot;, post(register))
+        .route(&quot;/login&quot;, post(login));
+
+    Router::new().nest(&quot;/auth&quot;, router).with_state(service)
+}</code></pre></pre>
+<p>And we have a working app! We haven't talked about how the files are set up, because this largely depends on preference and is ultimately arbitrary.</p>
+<p>Next up, we'll ensure our app works by writing some tests.</p>
+<div style="break-before: page; page-break-before: always;"></div><h1 id="testing"><a class="header" href="#testing">Testing</a></h1>
 <div style="break-before: page; page-break-before: always;"></div><h1 id="driver"><a class="header" href="#driver">Driver</a></h1>
+<p>TODO</p>
+<h2 id="atomic"><a class="header" href="#atomic">Atomic</a></h2>
 <p>TODO</p>
 
                     </main>
