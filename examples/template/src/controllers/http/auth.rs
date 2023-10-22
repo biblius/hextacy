@@ -38,7 +38,7 @@ pub async fn register(
     Json(data): Json<RegisterPayload>,
 ) -> Result<Response<String>, Error> {
     let Register { username, password } = Register::validify(data).map_err(Error::new)?;
-    let session = service.register(&username, &password).await?;
+    let (_, session) = service.register(&username, &password).await?;
     let (session_id, csrf) = (session.id.to_string(), session.csrf.to_string());
     let cookie = session_cookie("S_ID", &session_id, false);
     MessageResponse::new("Successfully created account")

@@ -36,7 +36,7 @@ pub fn impl_state(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn::E
                 field_loader
                     .loaders
                     .entry(field_id.clone())
-                    .or_insert(vec![])
+                    .or_default()
                     .push(loader);
                 priority += 1;
             }
@@ -49,7 +49,7 @@ pub fn impl_state(input: DeriveInput) -> Result<proc_macro2::TokenStream, syn::E
                 field_loader
                     .loaders
                     .entry(field_id.clone())
-                    .or_insert(vec![])
+                    .or_default()
                     .push(loader);
                 priority += 1;
             }

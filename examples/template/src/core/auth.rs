@@ -11,6 +11,8 @@ use hextacy::{component, exports::uuid::Uuid, queue::Producer, transaction};
 use serde::Serialize;
 use thiserror::Error;
 
+use super::models::user::User;
+
 #[derive(Debug, Serialize)]
 pub struct UserRegisteredEvent {
     id: Uuid,
@@ -38,7 +40,7 @@ impl<P> Authentication<P>
 where
     P: Producer,
 {
-    pub async fn register(&self, username: &str, password: &str) -> AppResult<Session> {
+    pub async fn register(&self, username: &str, password: &str) -> AppResult<(User, Session)> {
         let mut conn = self.repo.connect().await?;
 
         match self.user_repo.get_by_username(&mut conn, username).await {
@@ -49,21 +51,21 @@ where
 
         let hashed = hextacy::crypto::bcrypt_hash(password, 10)?;
 
-        let session: Session = transaction!(
+        let (user, session) = transaction!(
             conn: Repo => {
                 let user = self.user_repo.create(&mut conn, username, &hashed).await?;
                 let session = self.session_repo.create(&mut conn, &user, true).await?;
                 self.publisher
                     .publish(UserRegisteredEvent {
                       id: user.id,
-                      username: user.username,
+                      username: user.username.clone(),
                 })
                 .await?;
-                Ok(session)
+                Ok((user, session))
             }
         )?;
 
-        Ok(session)
+        Ok((user, session))
     }
 
     pub async fn login(
