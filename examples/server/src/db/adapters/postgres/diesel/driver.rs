@@ -27,24 +27,3 @@ impl Driver for DieselDriver {
         self.pool.connect().await
     }
 }
-
-/* #[async_trait]
-impl Atomic for Connection {
-    type TransactionResult = Self;
-
-    async fn start_transaction(mut self) -> Result<Self, DriverError> {
-        diesel::connection::AnsiTransactionManager::begin_transaction(&mut *self)?;
-        Ok(self)
-    }
-
-    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
-        diesel::connection::AnsiTransactionManager::commit_transaction(&mut *tx)?;
-        Ok(())
-    }
-
-    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
-        diesel::connection::AnsiTransactionManager::rollback_transaction(&mut *tx)?;
-        Ok(())
-    }
-}
- */

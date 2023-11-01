@@ -1,6 +1,8 @@
+use async_trait::async_trait;
+use hextacy::{Driver, DriverError};
 use mongodb::{
     options::{ClientOptions, Credential, ServerAddress},
-    Client,
+    Client, ClientSession,
 };
 use tracing::trace;
 
@@ -9,6 +11,15 @@ use tracing::trace;
 #[derive(Debug, Clone)]
 pub struct MongoDriver {
     pub driver: Client,
+}
+
+/// Just delegates to impl from hextacy.
+#[async_trait]
+impl Driver for MongoDriver {
+    type Connection = ClientSession;
+    async fn connect(&self) -> Result<Self::Connection, DriverError> {
+        self.driver.connect().await
+    }
 }
 
 impl MongoDriver {
