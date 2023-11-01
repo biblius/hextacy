@@ -5,24 +5,24 @@ use hextacy::Configure;
 
 use actix_web::{web, web::ServiceConfig};
 
-// Database
-use hextacy::adapters::{cache::redis::RedisDriver, db::sql::diesel::DieselDriver as Database};
-
 // Cache
 use crate::cache::adapters::redis::RedisAdapter as BasicCache;
+use crate::cache::driver::RedisDriver;
 
 // Adapters
-use crate::db::adapters::postgres::diesel::{
+/* use crate::db::adapters::postgres::diesel::{
+    use crate::db::adapters::postgres::diesel::driver::DieselDriver as Database;
     oauth::PgOAuthAdapter as OAuthAdapter, session::PgSessionAdapter as SessionAdapter,
     user::PgUserAdapter as UserAdapter,
-};
+}; */
 
 // Uncomment for sea orm
 
-/* use crate::db::adapters::postgres::seaorm::{
+use crate::db::adapters::postgres::seaorm::driver::SeaormDriver as Database;
+use crate::db::adapters::postgres::seaorm::{
     oauth::PgOAuthAdapter as OAuthAdapter, session::PgSessionAdapter as SessionAdapter,
     user::PgUserAdapter as UserAdapter,
-};*/
+};
 
 // Uncomment for Mongo
 
@@ -49,7 +49,7 @@ pub(super) mod auth_middleware {
     impl AuthenticationMiddleware {
         pub fn new(state: &AppState) -> Self {
             Self {
-                repo: AuthMwRepo::new(state.pg_diesel.clone(), SessionAdapter),
+                repo: AuthMwRepo::new(state.pg_sea.clone(), SessionAdapter),
                 cache: AuthMwCache::new(state.redis.clone(), BasicCache),
                 min_role: Role::User,
             }
@@ -78,7 +78,7 @@ pub(super) mod auth_service {
         fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
                 repository: AuthenticationRepositoryAccess::new(
-                    state.pg_diesel.clone(),
+                    state.pg_sea.clone(),
                     UserAdapter,
                     SessionAdapter,
                     OAuthAdapter,
@@ -111,7 +111,7 @@ pub(super) mod oauth_service {
         fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
                 repository: AuthenticationRepositoryAccess::new(
-                    state.pg_diesel.clone(),
+                    state.pg_sea.clone(),
                     UserAdapter,
                     SessionAdapter,
                     OAuthAdapter,
@@ -132,7 +132,7 @@ pub(super) mod user_service {
     impl Configure<AppState, ServiceConfig> for UserService {
         fn configure(state: &AppState, cfg: &mut ServiceConfig) {
             let service = Self {
-                repository: UsersRepository::new(state.pg_diesel.clone(), UserAdapter),
+                repository: UsersRepository::new(state.pg_sea.clone(), UserAdapter),
             };
             cfg.app_data(web::Data::new(service));
         }

@@ -5,7 +5,7 @@ pub mod integration_tests {
 
     use std::time::Duration;
 
-    use hextacy::{adapters::db::sql::seaorm::SeaormDriver, Driver};
+    use hextacy::Driver;
 
     use crate::{
         cache::adapters::RedisAdapter,
@@ -13,6 +13,7 @@ pub mod integration_tests {
         core::models::user::User,
         db::{
             adapters::{session::SessionAdapter, user::UserAdapter},
+            driver::SeaormDriver,
             entities::sessions::Model as SessionModel,
             entities::users::{ActiveModel as ActiveUserModel, Model as UserModel},
         },

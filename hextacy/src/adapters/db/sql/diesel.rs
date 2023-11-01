@@ -8,39 +8,25 @@ use diesel::{
 
 cfg_if!(
     if #[cfg(feature = "db-postgres-diesel")] {
-        type Connection = diesel::PgConnection;
+        pub type Connection = diesel::PgConnection;
     } else if #[cfg(feature = "db-mysql-diesel")] {
-        type Connection = diesel::MysqlConnection;
+        pub type Connection = diesel::MysqlConnection;
     } else if #[cfg(feature = "db-sqlite-diesel")] {
-        type Connection = diesel::SqliteConnection;
+        pub type Connection = diesel::SqliteConnection;
     } else {
         compile_error! {"At least one diesel driver must be selected"}
     }
 );
 
 pub type DieselConnection = PooledConnection<ConnectionManager<Connection>>;
-
-/// Thin wrapper around a diesel postgres connection pool.
-#[derive(Debug, Clone)]
-pub struct DieselDriver {
-    pool: Pool<ConnectionManager<Connection>>,
-}
-
-impl DieselDriver {
-    pub fn new(url: &str) -> Self {
-        let pool = Pool::builder()
-            .build(ConnectionManager::<Connection>::new(url))
-            .expect("Could not establish database connection");
-        Self { pool }
-    }
-}
+pub type DieselPool = Pool<ConnectionManager<Connection>>;
 
 #[async_trait]
-impl Driver for DieselDriver {
+impl Driver for DieselPool {
     type Connection = DieselConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        self.pool.get().map_err(DriverError::DieselConnection)
+        self.get().map_err(DriverError::DieselConnection)
     }
 }
 

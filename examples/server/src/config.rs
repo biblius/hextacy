@@ -1,18 +1,12 @@
 pub mod constants;
 pub mod cors;
 
+use crate::cache::driver::RedisDriver;
+use crate::db::adapters::mongo::driver::MongoDriver;
+use crate::db::adapters::postgres::{diesel::driver::DieselDriver, seaorm::driver::SeaormDriver};
+
 use self::constants::EMAIL_DIRECTORY;
-use hextacy::{
-    adapters::{
-        cache::redis::RedisDriver,
-        db::{
-            mongo::MongoDriver,
-            sql::{diesel::DieselDriver, seaorm::SeaormDriver},
-        },
-        email::SimpleTemplateMailer,
-    },
-    State,
-};
+use hextacy::{adapters::email::SimpleTemplateMailer, State};
 use std::sync::Arc;
 
 #[derive(Debug, Clone, State)]

@@ -1,51 +1,17 @@
 use crate::driver::{Driver, DriverError};
 use async_trait::async_trait;
-use deadpool_redis::redis::{
-    AsyncCommands, FromRedisValue, IntoConnectionInfo, RedisError, ToRedisArgs,
-};
-use deadpool_redis::{Config, Connection, Pool, Runtime};
+use deadpool_redis::redis::{AsyncCommands, FromRedisValue, RedisError, ToRedisArgs};
+use deadpool_redis::{Connection, Pool};
 use serde::{de::DeserializeOwned, Serialize};
-use std::fmt::Debug;
 
 pub type RedisConnection = Connection;
 
-/// Contains a redis deadpool instance.
-#[derive(Clone)]
-pub struct RedisDriver {
-    pool: Pool,
-}
-
-impl Debug for RedisDriver {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RedisDriver")
-            .field("pool", &"{ ... }")
-            .finish()
-    }
-}
-
-impl RedisDriver {
-    pub fn new(host: &str, port: u16, user: Option<&str>, password: Option<&str>, db: i64) -> Self {
-        let db_url = format!("redis://{host}:{port}");
-        let mut conn_info = db_url.clone().into_connection_info().unwrap();
-        conn_info.redis.password = password.map(|pw| pw.to_string());
-        conn_info.redis.username = user.map(|uname| uname.to_string());
-        conn_info.redis.db = db;
-        let pool = Config::from_connection_info(conn_info)
-            .builder()
-            .expect("Could not create redis pool builder")
-            .runtime(Runtime::Tokio1)
-            .build()
-            .expect("Could not create redis connection pool");
-        Self { pool }
-    }
-}
-
 #[async_trait]
-impl Driver for RedisDriver {
+impl Driver for Pool {
     type Connection = RedisConnection;
 
     async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        self.pool.get().await.map_err(DriverError::RedisConnection)
+        self.get().await.map_err(DriverError::RedisConnection)
     }
 }
 

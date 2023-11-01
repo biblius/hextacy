@@ -42,7 +42,7 @@ use crate::queue::{Consumer, Producer, QueueError};
 /// ```
 #[derive(Debug, Clone)]
 pub struct RedisMessageQueue {
-    client: Client,
+    pub client: Client,
 }
 
 impl RedisMessageQueue {

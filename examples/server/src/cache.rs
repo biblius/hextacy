@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod contracts;
+pub mod driver;
 
 use hextacy::exports::deadpool_redis::redis;
 use std::fmt::Display;

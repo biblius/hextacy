@@ -12,7 +12,7 @@ use crate::queue::{Consumer, Producer, QueueError};
 
 #[derive(Clone)]
 pub struct AmqpDriver {
-    conn: Arc<Connection>,
+    pub conn: Arc<Connection>,
 }
 
 impl Debug for AmqpDriver {

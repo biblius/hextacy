@@ -29,3 +29,4 @@ tracing = "0.1.37"
 validify = "1.0.12"
 # suitest = { path = "../../../suitest/suitest" }
 suitest = "0.1.2"
+deadpool-redis = "0.13.0"
