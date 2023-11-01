@@ -1,3 +1,4 @@
+use super::models::user::User;
 use crate::{
     cache::contracts::BasicCacheAccess,
     core::{
@@ -7,11 +8,10 @@ use crate::{
     error::Error,
     AppResult,
 };
-use hextacy::{component, exports::uuid::Uuid, queue::Producer, transaction};
+use hextacy::{component, queue::Producer, transaction};
 use serde::Serialize;
 use thiserror::Error;
-
-use super::models::user::User;
+use uuid::Uuid;
 
 #[derive(Debug, Serialize)]
 pub struct UserRegisteredEvent {

@@ -1,6 +1,6 @@
 use crate::{core::models::user::User, db::adapters::AdapterError};
 use async_trait::async_trait;
-use hextacy::exports::uuid::Uuid;
+use uuid::Uuid;
 
 #[async_trait]
 pub trait UserRepository<C> {

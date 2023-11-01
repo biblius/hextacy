@@ -11,7 +11,7 @@ use axum::middleware::Next;
 use axum::response::Response;
 use axum_extra::extract::CookieJar;
 use hextacy::component;
-use hextacy::exports::uuid::Uuid;
+use uuid::Uuid;
 
 #[component(
     use Repo as repo,

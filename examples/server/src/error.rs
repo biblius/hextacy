@@ -1,5 +1,6 @@
 use actix_web::{body::BoxBody, HttpResponse, HttpResponseBuilder as Response, ResponseError};
-use hextacy::{adapters::email::TemplateMailerError, exports::deadpool_redis::redis};
+use deadpool_redis::redis;
+use hextacy::adapters::email::TemplateMailerError;
 use reqwest::StatusCode;
 use serde::Serialize;
 use std::fmt::Debug;

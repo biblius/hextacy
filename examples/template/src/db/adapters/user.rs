@@ -4,9 +4,9 @@ use crate::core::repository::user::UserRepository;
 use crate::db::adapters::AdapterError;
 use crate::db::entities::users::Column;
 use async_trait::async_trait;
-use hextacy::exports::uuid::Uuid;
 use sea_orm::prelude::*;
 use sea_orm::ConnectionTrait;
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct UserAdapter;

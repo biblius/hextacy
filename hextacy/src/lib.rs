@@ -45,34 +45,6 @@ pub use hextacy_macros::RestResponse;
 /// Quality of life macros.
 pub use hextacy_macros::{component, contract, Constructor, State};
 
-/// Re-exported libraries for convenience and out of the box implementations.
-/// This will vary based on features flags.
-///
-/// See [adapters][crate::adapters] for concrete driver implementations.
-pub mod exports {
-    #[cfg(feature = "cache-redis")]
-    pub use deadpool_redis;
-    #[cfg(any(
-        feature = "db-postgres-diesel",
-        feature = "db-mysql-diesel",
-        feature = "db-sqlite-diesel"
-    ))]
-    pub use diesel;
-    #[cfg(feature = "email")]
-    pub use lettre;
-    #[cfg(feature = "db-mongo")]
-    pub use mongodb;
-    #[cfg(any(
-        feature = "db-postgres-seaorm",
-        feature = "db-mysql-seaorm",
-        feature = "db-sqlite-seaorm"
-    ))]
-    pub use sea_orm;
-
-    #[cfg(feature = "crypto")]
-    pub use {bcrypt, hmac, jsonwebtoken, rand, rsa, sha2, thotp, uuid};
-}
-
 /// A trait for hooking services up to application configurations. The usual application is simply
 /// instantiating a service and calling a framework specific function to hook it up to a service.
 pub trait Configure<State, Config> {

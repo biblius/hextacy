@@ -3,7 +3,7 @@ use crate::db::adapters::AdapterError;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
-use hextacy::exports::deadpool_redis::redis;
+use deadpool_redis::redis;
 use hextacy::queue::QueueError;
 use hextacy::DriverError;
 use serde::Serialize;
@@ -17,7 +17,7 @@ pub enum Error {
     Auth(#[from] AuthenticationError),
 
     #[error("UUID: {0}")]
-    Uuid(#[from] hextacy::exports::uuid::Error),
+    Uuid(#[from] uuid::Error),
 
     #[error("Crypto: {0}")]
     Crypto(#[from] hextacy::crypto::CryptoError),

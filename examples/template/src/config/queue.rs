@@ -62,7 +62,7 @@ pub struct RegisterUser {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GreetUser {
-    id: hextacy::exports::uuid::Uuid,
+    id: uuid::Uuid,
     greeting: String,
 }
 

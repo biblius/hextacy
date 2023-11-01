@@ -1,12 +1,9 @@
-use crate::error::Error;
-
 use super::contracts::BasicCacheAccess;
+use crate::error::Error;
 use async_trait::async_trait;
 use chrono::Utc;
-use hextacy::{
-    adapters::cache::redis::{RedisAdapterExt, RedisConnection},
-    exports::deadpool_redis::redis::AsyncCommands,
-};
+use deadpool_redis::redis::AsyncCommands;
+use hextacy::adapters::cache::redis::{RedisAdapterExt, RedisConnection};
 use serde::{de::DeserializeOwned, Serialize};
 
 #[derive(Debug, Clone)]

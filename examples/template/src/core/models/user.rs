@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use hextacy::exports::uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct User {

@@ -1,6 +1,6 @@
 use chrono::{NaiveDateTime, Utc};
-use hextacy::exports::uuid::Uuid;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// In seconds, 24 hours
 pub const SESSION_DURATION: i64 = 60 * 60 * 24;

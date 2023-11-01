@@ -52,7 +52,7 @@ pub trait Atomic: Sized {
 /// Assume a component which has a generic driver `D` that is able to create a connection.
 /// The driver's connection must be bound with [Atomic] in order to use it with this macro.
 ///
-/// ```
+/// ```ignore
 /// let conn = self.driver.connect().await?;
 /// transaction!(
 ///     conn: D => {
