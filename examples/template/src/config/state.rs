@@ -1,10 +1,8 @@
-use crate::cache::adapters::RedisAdapter as BasicCache;
-use crate::cache::driver::RedisDriver;
+use crate::cache::RedisDriver;
 use crate::core::auth::Authentication;
 use crate::db::adapters::session::SessionAdapter;
 use crate::db::adapters::user::UserAdapter;
 use crate::db::driver::SeaormDriver;
-use crate::{cache::adapters::RedisAdapter, controllers::http::middleware::auth::SessionGuard};
 use hextacy::adapters::queue::redis::RedisMessageQueue;
 use hextacy::adapters::queue::redis::RedisPublisher;
 use hextacy::State;
@@ -35,33 +33,27 @@ pub struct AppState {
 
 // Concretise services
 
-pub type AuthenticationService = Authentication<
-    SeaormDriver,
-    RedisDriver,
-    UserAdapter,
-    SessionAdapter,
-    BasicCache,
-    RedisPublisher,
->;
+pub type AuthenticationService = Authentication<UserAdapter, SessionAdapter, RedisPublisher>;
 
 impl AuthenticationService {
     pub async fn init(state: &AppState) -> AuthenticationService {
-        AuthenticationService::new(
-            state.repository.clone(),
-            state.cache.clone(),
-            UserAdapter,
-            SessionAdapter,
-            RedisAdapter,
-            state
+        AuthenticationService {
+            user_repo: UserAdapter {
+                driver: state.repository.clone(),
+            },
+            session_repo: SessionAdapter {
+                driver: state.repository.clone(),
+            },
+            producer: state
                 .redis_q
                 .publisher("my-channel")
                 .await
                 .expect("Could not create publisher"),
-        )
+        }
     }
 }
 
-pub type AuthenticationMiddleware =
+/* pub type AuthenticationMiddleware =
     SessionGuard<SeaormDriver, RedisDriver, SessionAdapter, RedisAdapter>;
 
 impl AuthenticationMiddleware {
@@ -74,3 +66,4 @@ impl AuthenticationMiddleware {
         )
     }
 }
+ */

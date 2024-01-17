@@ -1,5 +1,4 @@
-use crate::cache::contracts::BasicCacheAccess;
-use crate::config::state::AuthenticationMiddleware;
+// use crate::config::state::AuthenticationMiddleware;
 use crate::core::auth::AuthenticationError;
 use crate::core::models;
 use crate::core::repository::session::SessionRepository;
@@ -12,7 +11,7 @@ use axum::response::Response;
 use axum_extra::extract::CookieJar;
 use hextacy::component;
 use uuid::Uuid;
-
+/*
 #[component(
     use Repo as repo,
     use Cache as cache,
@@ -76,7 +75,7 @@ pub async fn session_check<B>(
 
     Ok(response)
 }
-
+ */
 /* pub(super) fn security_headers() -> DefaultHeaders {
     use hextacy::web::xhttp::security_headers::*;
     DefaultHeaders::new()

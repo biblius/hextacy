@@ -1,5 +1,4 @@
-use async_trait::async_trait;
-use hextacy::{Driver, DriverError};
+use hextacy::Driver;
 use sea_orm::DatabaseConnection;
 use sea_orm::{ConnectOptions, Database};
 
@@ -25,10 +24,10 @@ impl SeaormDriver {
     }
 }
 
-#[async_trait]
 impl Driver for SeaormDriver {
     type Connection = DatabaseConnection;
-    async fn connect(&self) -> Result<Self::Connection, DriverError> {
+    type Error = sea_orm::DbErr;
+    async fn connect(&self) -> Result<Self::Connection, Self::Error> {
         self.pool.connect().await
     }
 }

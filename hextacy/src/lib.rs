@@ -1,7 +1,7 @@
 /// Core traits for implementing on data sources.
 mod driver;
 
-pub use driver::{Atomic, Driver, DriverError};
+pub use driver::{Atomic, Driver};
 
 /// Provides out of the box implementations for the [Driver][driver::Driver] trait.
 /// Re-exports the underlying libraries used for the implementation.

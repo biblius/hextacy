@@ -8,19 +8,15 @@ use tracing::info;
 
 // A generic implementation for a handler. This should be passed in to the consumer's runtime
 // upon calling its `start` method.
-#[component(
-    use Driver as driver,
-    use Users
-)]
-pub struct HelloWorldHandler {}
+
+/* pub struct HelloWorldHandler {}
 
 /// The implementation that gets called in the consumer's runtime and handles the message.
-#[async_trait]
 impl<D, U> QueueHandler<HelloWorld> for HelloWorldHandler<D, U>
 where
     D: Driver + Send + Sync,
     D::Connection: Send,
-    U: UserRepository<D::Connection> + Send + Sync,
+    U: UserRepository + Send + Sync,
 {
     type Error = Error;
     async fn handle(&mut self, message: HelloWorld) -> Result<(), Self::Error> {
@@ -28,7 +24,7 @@ where
 
         match message {
             HelloWorld::Hello(GreetUser { id, greeting }) => {
-                let Some(user) = self.users.get_by_id(&mut conn, id).await? else {
+                let Some(user) = self.users.get_by_id(id).await? else {
                     // Normally we would handle this scenario by notifying whoever sent the greet or something
                     return Ok(());
                 };
@@ -38,13 +34,13 @@ where
                 ref username,
                 ref password,
             }) => {
-                let user = self.users.create(&mut conn, username, password).await?;
+                let user = self.users.create(username, password).await?;
                 info!("Successfully created user {user:?}");
             }
         }
         Ok(())
     }
-}
+} */
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]

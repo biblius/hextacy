@@ -1,5 +1,5 @@
-use async_trait::async_trait;
-use futures_util::StreamExt;
+use futures::StreamExt;
+// use futures_util::StreamExt;
 use lapin::{
     options::{BasicConsumeOptions, BasicPublishOptions, QueueDeclareOptions},
     types::FieldTable,
@@ -78,7 +78,6 @@ pub struct AmqpPublisher {
     channel: lapin::Channel,
 }
 
-#[async_trait]
 impl Producer for AmqpPublisher {
     async fn publish<M>(&self, message: M) -> Result<(), QueueError>
     where
@@ -98,7 +97,6 @@ impl Producer for AmqpPublisher {
     }
 }
 
-#[async_trait]
 impl<M> Consumer<M> for lapin::Consumer
 where
     M: DeserializeOwned + Send + Sync + 'static,

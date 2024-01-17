@@ -5,7 +5,6 @@ use axum::response::IntoResponse;
 use axum::Json;
 use deadpool_redis::redis;
 use hextacy::queue::QueueError;
-use hextacy::DriverError;
 use serde::Serialize;
 use serde_json::json;
 use thiserror::Error;
@@ -27,9 +26,6 @@ pub enum Error {
 
     #[error("Redis: {0}")]
     Redis(#[from] redis::RedisError),
-
-    #[error("Driver: {0}")]
-    Driver(#[from] DriverError),
 
     #[error("Validation: {0}")]
     Validation(#[from] ValidationErrors),

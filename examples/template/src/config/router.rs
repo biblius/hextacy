@@ -1,6 +1,6 @@
 use crate::{
-    config::state::{AppState, AuthenticationMiddleware, AuthenticationService},
-    controllers::http::middleware::auth::session_check,
+    config::state::{AppState, AuthenticationService},
+    // controllers::http::middleware::auth::session_check,
 };
 use axum::{
     middleware::{self},
@@ -9,11 +9,11 @@ use axum::{
 };
 
 pub async fn router(state: &AppState) -> Router {
-    let auth_middleware = AuthenticationMiddleware::init(state);
+    // let auth_middleware = AuthenticationMiddleware::init(state);
     let auth_service = AuthenticationService::init(state).await;
 
     let resource_router = resource_router();
-    let auth_router = auth_router(auth_service, auth_middleware).await;
+    let auth_router = auth_router(auth_service).await;
 
     let router = Router::new();
 
@@ -26,10 +26,7 @@ fn resource_router() -> Router {
     router.route("/favicon.ico", get(favicon::favicon))
 }
 
-async fn auth_router(
-    service: AuthenticationService,
-    auth_mw: AuthenticationMiddleware,
-) -> Router<()> {
+async fn auth_router(service: AuthenticationService) -> Router<()> {
     use crate::controllers::http::auth::*;
 
     let router = Router::new()
@@ -37,7 +34,7 @@ async fn auth_router(
         .route("/login", post(login))
         .route(
             "/logout",
-            post(logout).layer(middleware::from_fn_with_state(auth_mw, session_check)),
+            post(logout), /*.layer(middleware::from_fn_with_state(auth_mw, session_check)), */
         );
 
     Router::new().nest("/auth", router).with_state(service)

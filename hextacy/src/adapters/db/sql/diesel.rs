@@ -1,5 +1,4 @@
-use crate::driver::{Atomic, Driver, DriverError};
-use async_trait::async_trait;
+use crate::driver::{Atomic, Driver};
 use cfg_if::cfg_if;
 use diesel::{
     connection::TransactionManager,
@@ -21,30 +20,30 @@ cfg_if!(
 pub type DieselConnection = PooledConnection<ConnectionManager<Connection>>;
 pub type DieselPool = Pool<ConnectionManager<Connection>>;
 
-#[async_trait]
 impl Driver for DieselPool {
     type Connection = DieselConnection;
+    type Error = diesel::r2d2::PoolError;
 
-    async fn connect(&self) -> Result<Self::Connection, DriverError> {
-        self.get().map_err(DriverError::DieselConnection)
+    async fn connect(&self) -> Result<Self::Connection, Self::Error> {
+        self.get()
     }
 }
 
-#[async_trait]
 impl Atomic for DieselConnection {
     type TransactionResult = Self;
+    type Error = diesel::result::Error;
 
-    async fn start_transaction(mut self) -> Result<Self, DriverError> {
+    async fn start_transaction(mut self) -> Result<Self, Self::Error> {
         diesel::connection::AnsiTransactionManager::begin_transaction(&mut *self)?;
         Ok(self)
     }
 
-    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
+    async fn commit_transaction(mut tx: Self::TransactionResult) -> Result<(), Self::Error> {
         diesel::connection::AnsiTransactionManager::commit_transaction(&mut *tx)?;
         Ok(())
     }
 
-    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), DriverError> {
+    async fn abort_transaction(mut tx: Self::TransactionResult) -> Result<(), Self::Error> {
         diesel::connection::AnsiTransactionManager::rollback_transaction(&mut *tx)?;
         Ok(())
     }

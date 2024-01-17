@@ -5,67 +5,60 @@ use crate::core::models::session::Session;
 use crate::core::models::user::User;
 use crate::core::repository::session::SessionRepository;
 use crate::db::adapters::AdapterError;
-use async_trait::async_trait;
+use crate::db::driver::SeaormDriver;
 use chrono::Utc;
+use hextacy::Atomic;
+use hextacy::Driver;
 use sea_orm::prelude::*;
-use sea_orm::ConnectionTrait;
 use sea_orm::Set;
 
 #[derive(Debug, Clone)]
-pub struct SessionAdapter;
+pub struct SessionAdapter {
+    pub driver: SeaormDriver,
+}
 
-#[async_trait]
-impl<C> SessionRepository<C> for SessionAdapter
-where
-    C: ConnectionTrait + Send + Sync,
-{
-    async fn get_valid_by_id(
-        &self,
-        conn: &mut C,
-        id: Uuid,
-        csrf: Uuid,
-    ) -> Result<Option<Session>, AdapterError> {
+impl SessionRepository for SessionAdapter {
+    async fn get_valid_by_id(&self, id: Uuid, csrf: Uuid) -> Result<Option<Session>, AdapterError> {
+        let conn = self.driver.connect().await?;
         SessionEntity::find()
             .filter(Column::Id.eq(id))
             .filter(Column::Csrf.eq(csrf))
             .filter(Column::ExpiresAt.gt(Utc::now()))
-            .one(conn)
+            .one(&conn)
             .await
             .map(|s| s.map(Session::from))
             .map_err(AdapterError::SeaORM)
     }
 
-    async fn create(
-        &self,
-        conn: &mut C,
-        user: &User,
-        expires: bool,
-    ) -> Result<Session, AdapterError> {
+    async fn create(&self, user: &User, expires: bool) -> Result<Session, AdapterError> {
+        let conn = self.driver.connect().await?;
         let session: SessionModel = Session::new(user.id, expires).into();
         SessionEntity::insert(session)
-            .exec_with_returning(conn)
+            .exec_with_returning(&conn)
             .await
             .map(Session::from)
             .map_err(AdapterError::SeaORM)
     }
 
-    async fn expire(&self, conn: &mut C, id: Uuid) -> Result<Session, AdapterError> {
+    async fn expire(&self, id: Uuid) -> Result<Session, AdapterError> {
+        let conn = self.driver.connect().await?;
         SessionModel {
             id: Set(id),
             expires_at: Set(Utc::now().into()),
             ..Default::default()
         }
-        .update(conn)
+        .update(&conn)
         .await
         .map(Session::from)
         .map_err(AdapterError::SeaORM)
     }
 
-    async fn purge(&self, conn: &mut C, user_id: Uuid) -> Result<u64, AdapterError> {
+    async fn purge(&self, user_id: Uuid) -> Result<u64, AdapterError> {
+        let conn = self.driver.connect().await?;
         SessionEntity::update_many()
             .col_expr(Column::ExpiresAt, Expr::value(Utc::now()))
             .filter(Column::UserId.eq(user_id))
-            .exec(conn)
+            .exec(&conn)
             .await
             .map(|res| res.rows_affected)
             .map_err(AdapterError::SeaORM)

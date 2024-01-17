@@ -1,21 +1,31 @@
-use crate::{core::models::user::User, db::adapters::AdapterError};
-use async_trait::async_trait;
+use crate::{
+    core::models::{session::Session, user::User},
+    db::adapters::AdapterError,
+};
+use std::future::Future;
 use uuid::Uuid;
 
-#[async_trait]
-pub trait UserRepository<C> {
-    async fn get_by_id(&self, conn: &mut C, id: Uuid) -> Result<Option<User>, AdapterError>;
-
-    async fn get_by_username(
+pub trait UserRepository {
+    fn get_by_id(
         &self,
-        conn: &mut C,
+        id: Uuid,
+    ) -> impl Future<Output = Result<Option<User>, AdapterError>> + Send;
+
+    fn get_by_username(
+        &self,
         username: &str,
-    ) -> Result<Option<User>, AdapterError>;
+    ) -> impl Future<Output = Result<Option<User>, AdapterError>> + Send;
 
-    async fn create(
+    fn create(
         &self,
-        conn: &mut C,
         username: &str,
         password: &str,
-    ) -> Result<User, AdapterError>;
+    ) -> impl Future<Output = Result<User, AdapterError>> + Send;
+
+    async fn insert_with_session(
+        &self,
+        username: &str,
+        password: &str,
+        expires: bool,
+    ) -> Result<(User, Session), AdapterError>;
 }

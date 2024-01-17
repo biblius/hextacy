@@ -8,7 +8,6 @@ pub mod integration_tests {
     use hextacy::Driver;
 
     use crate::{
-        cache::adapters::RedisAdapter,
         config::state::{AppState, AuthenticationService},
         core::models::user::User,
         db::{
@@ -25,14 +24,19 @@ pub mod integration_tests {
         let app = AppState::load().await.unwrap();
         (
             app.repository.clone(),
-            AuthenticationService::new(
-                app.repository.clone(),
-                app.cache,
-                UserAdapter,
-                SessionAdapter,
-                RedisAdapter,
-                app.redis_q.publisher("my-queue").await.unwrap(),
-            ),
+            AuthenticationService {
+                user_repo: UserAdapter {
+                    driver: app.repository.clone(),
+                },
+                session_repo: SessionAdapter {
+                    driver: app.repository.clone(),
+                },
+                producer: app
+                    .redis_q
+                    .publisher("my-channel")
+                    .await
+                    .expect("Could not create publisher"),
+            },
         )
     }
 

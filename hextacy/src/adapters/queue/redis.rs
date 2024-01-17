@@ -1,8 +1,8 @@
-use async_trait::async_trait;
 use deadpool_redis::redis::{
     aio::Connection, AsyncCommands, Client, IntoConnectionInfo, Msg, RedisError,
 };
-use futures_util::{Stream, StreamExt};
+use futures::{Stream, StreamExt};
+// use futures_util::{Stream, StreamExt};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, pin::Pin, sync::Arc};
 
@@ -88,7 +88,6 @@ impl Debug for RedisPublisher {
     }
 }
 
-#[async_trait]
 impl Producer for RedisPublisher {
     async fn publish<M>(&self, message: M) -> Result<(), QueueError>
     where
@@ -108,7 +107,6 @@ pub struct RedisConsumer {
     stream: Pin<Box<dyn Stream<Item = Msg> + Send>>,
 }
 
-#[async_trait]
 impl<M> Consumer<M> for RedisConsumer
 where
     M: DeserializeOwned + Send + 'static,
